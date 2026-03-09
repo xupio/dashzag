@@ -1,6 +1,9 @@
 <?php
 
+use App\Models\User;
 use App\Http\Controllers\ProfileController;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -8,7 +11,137 @@ Route::get('/', function () {
 });
 
 Route::get('/dashboard', function () {
-    return view('dashboard');
+    $startOfThisMonth = Carbon::now()->startOfMonth();
+    $startOfLastMonth = Carbon::now()->subMonthNoOverflow()->startOfMonth();
+    $endOfLastMonth = Carbon::now()->subMonthNoOverflow()->endOfMonth();
+
+    $newCustomersCount = User::where('created_at', '>=', $startOfThisMonth)->count();
+    $lastMonthCustomersCount = User::whereBetween('created_at', [$startOfLastMonth, $endOfLastMonth])->count();
+
+    $newCustomersGrowth = $lastMonthCustomersCount > 0
+        ? (($newCustomersCount - $lastMonthCustomersCount) / $lastMonthCustomersCount) * 100
+        : ($newCustomersCount > 0 ? 100 : 0);
+
+    $customersTrendMonths = collect(range(5, 0))->map(function ($offset) {
+        return Carbon::now()->subMonthsNoOverflow($offset);
+    });
+
+    $customersChartLabels = $customersTrendMonths->map(function ($month) {
+        return $month->format('M');
+    })->values();
+
+    $customersChartData = $customersTrendMonths->map(function ($month) {
+        return User::whereBetween('created_at', [
+            $month->copy()->startOfMonth(),
+            $month->copy()->endOfMonth(),
+        ])->count();
+    })->values();
+
+    $btcChartLabels = collect();
+    $btcChartData = collect();
+    $btcLatestPrice = null;
+    $btcMonthlyChange = 0.0;
+
+    $btcResponse = Http::timeout(10)->get('https://api.coingecko.com/api/v3/coins/bitcoin/market_chart', [
+        'vs_currency' => 'usd',
+        'days' => 90,
+        'interval' => 'daily',
+    ]);
+
+    if ($btcResponse->successful()) {
+        $prices = collect(data_get($btcResponse->json(), 'prices', []));
+
+        $btcLastMonth = Carbon::now()->subMonthNoOverflow();
+        $btcStart = $btcLastMonth->copy()->startOfMonth();
+        $btcEnd = $btcLastMonth->copy()->endOfMonth();
+
+        $btcLastMonthPrices = $prices->map(function ($point) {
+            return [
+                'date' => Carbon::createFromTimestampMs((int) $point[0]),
+                'price' => (float) $point[1],
+            ];
+        })->filter(function ($point) use ($btcStart, $btcEnd) {
+            return $point['date']->betweenIncluded($btcStart, $btcEnd);
+        })->values();
+
+        $btcChartLabels = $btcLastMonthPrices->map(function ($point) {
+            return $point['date']->format('M d');
+        })->values();
+
+        $btcChartData = $btcLastMonthPrices->map(function ($point) {
+            return round($point['price'], 2);
+        })->values();
+
+        if ($btcLastMonthPrices->isNotEmpty()) {
+            $btcLatestPrice = $btcLastMonthPrices->last()['price'];
+            $btcFirstPrice = $btcLastMonthPrices->first()['price'];
+
+            $btcMonthlyChange = $btcFirstPrice > 0
+                ? (($btcLatestPrice - $btcFirstPrice) / $btcFirstPrice) * 100
+                : 0.0;
+        }
+    }
+
+    $difficultyChartLabels = collect();
+    $difficultyChartData = collect();
+    $difficultyLatestT = null;
+    $difficultyMonthlyChange = 0.0;
+
+    $difficultyResponse = Http::timeout(10)->get('https://api.blockchain.info/charts/difficulty', [
+        'timespan' => '90days',
+        'format' => 'json',
+        'sampled' => 'true',
+    ]);
+
+    if ($difficultyResponse->successful()) {
+        $difficultyValues = collect(data_get($difficultyResponse->json(), 'values', []));
+
+        $diffLastMonth = Carbon::now()->subMonthNoOverflow();
+        $diffStart = $diffLastMonth->copy()->startOfMonth();
+        $diffEnd = $diffLastMonth->copy()->endOfMonth();
+
+        $difficultyLastMonth = $difficultyValues->map(function ($point) {
+            return [
+                'date' => Carbon::createFromTimestamp((int) data_get($point, 'x')),
+                'difficulty' => (float) data_get($point, 'y'),
+            ];
+        })->filter(function ($point) use ($diffStart, $diffEnd) {
+            return $point['date']->betweenIncluded($diffStart, $diffEnd);
+        })->values();
+
+        $difficultyChartLabels = $difficultyLastMonth->map(function ($point) {
+            return $point['date']->format('M d');
+        })->values();
+
+        $difficultyChartData = $difficultyLastMonth->map(function ($point) {
+            return round($point['difficulty'] / 1_000_000_000_000, 2);
+        })->values();
+
+        if ($difficultyLastMonth->isNotEmpty()) {
+            $difficultyLatestRaw = $difficultyLastMonth->last()['difficulty'];
+            $difficultyFirstRaw = $difficultyLastMonth->first()['difficulty'];
+
+            $difficultyLatestT = $difficultyLatestRaw / 1_000_000_000_000;
+            $difficultyMonthlyChange = $difficultyFirstRaw > 0
+                ? (($difficultyLatestRaw - $difficultyFirstRaw) / $difficultyFirstRaw) * 100
+                : 0.0;
+        }
+    }
+
+    return view('dashboard', [
+        'newCustomersCount' => $newCustomersCount,
+        'newCustomersGrowth' => $newCustomersGrowth,
+        'customersChartLabels' => $customersChartLabels,
+        'customersChartData' => $customersChartData,
+        'btcChartLabels' => $btcChartLabels,
+        'btcChartData' => $btcChartData,
+        'btcLatestPrice' => $btcLatestPrice,
+        'btcMonthlyChange' => $btcMonthlyChange,
+        'difficultyChartLabels' => $difficultyChartLabels,
+        'difficultyChartData' => $difficultyChartData,
+        'difficultyLatestT' => $difficultyLatestT,
+        'difficultyMonthlyChange' => $difficultyMonthlyChange,
+    ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -105,4 +238,3 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 require __DIR__.'/auth.php';
-

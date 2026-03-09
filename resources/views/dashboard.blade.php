@@ -48,11 +48,11 @@
             </div>
             <div class="row">
               <div class="col-6 col-md-12 col-xl-5">
-                <h3 class="mb-2">3,897</h3>
+                <h3 class="mb-2">{{ number_format($newCustomersCount) }}</h3>
                 <div class="d-flex align-items-baseline">
-                  <p class="text-success">
-                    <span>+3.3%</span>
-                    <i data-lucide="arrow-up" class="icon-sm mb-1"></i>
+                  <p class="{{ $newCustomersGrowth >= 0 ? 'text-success' : 'text-danger' }}">
+                    <span>{{ $newCustomersGrowth >= 0 ? '+' : '' }}{{ number_format($newCustomersGrowth, 1) }}%</span>
+                    <i data-lucide="{{ $newCustomersGrowth >= 0 ? 'arrow-up' : 'arrow-down' }}" class="icon-sm mb-1"></i>
                   </p>
                 </div>
               </div>
@@ -67,7 +67,7 @@
         <div class="card">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-baseline">
-              <h6 class="card-title mb-0">New Orders</h6>
+              <h6 class="card-title mb-0">Bitcoin Price (Last Month)</h6>
               <div class="dropdown mb-2">
                 <a type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                   <i class="icon-lg text-secondary pb-3px" data-lucide="more-horizontal"></i>
@@ -83,11 +83,17 @@
             </div>
             <div class="row">
               <div class="col-6 col-md-12 col-xl-5">
-                <h3 class="mb-2">35,084</h3>
+                <h3 class="mb-2">
+                  @if($btcLatestPrice)
+                    ${{ number_format($btcLatestPrice, 2) }}
+                  @else
+                    N/A
+                  @endif
+                </h3>
                 <div class="d-flex align-items-baseline">
-                  <p class="text-danger">
-                    <span>-2.8%</span>
-                    <i data-lucide="arrow-down" class="icon-sm mb-1"></i>
+                  <p class="{{ $btcMonthlyChange >= 0 ? 'text-success' : 'text-danger' }}">
+                    <span>{{ $btcMonthlyChange >= 0 ? '+' : '' }}{{ number_format($btcMonthlyChange, 2) }}%</span>
+                    <i data-lucide="{{ $btcMonthlyChange >= 0 ? 'arrow-up' : 'arrow-down' }}" class="icon-sm mb-1"></i>
                   </p>
                 </div>
               </div>
@@ -102,7 +108,7 @@
         <div class="card">
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-baseline">
-              <h6 class="card-title mb-0">Growth</h6>
+              <h6 class="card-title mb-0">BTC Difficulty</h6>
               <div class="dropdown mb-2">
                 <a type="button" id="dropdownMenuButton2" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                   <i class="icon-lg text-secondary pb-3px" data-lucide="more-horizontal"></i>
@@ -118,11 +124,17 @@
             </div>
             <div class="row">
               <div class="col-6 col-md-12 col-xl-5">
-                <h3 class="mb-2">89.87%</h3>
+                <h3 class="mb-2">
+                  @if($difficultyLatestT)
+                    {{ number_format($difficultyLatestT, 2) }} T
+                  @else
+                    N/A
+                  @endif
+                </h3>
                 <div class="d-flex align-items-baseline">
-                  <p class="text-success">
-                    <span>+2.8%</span>
-                    <i data-lucide="arrow-up" class="icon-sm mb-1"></i>
+                  <p class="{{ $difficultyMonthlyChange >= 0 ? 'text-success' : 'text-danger' }}">
+                    <span>{{ $difficultyMonthlyChange >= 0 ? '+' : '' }}{{ number_format($difficultyMonthlyChange, 2) }}%</span>
+                    <i data-lucide="{{ $difficultyMonthlyChange >= 0 ? 'arrow-up' : 'arrow-down' }}" class="icon-sm mb-1"></i>
                   </p>
                 </div>
               </div>
@@ -428,4 +440,53 @@
 
 @push('custom-scripts')
   <script src="{{ asset('build/assets/dashboard-BZTY38fO.js') }}"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (!window.ApexCharts) {
+        return;
+      }
+
+      function renderSparkline(selector, seriesName, labels, data, color, valueSuffix) {
+        const element = document.querySelector(selector);
+        if (!element) {
+          return;
+        }
+
+        element.innerHTML = '';
+
+        const options = {
+          chart: {
+            type: 'line',
+            height: 70,
+            sparkline: { enabled: true },
+            toolbar: { show: false }
+          },
+          series: [{ name: seriesName, data: data }],
+          xaxis: { categories: labels },
+          stroke: { curve: 'smooth', width: 2 },
+          colors: [color],
+          tooltip: {
+            y: {
+              formatter: function (value) {
+                return valueSuffix ? (value + ' ' + valueSuffix) : value;
+              }
+            }
+          }
+        };
+
+        const chart = new ApexCharts(element, options);
+        chart.render();
+      }
+
+      renderSparkline('#customersChart', 'New Customers', @json($customersChartLabels), @json($customersChartData), '#6571ff', 'users');
+      renderSparkline('#ordersChart', 'BTC USD', @json($btcChartLabels), @json($btcChartData), '#f7931a', 'USD');
+    });
+  </script>
 @endpush
+
+
+
+
+
+
+
