@@ -6,6 +6,7 @@ use App\Notifications\InvitationAwareVerifyEmail;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -17,6 +18,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'name',
         'email',
         'password',
+        'account_type',
     ];
 
     protected $hidden = [
@@ -27,6 +29,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function friendInvitations(): HasMany
     {
         return $this->hasMany(FriendInvitation::class)->latest();
+    }
+
+    public function shareholder(): HasOne
+    {
+        return $this->hasOne(Shareholder::class);
     }
 
     public function sendEmailVerificationNotification(): void

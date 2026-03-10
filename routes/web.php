@@ -2,6 +2,7 @@
 
 use App\Mail\FriendInvitationMail;
 use App\Models\FriendInvitation;
+use App\Models\Shareholder;
 use App\Models\User;
 use App\Http\Controllers\ProfileController;
 use Carbon\Carbon;
@@ -284,6 +285,45 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::view('mdi-icons', 'pages.icons.mdi-icons');
     });
 
+    Route::get('/general/sell-products', function () {
+        return view('pages.general.sell-products', [
+            'user' => request()->user(),
+            'shareholder' => request()->user()->shareholder,
+        ]);
+    })->name('general.sell-products');
+
+    Route::post('/general/sell-products/subscribe', function (\Illuminate\Http\Request $request) {
+        $packages = [
+            'basic' => ['name' => 'Basic', 'price' => 40.00, 'billing_cycle' => 'monthly', 'units_limit' => 25],
+            'business' => ['name' => 'Business', 'price' => 70.00, 'billing_cycle' => 'monthly', 'units_limit' => 75],
+            'professional' => ['name' => 'Professional', 'price' => 250.00, 'billing_cycle' => 'monthly', 'units_limit' => 300],
+        ];
+
+        $validated = $request->validate([
+            'package' => ['required', 'in:basic,business,professional'],
+        ]);
+
+        $selectedPackage = $packages[$validated['package']];
+
+        Shareholder::updateOrCreate(
+            ['user_id' => $request->user()->id],
+            [
+                'package_name' => $selectedPackage['name'],
+                'price' => $selectedPackage['price'],
+                'billing_cycle' => $selectedPackage['billing_cycle'],
+                'units_limit' => $selectedPackage['units_limit'],
+                'status' => 'active',
+                'subscribed_at' => now(),
+            ],
+        );
+
+        $request->user()->forceFill(['account_type' => 'shareholder'])->save();
+
+        return redirect()
+            ->route('general.sell-products')
+            ->with('subscription_success', 'You are now subscribed to the '.$selectedPackage['name'].' package and marked as a shareholder.');
+    })->name('general.sell-products.subscribe');
+
     Route::group(['prefix' => 'general'], function () {
         Route::view('blank-page', 'pages.general.blank-page');
         Route::view('faq', 'pages.general.faq');
@@ -301,6 +341,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
+
 
 
 

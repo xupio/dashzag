@@ -286,6 +286,9 @@
               <a href="{{ url('/general/pricing') }}" class="nav-link {{ active_class(['general/pricing']) }}">Pricing</a>
             </li>
             <li class="nav-item">
+              <a href="{{ url('/general/sell-products') }}" class="nav-link {{ active_class(['general/sell-products']) }}">Sell Products</a>
+            </li>
+            <li class="nav-item">
               <a href="{{ url('/general/timeline') }}" class="nav-link {{ active_class(['general/timeline']) }}">Timeline</a>
             </li>
           </ul>
@@ -350,6 +353,7 @@
     </ul>
   </div>
 </nav>
+
 
 
 
