@@ -1,14 +1,28 @@
 <?php
 
+use App\Mail\FriendInvitationMail;
+use App\Models\FriendInvitation;
 use App\Models\User;
 use App\Http\Controllers\ProfileController;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::get('/friend-invitations/{friendInvitation}/verify', function (FriendInvitation $friendInvitation) {
+    if (! $friendInvitation->verified_at) {
+        $friendInvitation->forceFill(['verified_at' => now()])->save();
+    }
+
+    return view('friend-invitations.verified', [
+        'friendInvitation' => $friendInvitation,
+    ]);
+})->middleware(['signed', 'throttle:6,1'])->name('friend-invitations.verify');
 
 Route::get('/dashboard', function () {
     $startOfThisMonth = Carbon::now()->startOfMonth();
@@ -145,6 +159,55 @@ Route::get('/dashboard', function () {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/dashboard/profile', function () {
+        return view('pages.general.profile', [
+            'user' => request()->user(),
+        ]);
+    })->name('dashboard.profile');
+
+    Route::get('/dashboard/friends', function () {
+        $user = request()->user();
+
+        return view('pages.general.friends', [
+            'user' => $user,
+            'friendInvitations' => $user->friendInvitations,
+        ]);
+    })->name('dashboard.friends');
+
+    Route::post('/dashboard/friends/invite', function (\Illuminate\Http\Request $request) {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'email' => ['required', 'string', 'lowercase', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'country' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        $friendInvitation = FriendInvitation::updateOrCreate(
+            [
+                'user_id' => $request->user()->id,
+                'email' => $validated['email'],
+            ],
+            [
+                'name' => $validated['name'],
+                'phone' => $validated['phone'] ?? null,
+                'country' => $validated['country'] ?? null,
+            ],
+        );
+
+        $verificationUrl = URL::temporarySignedRoute(
+            'friend-invitations.verify',
+            now()->addDays(7),
+            ['friendInvitation' => $friendInvitation->id],
+        );
+
+        Mail::to($friendInvitation->email)->send(
+            new FriendInvitationMail($friendInvitation, $request->user(), $verificationUrl)
+        );
+
+        return redirect()
+            ->route('dashboard.friends')
+            ->with('invite_success', $validated['name'].' has been invited successfully and the email has been sent.');
+    })->name('dashboard.friends.invite');
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -225,7 +288,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::view('blank-page', 'pages.general.blank-page');
         Route::view('faq', 'pages.general.faq');
         Route::view('invoice', 'pages.general.invoice');
-        Route::view('profile', 'pages.general.profile');
+        Route::redirect('profile', '/dashboard/profile');
         Route::view('pricing', 'pages.general.pricing');
         Route::view('timeline', 'pages.general.timeline');
     });
@@ -238,3 +301,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
+
+
+
+
+
+
+
+
+

@@ -61,7 +61,7 @@
               <a href="{{ url('/email/inbox') }}" class="dropdown-item d-flex flex-column align-items-center justify-content-center w-70px h-70px"><i data-lucide="mail" class="icon-lg mb-1"></i><p class="fs-12px">Email</p></a>
             </div>
             <div class="col-3 text-center">
-              <a href="{{ url('/general/profile') }}" class="dropdown-item d-flex flex-column align-items-center justify-content-center w-70px h-70px"><i data-lucide="instagram" class="icon-lg mb-1"></i><p class="fs-12px">Profile</p></a>
+              <a href="{{ route('dashboard.profile') }}" class="dropdown-item d-flex flex-column align-items-center justify-content-center w-70px h-70px"><i data-lucide="instagram" class="icon-lg mb-1"></i><p class="fs-12px">Profile</p></a>
             </div>
           </div>
           <div class="px-3 py-2 d-flex align-items-center justify-content-center border-top">
@@ -225,13 +225,13 @@
           </div>
           <ul class="list-unstyled p-1">
             <li>
-              <a href="{{ url('/general/profile') }}" class="dropdown-item py-2 text-body ms-0">
+              <a href="{{ route('dashboard.profile') }}" class="dropdown-item py-2 text-body ms-0">
                 <i class="me-2 icon-md" data-lucide="user"></i>
                 <span>Profile</span>
               </a>
             </li>
             <li>
-              <a href="javascript:;" class="dropdown-item py-2 text-body ms-0">
+              <a href="{{ route('profile.edit') }}" class="dropdown-item py-2 text-body ms-0">
                 <i class="me-2 icon-md" data-lucide="edit"></i>
                 <span>Edit Profile</span>
               </a>
@@ -262,4 +262,6 @@
 
   </div>
 </nav>
+
+
 

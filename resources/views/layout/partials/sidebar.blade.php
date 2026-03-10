@@ -12,11 +12,25 @@
   <div class="sidebar-body">
     <ul class="nav" id="sidebarNav">
       <li class="nav-item nav-category">Main</li>
-      <li class="nav-item {{ active_class(['dashboard']) }}">
-        <a href="{{ route('dashboard') }}" class="nav-link">
+      <li class="nav-item {{ active_class(['dashboard', 'dashboard/profile', 'dashboard/friends']) }}">
+        <a class="nav-link" data-bs-toggle="collapse" href="#dashboardMenu" role="button" aria-expanded="{{ is_active_route(['dashboard', 'dashboard/profile', 'dashboard/friends']) }}" aria-controls="dashboardMenu">
           <i class="link-icon" data-lucide="home"></i>
           <span class="link-title">Dashboard</span>
+          <i class="link-arrow" data-lucide="chevron-down"></i>
         </a>
+        <div class="collapse {{ show_class(['dashboard', 'dashboard/profile', 'dashboard/friends']) }}" data-bs-parent="#sidebarNav" id="dashboardMenu">
+          <ul class="nav sub-menu">
+            <li class="nav-item">
+              <a href="{{ route('dashboard') }}" class="nav-link {{ active_class(['dashboard']) }}">Overview</a>
+            </li>
+            <li class="nav-item">
+              <a href="{{ route('dashboard.profile') }}" class="nav-link {{ active_class(['dashboard/profile']) }}">Profile</a>
+            </li>
+            <li class="nav-item">
+              <a href="{{ route('dashboard.friends') }}" class="nav-link {{ active_class(['dashboard/friends']) }}">Friends</a>
+            </li>
+          </ul>
+        </div>
       </li>
       <li class="nav-item nav-category">web apps</li>
       <li class="nav-item {{ active_class(['email/*']) }}">
@@ -266,7 +280,7 @@
               <a href="{{ url('/general/invoice') }}" class="nav-link {{ active_class(['general/invoice']) }}">Invoice</a>
             </li>
             <li class="nav-item">
-              <a href="{{ url('/general/profile') }}" class="nav-link {{ active_class(['general/profile']) }}">Profile</a>
+              <a href="{{ route('dashboard.profile') }}" class="nav-link {{ active_class(['general/profile']) }}">Profile</a>
             </li>
             <li class="nav-item">
               <a href="{{ url('/general/pricing') }}" class="nav-link {{ active_class(['general/pricing']) }}">Pricing</a>
@@ -298,7 +312,7 @@
             @endguest
             @auth
               <li class="nav-item">
-                <a href="{{ route('profile.edit') }}" class="nav-link {{ active_class(['profile']) }}">My Profile</a>
+                <a href="{{ route('dashboard.profile') }}" class="nav-link {{ active_class(['profile']) }}">My Profile</a>
               </li>
               <li class="nav-item">
                 <form method="POST" action="{{ route('logout') }}">
@@ -336,5 +350,7 @@
     </ul>
   </div>
 </nav>
+
+
 
 
