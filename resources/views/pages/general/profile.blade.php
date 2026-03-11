@@ -189,6 +189,11 @@
           <a href="{{ route('dashboard.profile') }}" class="btn btn-light text-start"><i data-lucide="user" class="icon-sm me-2"></i> Profile home</a>
           <a href="{{ route('profile.edit') }}" class="btn btn-light text-start"><i data-lucide="edit-3" class="icon-sm me-2"></i> Edit profile</a>
           <a href="{{ route('dashboard') }}" class="btn btn-light text-start"><i data-lucide="home" class="icon-sm me-2"></i> Dashboard</a>
+          <a href="{{ route('dashboard.wallet') }}" class="btn btn-light text-start"><i data-lucide="wallet" class="icon-sm me-2"></i> Wallet</a>
+          @if ($user->isAdmin())
+            <a href="{{ route('dashboard.operations') }}" class="btn btn-light text-start"><i data-lucide="shield-check" class="icon-sm me-2"></i> Operations</a>
+            <a href="{{ route('dashboard.miner') }}" class="btn btn-light text-start"><i data-lucide="cpu" class="icon-sm me-2"></i> Miner</a>
+          @endif
           <a href="{{ route('dashboard.friends') }}" class="btn btn-light text-start"><i data-lucide="users" class="icon-sm me-2"></i> Friends</a>
           <a href="{{ url('/email/inbox') }}" class="btn btn-light text-start"><i data-lucide="inbox" class="icon-sm me-2"></i> Inbox</a>
           <a href="{{ url('/apps/chat') }}" class="btn btn-light text-start"><i data-lucide="message-square" class="icon-sm me-2"></i> Chat</a>
@@ -199,4 +204,5 @@
   </div>
 </div>
 @endsection
+
 

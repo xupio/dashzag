@@ -5,432 +5,143 @@
 @endpush
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center flex-wrap grid-margin">
+<div class="d-flex justify-content-between align-items-center flex-wrap grid-margin gap-3">
   <div>
-    <h4 class="mb-3 mb-md-0">Welcome to Dashboard</h4>
+    <h4 class="mb-1">{{ $miner->name }} Mining Dashboard</h4>
+    <p class="text-secondary mb-0">Track live production, share availability, and your personal mining position.</p>
   </div>
-  <div class="d-flex align-items-center flex-wrap text-nowrap">
-    <div class="input-group flatpickr w-200px me-2 mb-2 mb-md-0" id="dashboardDate">
-      <span class="input-group-text input-group-addon bg-transparent border-primary" data-toggle><i data-lucide="calendar" class="text-primary"></i></span>
-      <input type="text" class="form-control bg-transparent border-primary" placeholder="Select date" data-input>
-    </div>
-    <button type="button" class="btn btn-outline-primary btn-icon-text me-2 mb-2 mb-md-0">
-      <i class="btn-icon-prepend" data-lucide="printer"></i>
-      Print
-    </button>
-    <button type="button" class="btn btn-primary btn-icon-text mb-2 mb-md-0">
-      <i class="btn-icon-prepend" data-lucide="download-cloud"></i>
-      Download Report
-    </button>
+  <div class="text-md-end">
+    <div class="fw-semibold">Current level: <span class="text-primary">{{ $level->name }}</span></div>
+    <div class="text-secondary small">Bonus rate: {{ number_format((float) $level->bonus_rate * 100, 2) }}%</div>
   </div>
 </div>
 
 <div class="row">
-  <div class="col-12 col-xl-12 stretch-card">
-    <div class="row flex-grow-1">
-      <div class="col-md-4 grid-margin stretch-card">
-        <div class="card">
-          <div class="card-body">
-            <div class="d-flex justify-content-between align-items-baseline">
-              <h6 class="card-title mb-0">New Customers</h6>
-              <div class="dropdown mb-2">
-                <a type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                  <i class="icon-lg text-secondary pb-3px" data-lucide="more-horizontal"></i>
-                </a>
-                <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                  <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="eye" class="icon-sm me-2"></i> <span class="">View</span></a>
-                  <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="edit-2" class="icon-sm me-2"></i> <span class="">Edit</span></a>
-                  <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="trash" class="icon-sm me-2"></i> <span class="">Delete</span></a>
-                  <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="printer" class="icon-sm me-2"></i> <span class="">Print</span></a>
-                  <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="download" class="icon-sm me-2"></i> <span class="">Download</span></a>
-                </div>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-6 col-md-12 col-xl-5">
-                <h3 class="mb-2">{{ number_format($newCustomersCount) }}</h3>
-                <div class="d-flex align-items-baseline">
-                  <p class="{{ $newCustomersGrowth >= 0 ? 'text-success' : 'text-danger' }}">
-                    <span>{{ $newCustomersGrowth >= 0 ? '+' : '' }}{{ number_format($newCustomersGrowth, 1) }}%</span>
-                    <i data-lucide="{{ $newCustomersGrowth >= 0 ? 'arrow-up' : 'arrow-down' }}" class="icon-sm mb-1"></i>
-                  </p>
-                </div>
-              </div>
-              <div class="col-6 col-md-12 col-xl-7">
-                <div id="customersChart" class="mt-md-3 mt-xl-0"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-4 grid-margin stretch-card">
-        <div class="card">
-          <div class="card-body">
-            <div class="d-flex justify-content-between align-items-baseline">
-              <h6 class="card-title mb-0">Bitcoin Price (Last Month)</h6>
-              <div class="dropdown mb-2">
-                <a type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                  <i class="icon-lg text-secondary pb-3px" data-lucide="more-horizontal"></i>
-                </a>
-                <div class="dropdown-menu" aria-labelledby="dropdownMenuButton1">
-                  <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="eye" class="icon-sm me-2"></i> <span class="">View</span></a>
-                  <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="edit-2" class="icon-sm me-2"></i> <span class="">Edit</span></a>
-                  <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="trash" class="icon-sm me-2"></i> <span class="">Delete</span></a>
-                  <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="printer" class="icon-sm me-2"></i> <span class="">Print</span></a>
-                  <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="download" class="icon-sm me-2"></i> <span class="">Download</span></a>
-                </div>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-6 col-md-12 col-xl-5">
-                <h3 class="mb-2">
-                  @if($btcLatestPrice)
-                    ${{ number_format($btcLatestPrice, 2) }}
-                  @else
-                    N/A
-                  @endif
-                </h3>
-                <div class="d-flex align-items-baseline">
-                  <p class="{{ $btcMonthlyChange >= 0 ? 'text-success' : 'text-danger' }}">
-                    <span>{{ $btcMonthlyChange >= 0 ? '+' : '' }}{{ number_format($btcMonthlyChange, 2) }}%</span>
-                    <i data-lucide="{{ $btcMonthlyChange >= 0 ? 'arrow-up' : 'arrow-down' }}" class="icon-sm mb-1"></i>
-                  </p>
-                </div>
-              </div>
-              <div class="col-6 col-md-12 col-xl-7">
-                <div id="ordersChart" class="mt-md-3 mt-xl-0"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-4 grid-margin stretch-card">
-        <div class="card">
-          <div class="card-body">
-            <div class="d-flex justify-content-between align-items-baseline">
-              <h6 class="card-title mb-0">BTC Difficulty</h6>
-              <div class="dropdown mb-2">
-                <a type="button" id="dropdownMenuButton2" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                  <i class="icon-lg text-secondary pb-3px" data-lucide="more-horizontal"></i>
-                </a>
-                <div class="dropdown-menu" aria-labelledby="dropdownMenuButton2">
-                  <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="eye" class="icon-sm me-2"></i> <span class="">View</span></a>
-                  <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="edit-2" class="icon-sm me-2"></i> <span class="">Edit</span></a>
-                  <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="trash" class="icon-sm me-2"></i> <span class="">Delete</span></a>
-                  <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="printer" class="icon-sm me-2"></i> <span class="">Print</span></a>
-                  <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="download" class="icon-sm me-2"></i> <span class="">Download</span></a>
-                </div>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-6 col-md-12 col-xl-5">
-                <h3 class="mb-2">
-                  @if($difficultyLatestT)
-                    {{ number_format($difficultyLatestT, 2) }} T
-                  @else
-                    N/A
-                  @endif
-                </h3>
-                <div class="d-flex align-items-baseline">
-                  <p class="{{ $difficultyMonthlyChange >= 0 ? 'text-success' : 'text-danger' }}">
-                    <span>{{ $difficultyMonthlyChange >= 0 ? '+' : '' }}{{ number_format($difficultyMonthlyChange, 2) }}%</span>
-                    <i data-lucide="{{ $difficultyMonthlyChange >= 0 ? 'arrow-up' : 'arrow-down' }}" class="icon-sm mb-1"></i>
-                  </p>
-                </div>
-              </div>
-              <div class="col-6 col-md-12 col-xl-7">
-                <div id="growthChart" class="mt-md-3 mt-xl-0"></div>
-              </div>
-            </div>
-          </div>
+  <div class="col-md-4 grid-margin stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <p class="text-secondary mb-1">{{ $miner->name }} daily output</p>
+        <h3 class="mb-2">${{ number_format((float) $miner->daily_output_usd, 2) }}</h3>
+        <div class="d-flex align-items-center gap-2 text-success">
+          <i data-lucide="activity" class="icon-sm"></i>
+          <span>{{ number_format((float) collect($performanceUptimeData)->last(), 2) }}% uptime today</span>
         </div>
       </div>
     </div>
   </div>
-</div> <!-- row -->
+  <div class="col-md-4 grid-margin stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <p class="text-secondary mb-1">Shares available</p>
+        <h3 class="mb-2">{{ number_format($availableShares) }} / {{ number_format($miner->total_shares) }}</h3>
+        <div class="progress" style="height: 8px;">
+          <div class="progress-bar bg-primary" role="progressbar" style="width: {{ $miner->total_shares > 0 ? min(($sharesSold / $miner->total_shares) * 100, 100) : 0 }}%"></div>
+        </div>
+        <div class="text-secondary small mt-2">{{ number_format($sharesSold) }} shares already sold</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4 grid-margin stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <p class="text-secondary mb-1">Your expected monthly earnings</p>
+        <h3 class="mb-2">${{ number_format($expectedMonthlyEarnings, 2) }}</h3>
+        <div class="text-secondary small">
+          Active investment: {{ $activeInvestment?->package?->name ?? 'No active package yet' }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="row">
-  <div class="col-12 col-xl-12 grid-margin stretch-card">
+  <div class="col-xl-8 grid-margin stretch-card">
     <div class="card overflow-hidden">
       <div class="card-body">
-        <div class="d-flex justify-content-between align-items-baseline mb-4 mb-md-3">
-          <h6 class="card-title mb-0">Revenue</h6>
-          <div class="dropdown">
-            <a type="button" id="dropdownMenuButton3" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-              <i class="icon-lg text-secondary pb-3px" data-lucide="more-horizontal"></i>
-            </a>
-            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton3">
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="eye" class="icon-sm me-2"></i> <span class="">View</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="edit-2" class="icon-sm me-2"></i> <span class="">Edit</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="trash" class="icon-sm me-2"></i> <span class="">Delete</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="printer" class="icon-sm me-2"></i> <span class="">Print</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="download" class="icon-sm me-2"></i> <span class="">Download</span></a>
-            </div>
+        <div class="d-flex justify-content-between align-items-baseline mb-3">
+          <div>
+            <h6 class="card-title mb-1">{{ $miner->name }} production trend</h6>
+            <p class="text-secondary mb-0">Last 7 days of revenue generated by the miner.</p>
           </div>
+          <a href="{{ route('general.sell-products') }}" class="btn btn-primary btn-sm">Buy shares</a>
         </div>
-        <div class="row align-items-start">
-          <div class="col-md-7">
-            <p class="text-secondary fs-13px mb-3 mb-md-0">Revenue is the income that a business has from its normal business activities, usually from the sale of goods and services to customers.</p>
-          </div>
-          <div class="col-md-5 d-flex justify-content-md-end">
-            <div class="btn-group mb-3 mb-md-0" role="group" aria-label="Basic example">
-              <button type="button" class="btn btn-outline-primary">Today</button>
-              <button type="button" class="btn btn-outline-primary d-none d-md-block">Week</button>
-              <button type="button" class="btn btn-primary">Month</button>
-              <button type="button" class="btn btn-outline-primary">Year</button>
-            </div>
-          </div>
-        </div>
-        <div id="revenueChart"></div>
+        <div id="minerRevenueChart"></div>
       </div>
     </div>
   </div>
-</div> <!-- row -->
+  <div class="col-xl-4 grid-margin stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="card-title mb-3">Your investment summary</h6>
+        <div class="mb-3">
+          <div class="text-secondary small">Total invested</div>
+          <div class="fs-4 fw-semibold">${{ number_format($totalInvested, 2) }}</div>
+        </div>
+        <div class="mb-3">
+          <div class="text-secondary small">Owned shares</div>
+          <div class="fs-4 fw-semibold">{{ number_format((int) $user->investments->where('status', 'active')->sum('shares_owned')) }}</div>
+        </div>
+        <div class="mb-3">
+          <div class="text-secondary small">Base monthly return</div>
+          <div class="fs-4 fw-semibold">{{ number_format((float) $miner->base_monthly_return_rate * 100, 2) }}%</div>
+        </div>
+        <div>
+          <div class="text-secondary small">Latest package</div>
+          <div class="fs-6 fw-semibold">{{ $user->shareholder?->package_name ?? 'Not subscribed yet' }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="row">
-  <div class="col-lg-7 col-xl-8 grid-margin stretch-card">
+  <div class="col-lg-6 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
-        <div class="d-flex justify-content-between align-items-baseline mb-2">
-          <h6 class="card-title mb-0">Monthly sales</h6>
-          <div class="dropdown mb-2">
-            <a type="button" id="dropdownMenuButton4" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-              <i class="icon-lg text-secondary pb-3px" data-lucide="more-horizontal"></i>
-            </a>
-            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton4">
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="eye" class="icon-sm me-2"></i> <span class="">View</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="edit-2" class="icon-sm me-2"></i> <span class="">Edit</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="trash" class="icon-sm me-2"></i> <span class="">Delete</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="printer" class="icon-sm me-2"></i> <span class="">Print</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="download" class="icon-sm me-2"></i> <span class="">Download</span></a>
-            </div>
-          </div>
-        </div>
-        <p class="text-secondary">Sales are activities related to selling or the number of goods or services sold in a given time period.</p>
-        <div id="monthlySalesChart"></div>
-      </div> 
-    </div>
-  </div>
-  <div class="col-lg-5 col-xl-4 grid-margin stretch-card">
-    <div class="card">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-baseline">
-          <h6 class="card-title mb-0">Cloud storage</h6>
-          <div class="dropdown mb-2">
-            <a type="button" id="dropdownMenuButton5" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-              <i class="icon-lg text-secondary pb-3px" data-lucide="more-horizontal"></i>
-            </a>
-            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton5">
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="eye" class="icon-sm me-2"></i> <span class="">View</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="edit-2" class="icon-sm me-2"></i> <span class="">Edit</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="trash" class="icon-sm me-2"></i> <span class="">Delete</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="printer" class="icon-sm me-2"></i> <span class="">Print</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="download" class="icon-sm me-2"></i> <span class="">Download</span></a>
-            </div>
-          </div>
-        </div>
-        <div id="storageChart"></div>
-        <div class="row mb-3">
-          <div class="col-6 d-flex justify-content-end">
-            <div>
-              <label class="d-flex align-items-center justify-content-end fs-10px text-uppercase fw-bolder">Total storage <span class="p-1 ms-1 rounded-circle bg-secondary"></span></label>
-              <h5 class="fw-bolder mb-0 text-end">8TB</h5>
-            </div>
-          </div>
-          <div class="col-6">
-            <div>
-              <label class="d-flex align-items-center fs-10px text-uppercase fw-bolder"><span class="p-1 me-1 rounded-circle bg-primary"></span> Used storage</label>
-              <h5 class="fw-bolder mb-0">~5TB</h5>
-            </div>
-          </div>
-        </div>
-        <div class="d-grid">
-          <button class="btn btn-primary">Upgrade storage</button>
-        </div>
+        <h6 class="card-title mb-3">Miner stats</h6>
+        <div id="minerStatsChart"></div>
       </div>
     </div>
   </div>
-</div> <!-- row -->
-
-<div class="row">
-  <div class="col-lg-5 col-xl-4 grid-margin grid-margin-lg-0 stretch-card">
+  <div class="col-lg-6 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
-        <div class="d-flex justify-content-between align-items-baseline mb-2">
-          <h6 class="card-title mb-0">Inbox</h6>
-          <div class="dropdown mb-2">
-            <a type="button" id="dropdownMenuButton6" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-              <i class="icon-lg text-secondary pb-3px" data-lucide="more-horizontal"></i>
-            </a>
-            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton6">
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="eye" class="icon-sm me-2"></i> <span class="">View</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="edit-2" class="icon-sm me-2"></i> <span class="">Edit</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="trash" class="icon-sm me-2"></i> <span class="">Delete</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="printer" class="icon-sm me-2"></i> <span class="">Print</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="download" class="icon-sm me-2"></i> <span class="">Download</span></a>
-            </div>
-          </div>
-        </div>
-        <div class="d-flex flex-column">
-          <a href="javascript:;" class="d-flex align-items-center border-bottom pb-3">
-            <div class="me-3">
-              <img src="{{ url('https://placehold.co/35x35') }}" class="rounded-circle w-35px" alt="user">
-            </div>
-            <div class="w-100">
-              <div class="d-flex justify-content-between">
-                <h6 class="text-body mb-2">Leonardo Payne</h6>
-                <p class="text-secondary fs-12px">12.30 PM</p>
-              </div>
-              <p class="text-secondary fs-13px">Hey! there I'm available...</p>
-            </div>
-          </a>
-          <a href="javascript:;" class="d-flex align-items-center border-bottom py-3">
-            <div class="me-3">
-              <img src="{{ url('https://placehold.co/35x35') }}" class="rounded-circle w-35px" alt="user">
-            </div>
-            <div class="w-100">
-              <div class="d-flex justify-content-between">
-                <h6 class="text-body mb-2">Carl Henson</h6>
-                <p class="text-secondary fs-12px">02.14 AM</p>
-              </div>
-              <p class="text-secondary fs-13px">I've finished it! See you so..</p>
-            </div>
-          </a>
-          <a href="javascript:;" class="d-flex align-items-center border-bottom py-3">
-            <div class="me-3">
-              <img src="{{ url('https://placehold.co/35x35') }}" class="rounded-circle w-35px" alt="user">
-            </div>
-            <div class="w-100">
-              <div class="d-flex justify-content-between">
-                <h6 class="text-body mb-2">Jensen Combs</h6>
-                <p class="text-secondary fs-12px">08.22 PM</p>
-              </div>
-              <p class="text-secondary fs-13px">This template is awesome!</p>
-            </div>
-          </a>
-          <a href="javascript:;" class="d-flex align-items-center border-bottom py-3">
-            <div class="me-3">
-              <img src="{{ url('https://placehold.co/35x35') }}" class="rounded-circle w-35px" alt="user">
-            </div>
-            <div class="w-100">
-              <div class="d-flex justify-content-between">
-                <h6 class="text-body mb-2">Amiah Burton</h6>
-                <p class="text-secondary fs-12px">05.49 AM</p>
-              </div>
-              <p class="text-secondary fs-13px">Nice to meet you</p>
-            </div>
-          </a>
-          <a href="javascript:;" class="d-flex align-items-center border-bottom py-3">
-            <div class="me-3">
-              <img src="{{ url('https://placehold.co/35x35') }}" class="rounded-circle w-35px" alt="user">
-            </div>
-            <div class="w-100">
-              <div class="d-flex justify-content-between">
-                <h6 class="text-body mb-2">Yaretzi Mayo</h6>
-                <p class="text-secondary fs-12px">01.19 AM</p>
-              </div>
-              <p class="text-secondary fs-13px">Hey! there I'm available...</p>
-            </div>
-          </a>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="col-lg-7 col-xl-8 stretch-card">
-    <div class="card">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-baseline mb-2">
-          <h6 class="card-title mb-0">Projects</h6>
-          <div class="dropdown mb-2">
-            <a type="button" id="dropdownMenuButton7" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-              <i class="icon-lg text-secondary pb-3px" data-lucide="more-horizontal"></i>
-            </a>
-            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton7">
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="eye" class="icon-sm me-2"></i> <span class="">View</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="edit-2" class="icon-sm me-2"></i> <span class="">Edit</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="trash" class="icon-sm me-2"></i> <span class="">Delete</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="printer" class="icon-sm me-2"></i> <span class="">Print</span></a>
-              <a class="dropdown-item d-flex align-items-center" href="javascript:;"><i data-lucide="download" class="icon-sm me-2"></i> <span class="">Download</span></a>
-            </div>
+        <div class="d-flex justify-content-between align-items-baseline mb-3">
+          <h6 class="card-title mb-0">Referral progress</h6>
+          <div class="d-flex gap-2 flex-wrap">
+            <a href="{{ route('dashboard.wallet') }}" class="btn btn-outline-success btn-sm">Open wallet</a>
+            <a href="{{ route('dashboard.friends') }}" class="btn btn-outline-primary btn-sm">Manage friends</a>
           </div>
         </div>
         <div class="table-responsive">
-          <table class="table table-hover mb-0">
-            <thead>
-              <tr>
-                <th class="pt-0">#</th>
-                <th class="pt-0">Project Name</th>
-                <th class="pt-0">Start Date</th>
-                <th class="pt-0">Due Date</th>
-                <th class="pt-0">Status</th>
-                <th class="pt-0">Assign</th>
-              </tr>
-            </thead>
+          <table class="table table-borderless mb-0">
             <tbody>
               <tr>
-                <td>1</td>
-                <td>NobleUI jQuery</td>
-                <td>01/01/2026</td>
-                <td>26/04/2026</td>
-                <td><span class="badge bg-danger">Released</span></td>
-                <td>Leonardo Payne</td>
+                <td class="ps-0 text-secondary">Pending invites</td>
+                <td class="text-end fw-semibold">{{ $pendingReferrals }}</td>
               </tr>
               <tr>
-                <td>2</td>
-                <td>NobleUI Angular</td>
-                <td>01/01/2026</td>
-                <td>26/04/2026</td>
-                <td><span class="badge bg-success">Review</span></td>
-                <td>Carl Henson</td>
+                <td class="ps-0 text-secondary">Verified invites</td>
+                <td class="text-end fw-semibold">{{ $verifiedReferrals }}</td>
               </tr>
               <tr>
-                <td>3</td>
-                <td>NobleUI ReactJs</td>
-                <td>01/05/2026</td>
-                <td>10/09/2026</td>
-                <td><span class="badge bg-info">Pending</span></td>
-                <td>Jensen Combs</td>
+                <td class="ps-0 text-secondary">Registered friends</td>
+                <td class="text-end fw-semibold text-success">{{ $registeredReferrals }}</td>
               </tr>
               <tr>
-                <td>4</td>
-                <td>NobleUI VueJs</td>
-                <td>01/01/2026</td>
-                <td>31/11/2026</td>
-                <td><span class="badge bg-warning">Work in Progress</span>
-                </td>
-                <td>Amiah Burton</td>
-              </tr>
-              <tr>
-                <td>5</td>
-                <td>NobleUI Laravel</td>
-                <td>01/01/2026</td>
-                <td>31/12/2026</td>
-                <td><span class="badge bg-danger">Coming soon</span></td>
-                <td>Yaretzi Mayo</td>
-              </tr>
-              <tr>
-                <td>6</td>
-                <td>NobleUI NodeJs</td>
-                <td>01/01/2026</td>
-                <td>31/12/2026</td>
-                <td><span class="badge bg-primary">Coming soon</span></td>
-                <td>Carl Henson</td>
-              </tr>
-              <tr>
-                <td class="border-bottom">3</td>
-                <td class="border-bottom">NobleUI EmberJs</td>
-                <td class="border-bottom">01/05/2026</td>
-                <td class="border-bottom">10/11/2026</td>
-                <td class="border-bottom"><span class="badge bg-info">Pending</span></td>
-                <td class="border-bottom">Jensen Combs</td>
+                <td class="ps-0 text-secondary">Level bonus impact</td>
+                <td class="text-end fw-semibold">{{ number_format((float) $level->bonus_rate * 100, 2) }}%</td>
               </tr>
             </tbody>
           </table>
         </div>
-      </div> 
+        <div class="alert alert-light border mt-3 mb-0">
+          Every verified and registered friend helps unlock stronger monthly return bonuses.
+        </div>
+      </div>
     </div>
   </div>
-</div> <!-- row -->
+</div>
 @endsection
 
 @push('plugin-scripts')
@@ -439,54 +150,72 @@
 @endpush
 
 @push('custom-scripts')
-  <script src="{{ asset('build/assets/dashboard-BZTY38fO.js') }}"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       if (!window.ApexCharts) {
         return;
       }
 
-      function renderSparkline(selector, seriesName, labels, data, color, valueSuffix) {
-        const element = document.querySelector(selector);
-        if (!element) {
-          return;
-        }
-
-        element.innerHTML = '';
-
-        const options = {
+      const revenueElement = document.querySelector('#minerRevenueChart');
+      if (revenueElement) {
+        new ApexCharts(revenueElement, {
           chart: {
-            type: 'line',
-            height: 70,
-            sparkline: { enabled: true },
+            type: 'area',
+            height: 320,
             toolbar: { show: false }
           },
-          series: [{ name: seriesName, data: data }],
-          xaxis: { categories: labels },
-          stroke: { curve: 'smooth', width: 2 },
-          colors: [color],
-          tooltip: {
-            y: {
-              formatter: function (value) {
-                return valueSuffix ? (value + ' ' + valueSuffix) : value;
-              }
+          series: [{
+            name: 'Revenue (USD)',
+            data: @json($performanceRevenueData)
+          }],
+          xaxis: {
+            categories: @json($performanceLabels)
+          },
+          stroke: {
+            curve: 'smooth',
+            width: 3
+          },
+          dataLabels: { enabled: false },
+          colors: ['#6571ff'],
+          fill: {
+            type: 'gradient',
+            gradient: {
+              opacityFrom: 0.35,
+              opacityTo: 0.05
             }
           }
-        };
-
-        const chart = new ApexCharts(element, options);
-        chart.render();
+        }).render();
       }
 
-      renderSparkline('#customersChart', 'New Customers', @json($customersChartLabels), @json($customersChartData), '#6571ff', 'users');
-      renderSparkline('#ordersChart', 'BTC USD', @json($btcChartLabels), @json($btcChartData), '#f7931a', 'USD');
+      const statsElement = document.querySelector('#minerStatsChart');
+      if (statsElement) {
+        new ApexCharts(statsElement, {
+          chart: {
+            type: 'line',
+            height: 320,
+            toolbar: { show: false }
+          },
+          series: [
+            {
+              name: 'Hashrate (TH/s)',
+              data: @json($performanceHashrateData)
+            },
+            {
+              name: 'Uptime %',
+              data: @json($performanceUptimeData)
+            }
+          ],
+          xaxis: {
+            categories: @json($performanceLabels)
+          },
+          stroke: {
+            curve: 'smooth',
+            width: 3
+          },
+          dataLabels: { enabled: false },
+          colors: ['#00acc1', '#05a34a']
+        }).render();
+      }
     });
   </script>
 @endpush
-
-
-
-
-
-
-
