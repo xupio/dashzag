@@ -16,9 +16,12 @@ class PayoutRequest extends Model
         'amount',
         'method',
         'destination',
+        'transaction_reference',
         'notes',
+        'admin_notes',
         'status',
         'requested_at',
+        'approved_at',
         'processed_at',
     ];
 
@@ -27,6 +30,7 @@ class PayoutRequest extends Model
         return [
             'amount' => 'decimal:2',
             'requested_at' => 'datetime',
+            'approved_at' => 'datetime',
             'processed_at' => 'datetime',
         ];
     }

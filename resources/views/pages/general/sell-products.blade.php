@@ -25,17 +25,39 @@
       <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
         <div>
           <h4 class="mb-1">Buy shares in {{ $miner->name }}</h4>
-          <p class="text-secondary mb-0">Choose one of the live share packages below. Every package represents real shares from the active miner.</p>
+          <p class="text-secondary mb-0">Choose one of the live share packages below. Every package represents real shares from the selected active miner.</p>
         </div>
         <div class="text-md-end">
           <div class="fw-semibold">Account type: <span class="text-primary text-capitalize">{{ $user->account_type }}</span></div>
           <div class="text-secondary small">Current level: {{ $level->name }} | Bonus {{ number_format((float) $level->bonus_rate * 100, 2) }}%</div>
-          <div class="text-secondary small">Current package: {{ $shareholder?->package_name ?? 'No active package yet' }}</div>
+          <div class="text-secondary small">Current package on this miner: {{ $activeInvestment?->package?->name ?? 'No active package yet' }}</div>
         </div>
       </div>
     </div>
   </div>
 </div>
+
+@if (($miners ?? collect())->count() > 1)
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
+          <div>
+            <h6 class="mb-1">Choose miner</h6>
+            <p class="text-secondary mb-0">Each miner has its own share pool, packages, and projected return profile.</p>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            @foreach ($miners as $networkMiner)
+              <a href="{{ route('general.sell-products') }}?miner={{ $networkMiner->slug }}" class="btn {{ $networkMiner->id === $miner->id ? 'btn-primary' : 'btn-outline-primary' }} btn-sm">
+                {{ $networkMiner->name }}
+              </a>
+            @endforeach
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+@endif
 
 <div class="row mb-4">
   <div class="col-md-4 grid-margin stretch-card">
@@ -73,7 +95,7 @@
           @php
             $accent = ['primary', 'success', 'warning'][$index] ?? 'primary';
             $icon = ['award', 'trending-up', 'briefcase'][$index] ?? 'award';
-            $isCurrent = $shareholder?->package_name === $package->name;
+            $isCurrent = $activeInvestment?->package_id === $package->id;
           @endphp
           <div class="col-md-4 stretch-card {{ $index < count($packages) - 1 ? 'grid-margin grid-margin-md-0' : '' }}">
             <div class="card {{ $isCurrent ? 'border border-' . $accent : '' }}">
@@ -87,7 +109,7 @@
                   <tr><td><i data-lucide="check" class="icon-md text-primary me-2"></i></td><td><p class="mb-2">Projected monthly return {{ number_format((float) $package->monthly_return_rate * 100, 2) }}%</p></td></tr>
                   <tr><td><i data-lucide="check" class="icon-md text-primary me-2"></i></td><td><p class="mb-2">Equivalent units {{ $package->units_limit }}</p></td></tr>
                   <tr><td><i data-lucide="check" class="icon-md text-primary me-2"></i></td><td><p class="mb-2">Active miner: {{ $miner->name }}</p></td></tr>
-                  <tr><td><i data-lucide="check" class="icon-md text-primary me-2"></i></td><td><p class="mb-2">Your level bonus applies after purchase</p></td></tr>
+                  <tr><td><i data-lucide="check" class="icon-md text-primary me-2"></i></td><td><p class="mb-2">Level and team bonuses apply after purchase</p></td></tr>
                 </table>
                 <div class="d-grid mt-4">
                   <form method="POST" action="{{ route('general.sell-products.subscribe') }}">
@@ -111,13 +133,14 @@
       <div class="card">
         <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
           <div>
-            <h5 class="mb-1">Latest active investment</h5>
+            <h5 class="mb-1">Latest active investment on {{ $miner->name }}</h5>
             <p class="text-secondary mb-0">{{ $activeInvestment->package?->name }} | {{ $activeInvestment->shares_owned }} shares | {{ number_format(((float) $activeInvestment->monthly_return_rate + (float) $activeInvestment->level_bonus_rate) * 100, 2) }}% total monthly return target</p>
           </div>
-          <a href="{{ route('dashboard') }}" class="btn btn-outline-primary">View dashboard</a>
+          <a href="{{ route('dashboard') }}?miner={{ $miner->slug }}" class="btn btn-outline-primary">View dashboard</a>
         </div>
       </div>
     </div>
   </div>
 @endif
 @endsection
+

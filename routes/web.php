@@ -8,7 +8,9 @@ use App\Models\InvestmentPackage;
 use App\Models\Miner;
 use App\Models\MinerPerformanceLog;
 use App\Models\PayoutRequest;
+use App\Models\ReferralEvent;
 use App\Models\Shareholder;
+use App\Models\User;
 use App\Models\UserInvestment;
 use App\Support\MiningPlatform;
 use Illuminate\Http\Request;
@@ -30,43 +32,33 @@ Route::get('/friend-invitations/{friendInvitation}/verify', function (FriendInvi
     ]);
 })->middleware(['signed', 'throttle:6,1'])->name('friend-invitations.verify');
 
-Route::get('/dashboard', function () {
+Route::get('/dashboard', function (Request $request) {
     MiningPlatform::ensureDefaults();
 
-    $user = request()->user()->load(['userLevel', 'shareholder', 'investments.package', 'friendInvitations']);
+    $user = $request->user()->load(['userLevel', 'shareholder', 'investments.package', 'investments.miner', 'friendInvitations']);
     $level = MiningPlatform::syncUserLevel($user);
-    $user->load(['userLevel', 'shareholder', 'investments.package']);
+    $user->load(['userLevel', 'shareholder', 'investments.package', 'investments.miner']);
 
-    $miner = Miner::with(['performanceLogs', 'packages' => fn ($query) => $query->where('is_active', true)->orderBy('display_order')])
-        ->where('slug', 'alpha-one')
-        ->firstOrFail();
+    $miners = MiningPlatform::activeMiners();
+    $miner = MiningPlatform::resolveMiner($request->query('miner'));
+    $miner->load(['performanceLogs', 'packages' => fn ($query) => $query->where('is_active', true)->orderBy('display_order')]);
 
-    $performanceLogs = $miner->performanceLogs()
-        ->orderBy('logged_on')
-        ->take(7)
-        ->get();
-
+    $performanceLogs = $miner->performanceLogs()->orderBy('logged_on')->take(7)->get();
     $sharesSold = MiningPlatform::totalSharesSold($miner);
-    $availableShares = max($miner->total_shares - $sharesSold, 0);
-    $expectedMonthlyEarnings = MiningPlatform::expectedMonthlyEarnings($user);
-    $activeInvestment = $user->investments->firstWhere('status', 'active');
-    $totalInvested = (float) $user->investments->where('status', 'active')->sum('amount');
-    $registeredReferrals = $user->friendInvitations->whereNotNull('registered_at')->count();
-    $verifiedReferrals = $user->friendInvitations->whereNotNull('verified_at')->count();
-    $pendingReferrals = $user->friendInvitations->whereNull('verified_at')->count();
 
     return view('dashboard', [
         'user' => $user,
+        'miners' => $miners,
         'miner' => $miner,
         'level' => $level,
         'sharesSold' => $sharesSold,
-        'availableShares' => $availableShares,
-        'expectedMonthlyEarnings' => $expectedMonthlyEarnings,
-        'activeInvestment' => $activeInvestment,
-        'totalInvested' => $totalInvested,
-        'registeredReferrals' => $registeredReferrals,
-        'verifiedReferrals' => $verifiedReferrals,
-        'pendingReferrals' => $pendingReferrals,
+        'availableShares' => max($miner->total_shares - $sharesSold, 0),
+        'expectedMonthlyEarnings' => MiningPlatform::expectedMonthlyEarnings($user),
+        'activeInvestment' => $user->investments->where('status', 'active')->firstWhere('miner_id', $miner->id),
+        'totalInvested' => (float) $user->investments->where('status', 'active')->sum('amount'),
+        'registeredReferrals' => $user->friendInvitations->whereNotNull('registered_at')->count(),
+        'verifiedReferrals' => $user->friendInvitations->whereNotNull('verified_at')->count(),
+        'pendingReferrals' => $user->friendInvitations->whereNull('verified_at')->count(),
         'performanceLabels' => $performanceLogs->map(fn ($log) => $log->logged_on->format('M d'))->values(),
         'performanceRevenueData' => $performanceLogs->map(fn ($log) => round((float) $log->revenue_usd, 2))->values(),
         'performanceHashrateData' => $performanceLogs->map(fn ($log) => round((float) $log->hashrate_th, 2))->values(),
@@ -80,6 +72,73 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'user' => request()->user(),
         ]);
     })->name('dashboard.profile');
+
+    Route::get('/dashboard/investments', function () {
+        MiningPlatform::ensureDefaults();
+
+        $user = request()->user()->load(['investments.miner', 'investments.package', 'earnings']);
+        $activeInvestments = $user->investments->where('status', 'active')->values();
+
+        return view('pages.general.investments', [
+            'user' => $user,
+            'investments' => $user->investments,
+            'activeInvestments' => $activeInvestments,
+            'totalInvested' => (float) $activeInvestments->sum('amount'),
+            'totalSharesOwned' => (int) $activeInvestments->sum('shares_owned'),
+            'expectedMonthlyEarnings' => MiningPlatform::expectedMonthlyEarnings($user),
+            'availableEarnings' => (float) $user->earnings->where('status', 'available')->sum('amount'),
+        ]);
+    })->name('dashboard.investments');
+
+    Route::get('/dashboard/network', function () {
+        MiningPlatform::ensureDefaults();
+
+        $user = request()->user()->load([
+            'sponsor',
+            'friendInvitations',
+            'earnings',
+            'referralEvents.relatedUser',
+            'referralEvents.investment.package',
+            'sponsoredUsers' => fn ($query) => $query->with([
+                'investments.package',
+                'investments.miner',
+                'sponsoredUsers.investments.package',
+                'sponsoredUsers.investments.miner',
+            ])->orderBy('name'),
+        ]);
+
+        $friendInvitations = $user->friendInvitations->sortByDesc('created_at')->values();
+        $directTeam = $user->sponsoredUsers->values();
+        $secondLevelTeam = $directTeam
+            ->flatMap(fn ($member) => $member->sponsoredUsers)
+            ->unique('id')
+            ->values();
+
+        $referralRewards = $user->earnings
+            ->whereIn('source', ['referral_registration', 'referral_subscription', 'team_subscription_bonus', 'team_downline_bonus'])
+            ->sortByDesc(fn ($reward) => optional($reward->earned_on)->timestamp ?? 0)
+            ->values();
+
+        $activeTeamInvestors = $directTeam->filter(fn ($member) => $member->investments->where('status', 'active')->isNotEmpty())->count();
+        $teamCapital = (float) $directTeam->sum(fn ($member) => $member->investments->where('status', 'active')->sum('amount'));
+
+        return view('pages.general.network', [
+            'user' => $user,
+            'friendInvitations' => $friendInvitations,
+            'directTeam' => $directTeam,
+            'secondLevelTeam' => $secondLevelTeam,
+            'teamEvents' => $user->referralEvents->sortByDesc('created_at')->values(),
+            'teamBonusRate' => MiningPlatform::teamBonusRate($user),
+            'activeTeamInvestors' => $activeTeamInvestors,
+            'teamCapital' => $teamCapital,
+            'invitedCount' => $friendInvitations->count(),
+            'verifiedCount' => $friendInvitations->whereNotNull('verified_at')->count(),
+            'registeredCount' => $friendInvitations->whereNotNull('registered_at')->count(),
+            'subscribedCount' => $activeTeamInvestors,
+            'referralRewards' => $referralRewards,
+            'referralRewardsTotal' => (float) $referralRewards->sum('amount'),
+        ]);
+    })->name('dashboard.network');
 
     Route::get('/dashboard/wallet', function () {
         MiningPlatform::ensureDefaults();
@@ -137,96 +196,370 @@ Route::middleware(['auth', 'verified'])->group(function () {
     })->name('dashboard.wallet.generate');
 
     Route::middleware('admin')->group(function () {
+        Route::get('/dashboard/miners', function () {
+            MiningPlatform::ensureDefaults();
+
+            return view('pages.general.miners', [
+                'miners' => Miner::with(['packages', 'investments'])->orderBy('name')->get(),
+            ]);
+        })->name('dashboard.miners');
+
+        Route::post('/dashboard/miners', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $validated = $request->validate([
+                'name' => ['required', 'string', 'max:255'],
+                'slug' => ['nullable', 'string', 'max:255', 'unique:miners,slug'],
+                'description' => ['nullable', 'string'],
+                'total_shares' => ['required', 'integer', 'min:1'],
+                'share_price' => ['required', 'numeric', 'min:1'],
+                'daily_output_usd' => ['required', 'numeric', 'min:0'],
+                'monthly_output_usd' => ['required', 'numeric', 'min:0'],
+                'base_monthly_return_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'status' => ['required', 'in:active,paused,maintenance'],
+            ]);
+
+            $miner = MiningPlatform::createMiner($validated);
+
+            return redirect()->route('dashboard.miners')->with('miners_success', $miner->name.' has been created with starter packages and baseline logs.');
+        })->name('dashboard.miners.store');
+        Route::get('/dashboard/analytics', function () {
+            MiningPlatform::ensureDefaults();
+
+            $users = User::with(['friendInvitations', 'investments', 'earnings'])->get();
+            $packages = InvestmentPackage::with('investments')->orderBy('display_order')->get();
+            $miner = MiningPlatform::resolveMiner(request()->query('miner'));
+            $miners = Miner::with(['investments.user', 'packages'])->orderBy('name')->get();
+
+            $topInvestors = $users->sortByDesc(fn ($user) => $user->investments->where('status', 'active')->sum('amount'))->take(5)->values();
+            $topReferrers = $users->sortByDesc(fn ($user) => $user->friendInvitations->whereNotNull('registered_at')->count())->take(5)->values();
+
+            return view('pages.general.analytics', [
+                'totalInvested' => (float) UserInvestment::where('status', 'active')->sum('amount'),
+                'totalSharesSold' => (int) UserInvestment::where('status', 'active')->sum('shares_owned'),
+                'totalAvailableLiability' => (float) Earning::where('status', 'available')->sum('amount'),
+                'totalPendingPayouts' => (float) PayoutRequest::whereIn('status', ['pending', 'approved'])->sum('amount'),
+                'totalPaidOut' => (float) Earning::where('status', 'paid')->sum('amount'),
+                'activeShareholders' => (int) User::where('account_type', 'shareholder')->count(),
+                'packages' => $packages,
+                'topInvestors' => $topInvestors,
+                'topReferrers' => $topReferrers,
+                'miner' => $miner,
+                'miners' => $miners,
+            ]);
+        })->name('dashboard.analytics');
+
+        Route::get('/dashboard/network-admin', function () {
+            MiningPlatform::ensureDefaults();
+
+            $users = User::with([
+                'sponsor',
+                'userLevel',
+                'investments.package',
+                'investments.miner',
+                'sponsoredUsers.investments',
+            ])->orderBy('name')->get();
+
+            return view('pages.general.network-admin', [
+                'users' => $users,
+                'events' => ReferralEvent::with(['sponsor', 'relatedUser', 'investment.package'])
+                    ->latest()
+                    ->limit(25)
+                    ->get(),
+            ]);
+        })->name('dashboard.network-admin');
+
+        Route::get('/dashboard/shareholders', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $minerSlug = $request->query('miner');
+            $status = $request->query('status');
+
+            $investments = UserInvestment::with(['user', 'miner', 'package'])
+                ->when($minerSlug, fn ($query) => $query->whereHas('miner', fn ($minerQuery) => $minerQuery->where('slug', $minerSlug)))
+                ->when($status, fn ($query) => $query->where('status', $status))
+                ->latest('subscribed_at')
+                ->get();
+
+            return view('pages.general.shareholders', [
+                'miners' => Miner::orderBy('name')->get(),
+                'investments' => $investments,
+                'selectedMiner' => $minerSlug,
+                'selectedStatus' => $status,
+            ]);
+        })->name('dashboard.shareholders');
+
+        Route::get('/dashboard/shareholders/export', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $minerSlug = $request->query('miner');
+            $status = $request->query('status');
+
+            $investments = UserInvestment::with(['user', 'miner', 'package'])
+                ->when($minerSlug, fn ($query) => $query->whereHas('miner', fn ($minerQuery) => $minerQuery->where('slug', $minerSlug)))
+                ->when($status, fn ($query) => $query->where('status', $status))
+                ->latest('subscribed_at')
+                ->get();
+
+            $filename = 'shareholders-report-'.now()->format('Ymd-His').'.csv';
+
+            return response()->streamDownload(function () use ($investments) {
+                $handle = fopen('php://output', 'w');
+                fputcsv($handle, ['Investor Name', 'Investor Email', 'Miner', 'Package', 'Amount', 'Shares', 'Return Rate', 'Status', 'Subscribed At']);
+
+                foreach ($investments as $investment) {
+                    fputcsv($handle, [
+                        $investment->user?->name,
+                        $investment->user?->email,
+                        $investment->miner?->name,
+                        $investment->package?->name,
+                        number_format((float) $investment->amount, 2, '.', ''),
+                        (int) $investment->shares_owned,
+                        number_format(((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate) * 100, 2, '.', '').'%',
+                        $investment->status,
+                        optional($investment->subscribed_at)->format('Y-m-d H:i:s'),
+                    ]);
+                }
+
+                fclose($handle);
+            }, $filename, ['Content-Type' => 'text/csv']);
+        })->name('dashboard.shareholders.export');
+        Route::get('/dashboard/users', function () {
+            MiningPlatform::ensureDefaults();
+
+            return view('pages.general.users', [
+                'users' => User::with(['userLevel', 'investments', 'earnings'])->orderBy('created_at')->get(),
+            ]);
+        })->name('dashboard.users');
+
+        Route::post('/dashboard/users/{user}/role', function (Request $request, User $user) {
+            $validated = $request->validate([
+                'role' => ['required', 'in:user,admin'],
+            ]);
+
+            $user->forceFill(['role' => $validated['role']])->save();
+
+            return redirect()->route('dashboard.users')->with('users_success', $user->email.' role updated to '.$validated['role'].'.');
+        })->name('dashboard.users.role');
+
         Route::get('/dashboard/operations', function () {
-        MiningPlatform::ensureDefaults();
+            MiningPlatform::ensureDefaults();
 
-        return view('pages.general.operations', [
-            'payoutRequests' => PayoutRequest::with(['user', 'earnings'])->latest('requested_at')->get(),
-        ]);
-    })->name('dashboard.operations');
+            return view('pages.general.operations', [
+                'payoutRequests' => PayoutRequest::with(['user', 'earnings'])->latest('requested_at')->get(),
+            ]);
+        })->name('dashboard.operations');
 
-        Route::post('/dashboard/operations/payouts/{payoutRequest}/approve', function (PayoutRequest $payoutRequest) {
-        MiningPlatform::approvePayoutRequest($payoutRequest);
+        Route::get('/dashboard/operations/export', function () {
+            MiningPlatform::ensureDefaults();
 
-        return redirect()->route('dashboard.operations')->with('operations_success', 'Payout request approved successfully.');
-    })->name('dashboard.operations.payouts.approve');
+            $payoutRequests = PayoutRequest::with(['user', 'earnings'])->latest('requested_at')->get();
+            $filename = 'payout-operations-'.now()->format('Ymd-His').'.csv';
 
-        Route::post('/dashboard/operations/payouts/{payoutRequest}/pay', function (PayoutRequest $payoutRequest) {
-        MiningPlatform::markPayoutRequestPaid($payoutRequest);
+            return response()->streamDownload(function () use ($payoutRequests) {
+                $handle = fopen('php://output', 'w');
+                fputcsv($handle, ['User Name', 'User Email', 'Requested At', 'Amount', 'Method', 'Destination', 'Status', 'Approved At', 'Paid At', 'Transaction Reference', 'Admin Notes']);
 
-        return redirect()->route('dashboard.operations')->with('operations_success', 'Payout request marked as paid.');
-    })->name('dashboard.operations.payouts.pay');
+                foreach ($payoutRequests as $request) {
+                    fputcsv($handle, [
+                        $request->user?->name,
+                        $request->user?->email,
+                        optional($request->requested_at)->format('Y-m-d H:i:s'),
+                        number_format((float) $request->amount, 2, '.', ''),
+                        $request->method,
+                        $request->destination,
+                        $request->status,
+                        optional($request->approved_at)->format('Y-m-d H:i:s'),
+                        optional($request->processed_at)->format('Y-m-d H:i:s'),
+                        $request->transaction_reference,
+                        $request->admin_notes,
+                    ]);
+                }
 
-        Route::get('/dashboard/miner', function () {
-        MiningPlatform::ensureDefaults();
+                fclose($handle);
+            }, $filename, ['Content-Type' => 'text/csv']);
+        })->name('dashboard.operations.export');
 
-        $miner = Miner::with([
-            'packages' => fn ($query) => $query->where('is_active', true)->orderBy('display_order'),
-            'performanceLogs' => fn ($query) => $query->orderByDesc('logged_on')->limit(10),
-        ])->where('slug', 'alpha-one')->firstOrFail();
+        Route::post('/dashboard/operations/payouts/{payoutRequest}/approve', function (Request $request, PayoutRequest $payoutRequest) {
+            $validated = $request->validate([
+                'admin_notes' => ['nullable', 'string', 'max:1000'],
+            ]);
 
-        $sharesSold = MiningPlatform::totalSharesSold($miner);
+            MiningPlatform::approvePayoutRequest($payoutRequest, $validated['admin_notes'] ?? null);
 
-        return view('pages.general.miner', [
-            'miner' => $miner,
-            'sharesSold' => $sharesSold,
-            'availableShares' => max($miner->total_shares - $sharesSold, 0),
-            'recentLogs' => $miner->performanceLogs,
-        ]);
-    })->name('dashboard.miner');
+            return redirect()->route('dashboard.operations')->with('operations_success', 'Payout request approved successfully.');
+        })->name('dashboard.operations.payouts.approve');
 
-    Route::post('/dashboard/miner', function (Request $request) {
-        MiningPlatform::ensureDefaults();
+        Route::post('/dashboard/operations/payouts/{payoutRequest}/pay', function (Request $request, PayoutRequest $payoutRequest) {
+            $validated = $request->validate([
+                'transaction_reference' => ['nullable', 'string', 'max:255'],
+                'admin_notes' => ['nullable', 'string', 'max:1000'],
+            ]);
 
-        $miner = Miner::where('slug', 'alpha-one')->firstOrFail();
+            MiningPlatform::markPayoutRequestPaid(
+                $payoutRequest,
+                $validated['transaction_reference'] ?? null,
+                $validated['admin_notes'] ?? null,
+            );
 
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'total_shares' => ['required', 'integer', 'min:1'],
-            'share_price' => ['required', 'numeric', 'min:1'],
-            'daily_output_usd' => ['required', 'numeric', 'min:0'],
-            'monthly_output_usd' => ['required', 'numeric', 'min:0'],
-            'base_monthly_return_rate' => ['required', 'numeric', 'min:0', 'max:1'],
-            'status' => ['required', 'in:active,paused,maintenance'],
-        ]);
+            return redirect()->route('dashboard.operations')->with('operations_success', 'Payout request marked as paid.');
+        })->name('dashboard.operations.payouts.pay');
 
-        $miner->update($validated);
+        Route::get('/dashboard/packages', function () {
+            MiningPlatform::ensureDefaults();
 
-        return redirect()
-            ->route('dashboard.miner')
-            ->with('miner_success', $miner->name.' details have been updated successfully.');
-    })->name('dashboard.miner.update');
+            return view('pages.general.packages', [
+                'packages' => InvestmentPackage::with('miner')->orderBy('display_order')->get(),
+                'miners' => Miner::orderBy('name')->get(),
+            ]);
+        })->name('dashboard.packages');
 
-    Route::post('/dashboard/miner/logs', function (Request $request) {
-        MiningPlatform::ensureDefaults();
+        Route::post('/dashboard/packages', function (Request $request) {
+            MiningPlatform::ensureDefaults();
 
-        $miner = Miner::where('slug', 'alpha-one')->firstOrFail();
+            $validated = $request->validate([
+                'miner_id' => ['required', 'exists:miners,id'],
+                'name' => ['required', 'string', 'max:255'],
+                'slug' => ['required', 'string', 'max:255', 'unique:investment_packages,slug'],
+                'price' => ['required', 'numeric', 'min:1'],
+                'shares_count' => ['required', 'integer', 'min:1'],
+                'units_limit' => ['required', 'integer', 'min:1'],
+                'monthly_return_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'display_order' => ['required', 'integer', 'min:1'],
+                'is_active' => ['nullable', 'boolean'],
+            ]);
 
-        $validated = $request->validate([
-            'logged_on' => ['required', 'date'],
-            'revenue_usd' => ['required', 'numeric', 'min:0'],
-            'hashrate_th' => ['required', 'numeric', 'min:0'],
-            'uptime_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
-            'notes' => ['nullable', 'string'],
-        ]);
+            $package = InvestmentPackage::create([
+                'miner_id' => $validated['miner_id'],
+                'name' => $validated['name'],
+                'slug' => $validated['slug'],
+                'price' => $validated['price'],
+                'shares_count' => $validated['shares_count'],
+                'units_limit' => $validated['units_limit'],
+                'monthly_return_rate' => $validated['monthly_return_rate'],
+                'display_order' => $validated['display_order'],
+                'is_active' => $request->boolean('is_active'),
+            ]);
 
-        MinerPerformanceLog::updateOrCreate(
-            [
-                'miner_id' => $miner->id,
-                'logged_on' => $validated['logged_on'],
-            ],
-            [
-                'revenue_usd' => $validated['revenue_usd'],
-                'hashrate_th' => $validated['hashrate_th'],
-                'uptime_percentage' => $validated['uptime_percentage'],
-                'notes' => $validated['notes'] ?? null,
-            ],
-        );
+            return redirect()->route('dashboard.packages')->with('packages_success', $package->name.' created successfully.');
+        })->name('dashboard.packages.store');
 
-        return redirect()
-            ->route('dashboard.miner')
-            ->with('log_success', 'Performance log saved successfully for '.$miner->name.'.');
+        Route::post('/dashboard/packages/{investmentPackage}', function (Request $request, InvestmentPackage $investmentPackage) {
+            $validated = $request->validate([
+                'name' => ['required', 'string', 'max:255'],
+                'price' => ['required', 'numeric', 'min:1'],
+                'shares_count' => ['required', 'integer', 'min:1'],
+                'units_limit' => ['required', 'integer', 'min:1'],
+                'monthly_return_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'display_order' => ['required', 'integer', 'min:1'],
+                'is_active' => ['nullable', 'boolean'],
+            ]);
+
+            $investmentPackage->update([
+                'name' => $validated['name'],
+                'price' => $validated['price'],
+                'shares_count' => $validated['shares_count'],
+                'units_limit' => $validated['units_limit'],
+                'monthly_return_rate' => $validated['monthly_return_rate'],
+                'display_order' => $validated['display_order'],
+                'is_active' => $request->boolean('is_active'),
+            ]);
+
+            return redirect()->route('dashboard.packages')->with('packages_success', $investmentPackage->name.' updated successfully.');
+        })->name('dashboard.packages.update');
+
+        Route::post('/dashboard/packages/{investmentPackage}/archive', function (InvestmentPackage $investmentPackage) {
+            $investmentPackage->forceFill(['is_active' => false])->save();
+
+            return redirect()->route('dashboard.packages')->with('packages_success', $investmentPackage->name.' archived successfully.');
+        })->name('dashboard.packages.archive');
+
+        Route::post('/dashboard/packages/{investmentPackage}/delete', function (InvestmentPackage $investmentPackage) {
+            if ($investmentPackage->investments()->exists()) {
+                return redirect()->route('dashboard.packages')->with('packages_error', $investmentPackage->name.' cannot be deleted because it already has investment history. Archive it instead.');
+            }
+
+            $packageName = $investmentPackage->name;
+            $investmentPackage->delete();
+
+            return redirect()->route('dashboard.packages')->with('packages_success', $packageName.' deleted successfully.');
+        })->name('dashboard.packages.delete');
+
+        Route::get('/dashboard/miner', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $miners = MiningPlatform::activeMiners();
+            $miner = MiningPlatform::resolveMiner($request->query('miner'));
+            $miner->load([
+                'packages' => fn ($query) => $query->where('is_active', true)->orderBy('display_order'),
+                'performanceLogs' => fn ($query) => $query->orderByDesc('logged_on')->limit(10),
+            ]);
+
+            $sharesSold = MiningPlatform::totalSharesSold($miner);
+
+            return view('pages.general.miner', [
+                'miners' => $miners,
+                'miner' => $miner,
+                'sharesSold' => $sharesSold,
+                'availableShares' => max($miner->total_shares - $sharesSold, 0),
+                'recentLogs' => $miner->performanceLogs,
+            ]);
+        })->name('dashboard.miner');
+
+        Route::post('/dashboard/miner', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $validated = $request->validate([
+                'miner_slug' => ['required', 'string', 'exists:miners,slug'],
+                'name' => ['required', 'string', 'max:255'],
+                'description' => ['nullable', 'string'],
+                'total_shares' => ['required', 'integer', 'min:1'],
+                'share_price' => ['required', 'numeric', 'min:1'],
+                'daily_output_usd' => ['required', 'numeric', 'min:0'],
+                'monthly_output_usd' => ['required', 'numeric', 'min:0'],
+                'base_monthly_return_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'status' => ['required', 'in:active,paused,maintenance'],
+            ]);
+
+            $miner = Miner::where('slug', $validated['miner_slug'])->firstOrFail();
+            unset($validated['miner_slug']);
+            $miner->update($validated);
+
+            return redirect()
+                ->to(route('dashboard.miner').'?miner='.$miner->slug)
+                ->with('miner_success', $miner->name.' details have been updated successfully.');
+        })->name('dashboard.miner.update');
+
+        Route::post('/dashboard/miner/logs', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $validated = $request->validate([
+                'miner_slug' => ['required', 'string', 'exists:miners,slug'],
+                'logged_on' => ['required', 'date'],
+                'revenue_usd' => ['required', 'numeric', 'min:0'],
+                'hashrate_th' => ['required', 'numeric', 'min:0'],
+                'uptime_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
+                'notes' => ['nullable', 'string'],
+            ]);
+
+            $miner = Miner::where('slug', $validated['miner_slug'])->firstOrFail();
+
+            MinerPerformanceLog::updateOrCreate(
+                [
+                    'miner_id' => $miner->id,
+                    'logged_on' => $validated['logged_on'],
+                ],
+                [
+                    'revenue_usd' => $validated['revenue_usd'],
+                    'hashrate_th' => $validated['hashrate_th'],
+                    'uptime_percentage' => $validated['uptime_percentage'],
+                    'notes' => $validated['notes'] ?? null,
+                ],
+            );
+
+            return redirect()
+                ->to(route('dashboard.miner').'?miner='.$miner->slug)
+                ->with('log_success', 'Performance log saved successfully for '.$miner->name.'.');
         })->name('dashboard.miner.logs.store');
     });
 
@@ -350,26 +683,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::view('mdi-icons', 'pages.icons.mdi-icons');
     });
 
-    Route::get('/general/sell-products', function () {
+    Route::get('/general/sell-products', function (Request $request) {
         MiningPlatform::ensureDefaults();
 
-        $user = request()->user()->load(['shareholder', 'userLevel', 'investments.package']);
+        $user = $request->user()->load(['shareholder', 'userLevel', 'investments.package', 'investments.miner']);
         $level = MiningPlatform::syncUserLevel($user);
-        $user->load(['shareholder', 'userLevel', 'investments.package']);
+        $user->load(['shareholder', 'userLevel', 'investments.package', 'investments.miner']);
 
-        $miner = Miner::with(['packages' => fn ($query) => $query->where('is_active', true)->orderBy('display_order')])
-            ->where('slug', 'alpha-one')
-            ->firstOrFail();
+        $miners = MiningPlatform::activeMiners();
+        $miner = MiningPlatform::resolveMiner($request->query('miner'));
+        $miner->load(['packages' => fn ($query) => $query->where('is_active', true)->orderBy('display_order')]);
 
         $sharesSold = MiningPlatform::totalSharesSold($miner);
 
         return view('pages.general.sell-products', [
             'user' => $user,
             'level' => $level,
+            'miners' => $miners,
             'miner' => $miner,
             'packages' => $miner->packages,
             'shareholder' => $user->shareholder,
-            'activeInvestment' => $user->investments->firstWhere('status', 'active'),
+            'activeInvestment' => $user->investments->where('status', 'active')->firstWhere('miner_id', $miner->id),
             'sharesSold' => $sharesSold,
             'availableShares' => max($miner->total_shares - $sharesSold, 0),
         ]);
@@ -382,13 +716,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'package' => ['required', 'string', 'exists:investment_packages,slug'],
         ]);
 
-        $user = $request->user()->load(['shareholder', 'userLevel', 'investments']);
+        $user = $request->user()->load(['shareholder', 'userLevel', 'investments', 'sponsor']);
         $package = InvestmentPackage::with('miner')
             ->where('slug', $validated['package'])
             ->where('is_active', true)
             ->firstOrFail();
 
         $level = MiningPlatform::syncUserLevel($user);
+        $teamBonusRate = MiningPlatform::teamBonusRate($user);
 
         $shareholder = Shareholder::updateOrCreate(
             ['user_id' => $user->id],
@@ -411,36 +746,33 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'shares_owned' => $package->shares_count,
             'monthly_return_rate' => $package->monthly_return_rate,
             'level_bonus_rate' => $level->bonus_rate,
+            'team_bonus_rate' => $teamBonusRate,
             'status' => 'active',
             'subscribed_at' => now(),
         ]);
 
         $user->forceFill(['account_type' => 'shareholder'])->save();
-
-        $level = MiningPlatform::syncUserLevel($user->fresh());
-
-        UserInvestment::where('user_id', $user->id)
-            ->where('status', 'active')
-            ->update(['level_bonus_rate' => $level->bonus_rate]);
+        $refreshedUser = MiningPlatform::refreshInvestmentBonusRates($user->fresh());
+        $investment->refresh();
 
         Earning::firstOrCreate(
             [
-                'user_id' => $user->id,
+                'user_id' => $refreshedUser->id,
                 'investment_id' => $investment->id,
                 'earned_on' => now()->toDateString(),
                 'source' => 'projected_return',
             ],
             [
-                'amount' => round((float) $package->price * ((float) $package->monthly_return_rate + (float) $level->bonus_rate), 2),
+                'amount' => round((float) $investment->amount * ((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate + (float) $investment->team_bonus_rate), 2),
                 'status' => 'pending',
                 'notes' => 'Initial projected monthly return generated after package subscription.',
             ],
         );
 
-        MiningPlatform::awardReferralSubscription($user, $investment);
+        MiningPlatform::awardReferralSubscription($refreshedUser, $investment);
 
         return redirect()
-            ->route('general.sell-products')
+            ->route('general.sell-products', ['miner' => $package->miner?->slug])
             ->with('subscription_success', 'You are now subscribed to the '.$package->name.' package and your mining shares are active.');
     })->name('general.sell-products.subscribe');
 
@@ -460,3 +792,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

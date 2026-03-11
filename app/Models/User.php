@@ -22,6 +22,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'account_type',
         'role',
         'user_level_id',
+        'sponsor_user_id',
     ];
 
     protected $hidden = [
@@ -32,6 +33,16 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
+    }
+
+    public function sponsor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sponsor_user_id');
+    }
+
+    public function sponsoredUsers(): HasMany
+    {
+        return $this->hasMany(User::class, 'sponsor_user_id')->latest('created_at');
     }
 
     public function friendInvitations(): HasMany
@@ -62,6 +73,11 @@ class User extends Authenticatable implements MustVerifyEmail
     public function payoutRequests(): HasMany
     {
         return $this->hasMany(PayoutRequest::class)->latest('requested_at');
+    }
+
+    public function referralEvents(): HasMany
+    {
+        return $this->hasMany(ReferralEvent::class, 'sponsor_user_id')->latest();
     }
 
     public function sendEmailVerificationNotification(): void

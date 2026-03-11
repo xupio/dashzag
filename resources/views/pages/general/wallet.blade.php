@@ -132,6 +132,7 @@
                   <th>Method</th>
                   <th>Destination</th>
                   <th>Status</th>
+                  <th>Audit</th>
                   <th>Notes</th>
                 </tr>
               </thead>
@@ -143,7 +144,15 @@
                     <td>{{ str($request->method)->replace('_', ' ')->title() }}</td>
                     <td>{{ $request->destination }}</td>
                     <td><span class="badge {{ $request->status === 'paid' ? 'bg-primary' : ($request->status === 'approved' ? 'bg-info' : 'bg-warning text-dark') }}">{{ str($request->status)->title() }}</span></td>
-                    <td>{{ $request->notes ?: '—' }}</td>
+                    <td>
+                      <div class="text-secondary small">Approved: {{ $request->approved_at?->format('M d, Y h:i A') ?? '—' }}</div>
+                      <div class="text-secondary small">Paid: {{ $request->processed_at?->format('M d, Y h:i A') ?? '—' }}</div>
+                      <div class="text-secondary small">Reference: {{ $request->transaction_reference ?: '—' }}</div>
+                    </td>
+                    <td>
+                      <div>{{ $request->notes ?: '—' }}</div>
+                      <div class="text-secondary small mt-1">Admin: {{ $request->admin_notes ?: '—' }}</div>
+                    </td>
                   </tr>
                 @endforeach
               </tbody>

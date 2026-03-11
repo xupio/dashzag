@@ -17,7 +17,7 @@ test('verified user can subscribe to a mining package and become a shareholder',
         'package' => 'growth-500',
     ]);
 
-    $response->assertRedirect(route('general.sell-products'));
+    $response->assertRedirect(route('general.sell-products', ['miner' => 'alpha-one']));
 
     $user->refresh();
     $user->load(['shareholder', 'investments.package', 'userLevel']);
@@ -32,3 +32,4 @@ test('verified user can subscribe to a mining package and become a shareholder',
     expect((int) $user->investments->first()->shares_owned)->toBe(5);
     expect($user->userLevel)->not->toBeNull();
 });
+

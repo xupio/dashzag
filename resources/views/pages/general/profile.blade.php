@@ -118,15 +118,15 @@
                 </a>
               </div>
               <div class="col-sm-6">
-                <a href="{{ url('/email/inbox') }}" class="card border h-100 text-decoration-none text-body">
+                <a href="{{ route('dashboard.network') }}" class="card border h-100 text-decoration-none text-body">
                   <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
                       <div class="wd-40 ht-40 rounded-circle bg-info bg-opacity-10 d-flex align-items-center justify-content-center me-3">
-                        <i data-lucide="mail" class="text-info"></i>
+                        <i data-lucide="network" class="text-info"></i>
                       </div>
-                      <h6 class="mb-0">Inbox</h6>
+                      <h6 class="mb-0">My network</h6>
                     </div>
-                    <p class="text-secondary mb-0">Open the email workspace directly from your profile when you need quick follow-up access.</p>
+                    <p class="text-secondary mb-0">See your team structure, referral events, and downline performance in one place.</p>
                   </div>
                 </a>
               </div>
@@ -170,8 +170,8 @@
               <div class="col-md-4">
                 <div class="border rounded p-3 h-100">
                   <p class="text-secondary mb-1">Next action</p>
-                  <h5 class="mb-2">Keep profile updated</h5>
-                  <small class="text-secondary">Refresh your details anytime from the account settings screen.</small>
+                  <h5 class="mb-2">Grow your team</h5>
+                  <small class="text-secondary">Invite active investors and raise your team bonus rate over time.</small>
                 </div>
               </div>
             </div>
@@ -189,9 +189,17 @@
           <a href="{{ route('dashboard.profile') }}" class="btn btn-light text-start"><i data-lucide="user" class="icon-sm me-2"></i> Profile home</a>
           <a href="{{ route('profile.edit') }}" class="btn btn-light text-start"><i data-lucide="edit-3" class="icon-sm me-2"></i> Edit profile</a>
           <a href="{{ route('dashboard') }}" class="btn btn-light text-start"><i data-lucide="home" class="icon-sm me-2"></i> Dashboard</a>
+          <a href="{{ route('dashboard.investments') }}" class="btn btn-light text-start"><i data-lucide="chart-column" class="icon-sm me-2"></i> Investments</a>
+          <a href="{{ route('dashboard.network') }}" class="btn btn-light text-start"><i data-lucide="network" class="icon-sm me-2"></i> Network</a>
           <a href="{{ route('dashboard.wallet') }}" class="btn btn-light text-start"><i data-lucide="wallet" class="icon-sm me-2"></i> Wallet</a>
           @if ($user->isAdmin())
+            <a href="{{ route('dashboard.analytics') }}" class="btn btn-light text-start"><i data-lucide="bar-chart-3" class="icon-sm me-2"></i> Analytics</a>
+            <a href="{{ route('dashboard.network-admin') }}" class="btn btn-light text-start"><i data-lucide="git-branch-plus" class="icon-sm me-2"></i> Network Admin</a>
+            <a href="{{ route('dashboard.shareholders') }}" class="btn btn-light text-start"><i data-lucide="badge-dollar-sign" class="icon-sm me-2"></i> Shareholders</a>
+            <a href="{{ route('dashboard.users') }}" class="btn btn-light text-start"><i data-lucide="users-round" class="icon-sm me-2"></i> Users</a>
             <a href="{{ route('dashboard.operations') }}" class="btn btn-light text-start"><i data-lucide="shield-check" class="icon-sm me-2"></i> Operations</a>
+            <a href="{{ route('dashboard.packages') }}" class="btn btn-light text-start"><i data-lucide="package" class="icon-sm me-2"></i> Packages</a>
+            <a href="{{ route('dashboard.miners') }}" class="btn btn-light text-start"><i data-lucide="server" class="icon-sm me-2"></i> Miners</a>
             <a href="{{ route('dashboard.miner') }}" class="btn btn-light text-start"><i data-lucide="cpu" class="icon-sm me-2"></i> Miner</a>
           @endif
           <a href="{{ route('dashboard.friends') }}" class="btn btn-light text-start"><i data-lucide="users" class="icon-sm me-2"></i> Friends</a>
@@ -204,5 +212,3 @@
   </div>
 </div>
 @endsection
-
-

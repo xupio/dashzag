@@ -18,12 +18,20 @@ class VerifyEmailController extends Controller
         }
 
         if ($request->user()->markEmailAsVerified()) {
-            FriendInvitation::where('email', $request->user()->email)
+            $user = $request->user();
+
+            MiningPlatform::assignSponsorFromInvitations($user);
+
+            FriendInvitation::where('email', $user->email)
                 ->update(['registered_at' => now()]);
 
-            MiningPlatform::awardReferralRegistration($request->user());
+            MiningPlatform::awardReferralRegistration($user);
 
-            event(new Verified($request->user()));
+            if ($user->sponsor) {
+                MiningPlatform::refreshInvestmentBonusRates($user->sponsor->fresh());
+            }
+
+            event(new Verified($user));
         }
 
         return redirect()->intended(route('dashboard', absolute: false).'?verified=1');

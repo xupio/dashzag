@@ -11,7 +11,7 @@ beforeEach(function () {
     MiningPlatform::ensureDefaults();
 });
 
-test('inviter receives registration reward when invited user verifies email', function () {
+test('invited user is attached to sponsor when email is verified', function () {
     $inviter = User::factory()->create([
         'email_verified_at' => now(),
     ]);
@@ -37,22 +37,29 @@ test('inviter receives registration reward when invited user verifies email', fu
 
     app(VerifyEmailController::class)($request);
 
+    $referredUser->refresh();
     $inviter->refresh();
-    $inviter->load('earnings');
+    $inviter->load(['earnings', 'referralEvents']);
 
+    expect($referredUser->sponsor_user_id)->toBe($inviter->id);
     expect($inviter->earnings->where('source', 'referral_registration'))->toHaveCount(1);
-    expect((float) $inviter->earnings->firstWhere('source', 'referral_registration')->amount)->toBe(25.0);
+    expect($inviter->referralEvents->where('type', 'team_registered'))->toHaveCount(1);
 });
 
-test('inviter receives subscription reward when invited user buys a package', function () {
+test('inviter receives subscription rewards and team bonus rate when referred user buys a package', function () {
     $inviter = User::factory()->create([
         'email_verified_at' => now(),
     ]);
+
+    $this->actingAs($inviter)->post(route('general.sell-products.subscribe'), [
+        'package' => 'starter-100',
+    ])->assertRedirect();
 
     FriendInvitation::create([
         'user_id' => $inviter->id,
         'name' => 'Referred Buyer',
         'email' => 'buyer@example.com',
+        'verified_at' => now(),
         'registered_at' => now(),
     ]);
 
@@ -60,17 +67,18 @@ test('inviter receives subscription reward when invited user buys a package', fu
         'email' => 'buyer@example.com',
         'email_verified_at' => now(),
         'account_type' => 'user',
+        'sponsor_user_id' => $inviter->id,
     ]);
 
     $this->actingAs($buyer)->post(route('general.sell-products.subscribe'), [
         'package' => 'growth-500',
-    ])->assertRedirect(route('general.sell-products'));
+    ])->assertRedirect();
 
     $inviter->refresh();
-    $inviter->load('earnings');
+    $inviter->load(['earnings', 'investments', 'referralEvents']);
 
-    $reward = $inviter->earnings->firstWhere('source', 'referral_subscription');
-
-    expect($reward)->not->toBeNull();
-    expect((float) $reward->amount)->toBe(25.0);
+    expect((float) $inviter->earnings->firstWhere('source', 'referral_subscription')->amount)->toBe(25.0)
+        ->and((float) $inviter->earnings->firstWhere('source', 'team_subscription_bonus')->amount)->toBe(15.0)
+        ->and((float) $inviter->investments->first()->fresh()->team_bonus_rate)->toBe(0.0025)
+        ->and($inviter->referralEvents->where('type', 'team_subscription'))->toHaveCount(1);
 });

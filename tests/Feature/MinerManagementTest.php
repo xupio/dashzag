@@ -8,12 +8,13 @@ beforeEach(function () {
     MiningPlatform::ensureDefaults();
 });
 
-test('admin can update alpha one miner details', function () {
+test('admin can update a selected miner details', function () {
     $user = User::factory()->admin()->create([
         'email_verified_at' => now(),
     ]);
 
     $response = $this->actingAs($user)->post(route('dashboard.miner.update'), [
+        'miner_slug' => 'alpha-one',
         'name' => 'Alpha One Prime',
         'description' => 'Updated miner profile.',
         'total_shares' => 1500,
@@ -24,7 +25,7 @@ test('admin can update alpha one miner details', function () {
         'status' => 'maintenance',
     ]);
 
-    $response->assertRedirect(route('dashboard.miner'));
+    $response->assertRedirect(route('dashboard.miner').'?miner=alpha-one');
 
     $miner = Miner::where('slug', 'alpha-one')->firstOrFail();
 
@@ -33,12 +34,13 @@ test('admin can update alpha one miner details', function () {
     expect((float) $miner->share_price)->toBe(125.5);
 });
 
-test('admin can store a miner performance log', function () {
+test('admin can update a secondary miner performance log', function () {
     $user = User::factory()->admin()->create([
         'email_verified_at' => now(),
     ]);
 
     $response = $this->actingAs($user)->post(route('dashboard.miner.logs.store'), [
+        'miner_slug' => 'beta-flux',
         'logged_on' => '2026-03-11',
         'revenue_usd' => 1999.99,
         'hashrate_th' => 512.45,
@@ -46,9 +48,9 @@ test('admin can store a miner performance log', function () {
         'notes' => 'Strong mining day.',
     ]);
 
-    $response->assertRedirect(route('dashboard.miner'));
+    $response->assertRedirect(route('dashboard.miner').'?miner=beta-flux');
 
-    $miner = Miner::where('slug', 'alpha-one')->firstOrFail();
+    $miner = Miner::where('slug', 'beta-flux')->firstOrFail();
     $log = $miner->performanceLogs()->whereDate('logged_on', '2026-03-11')->first();
 
     expect($log)->not->toBeNull();
@@ -62,6 +64,7 @@ test('non admin user cannot manage miner data', function () {
 
     $this->actingAs($user)
         ->post(route('dashboard.miner.update'), [
+            'miner_slug' => 'alpha-one',
             'name' => 'Blocked Update',
             'description' => 'Should not be saved.',
             'total_shares' => 1000,

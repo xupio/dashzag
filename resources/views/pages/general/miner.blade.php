@@ -6,13 +6,13 @@
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
       <div>
         <h4 class="mb-1">Manage {{ $miner->name }}</h4>
-        <p class="text-secondary mb-0">Update the miner details and record daily cloud mining performance from one screen.</p>
+        <p class="text-secondary mb-0">Update miner details and record daily cloud mining performance from one screen.</p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <a href="{{ route('dashboard') }}" class="btn btn-outline-primary btn-icon-text">
+        <a href="{{ route('dashboard') }}?miner={{ $miner->slug }}" class="btn btn-outline-primary btn-icon-text">
           <i data-lucide="layout-dashboard" class="btn-icon-prepend"></i> Dashboard
         </a>
-        <a href="{{ route('general.sell-products') }}" class="btn btn-primary btn-icon-text">
+        <a href="{{ route('general.sell-products') }}?miner={{ $miner->slug }}" class="btn btn-primary btn-icon-text">
           <i data-lucide="shopping-cart" class="btn-icon-prepend"></i> View packages
         </a>
       </div>
@@ -26,6 +26,28 @@
 
 @if (session('log_success'))
   <div class="alert alert-success">{{ session('log_success') }}</div>
+@endif
+
+@if (($miners ?? collect())->count() > 1)
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
+          <div>
+            <h6 class="mb-1">Select miner</h6>
+            <p class="text-secondary mb-0">Switch between active miners and manage each one with the same admin screen.</p>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            @foreach ($miners as $networkMiner)
+              <a href="{{ route('dashboard.miner') }}?miner={{ $networkMiner->slug }}" class="btn {{ $networkMiner->id === $miner->id ? 'btn-primary' : 'btn-outline-primary' }} btn-sm">
+                {{ $networkMiner->name }}
+              </a>
+            @endforeach
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 @endif
 
 <div class="row mb-4">
@@ -62,6 +84,7 @@
         <h5 class="mb-3">Miner configuration</h5>
         <form method="POST" action="{{ route('dashboard.miner.update') }}">
           @csrf
+          <input type="hidden" name="miner_slug" value="{{ $miner->slug }}">
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label">Name</label>
@@ -128,6 +151,7 @@
         <h5 class="mb-3">Add daily performance log</h5>
         <form method="POST" action="{{ route('dashboard.miner.logs.store') }}">
           @csrf
+          <input type="hidden" name="miner_slug" value="{{ $miner->slug }}">
           <div class="mb-3">
             <label class="form-label">Log date</label>
             <input type="date" name="logged_on" class="form-control @error('logged_on') is-invalid @enderror" value="{{ old('logged_on', now()->toDateString()) }}" required>

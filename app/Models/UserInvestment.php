@@ -20,6 +20,7 @@ class UserInvestment extends Model
         'shares_owned',
         'monthly_return_rate',
         'level_bonus_rate',
+        'team_bonus_rate',
         'status',
         'subscribed_at',
     ];
@@ -30,6 +31,7 @@ class UserInvestment extends Model
             'amount' => 'decimal:2',
             'monthly_return_rate' => 'decimal:4',
             'level_bonus_rate' => 'decimal:4',
+            'team_bonus_rate' => 'decimal:4',
             'subscribed_at' => 'datetime',
         ];
     }
