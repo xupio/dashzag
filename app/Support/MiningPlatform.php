@@ -7,7 +7,9 @@ use App\Models\FriendInvitation;
 use App\Models\InvestmentPackage;
 use App\Models\Miner;
 use App\Models\PayoutRequest;
+use App\Models\PlatformSetting;
 use App\Models\ReferralEvent;
+use App\Models\Shareholder;
 use App\Models\User;
 use App\Models\UserInvestment;
 use App\Models\UserLevel;
@@ -19,10 +21,122 @@ use RuntimeException;
 
 class MiningPlatform
 {
+    public const FREE_STARTER_PACKAGE_SLUG = 'starter-free';
+    public const BASIC_UPGRADE_PACKAGE_SLUG = 'starter-100';
+    public const FREE_STARTER_VERIFIED_INVITES_REQUIRED = 20;
+    public const FREE_STARTER_DIRECT_BASIC_REQUIRED = 1;
     public const REFERRAL_REGISTRATION_REWARD = 25.00;
     public const REFERRAL_SUBSCRIPTION_REWARD_RATE = 0.05;
     public const TEAM_DIRECT_SUBSCRIPTION_REWARD_RATE = 0.03;
     public const TEAM_INDIRECT_SUBSCRIPTION_REWARD_RATE = 0.01;
+
+    public static function defaultRewardSettings(): array
+    {
+        return [
+            'free_starter_verified_invites_required' => (string) self::FREE_STARTER_VERIFIED_INVITES_REQUIRED,
+            'free_starter_direct_basic_required' => (string) self::FREE_STARTER_DIRECT_BASIC_REQUIRED,
+            'referral_registration_reward' => (string) self::REFERRAL_REGISTRATION_REWARD,
+            'referral_subscription_reward_rate' => (string) self::REFERRAL_SUBSCRIPTION_REWARD_RATE,
+            'team_direct_subscription_reward_rate' => (string) self::TEAM_DIRECT_SUBSCRIPTION_REWARD_RATE,
+            'team_indirect_subscription_reward_rate' => (string) self::TEAM_INDIRECT_SUBSCRIPTION_REWARD_RATE,
+            'invitation_bonus_after_10_rate' => '0.0030',
+            'invitation_bonus_after_20_rate' => '0.0075',
+            'invitation_bonus_after_50_rate' => '0.0150',
+            'team_bonus_after_1_investor_rate' => '0.0025',
+            'team_bonus_after_3_investor_rate' => '0.0050',
+            'team_bonus_after_5_investor_rate' => '0.0100',
+            'team_level_3_subscription_reward_rate' => '0.0050',
+            'team_level_4_subscription_reward_rate' => '0.0025',
+            'team_level_5_subscription_reward_rate' => '0.0010',
+        ];
+    }
+
+    public static function rewardSettings(): array
+    {
+        self::ensureDefaults();
+
+        return PlatformSetting::query()
+            ->whereIn('key', array_keys(self::defaultRewardSettings()))
+            ->pluck('value', 'key')
+            ->all();
+    }
+
+    public static function rewardSetting(string $key): string
+    {
+        return self::rewardSettings()[$key] ?? self::defaultRewardSettings()[$key] ?? '';
+    }
+
+    public static function updateRewardSettings(array $settings): void
+    {
+        foreach ($settings as $key => $value) {
+            PlatformSetting::updateOrCreate(
+                ['key' => $key],
+                ['value' => (string) $value],
+            );
+        }
+    }
+    public static function defaultPlatformSettings(): array
+    {
+        return [
+            'new_miner_total_shares' => '1000',
+            'new_miner_share_price' => '100',
+            'new_miner_daily_output_usd' => '1200',
+            'new_miner_monthly_output_usd' => '36000',
+            'new_miner_base_monthly_return_rate' => '0.0800',
+            'launch_package_name' => 'Launch',
+            'launch_package_shares_count' => '1',
+            'launch_package_units_limit' => '1',
+            'launch_package_price_multiplier' => '1',
+            'launch_package_rate_bonus' => '0.0000',
+            'growth_package_name' => 'Growth',
+            'growth_package_shares_count' => '5',
+            'growth_package_units_limit' => '5',
+            'growth_package_price_multiplier' => '5',
+            'growth_package_rate_bonus' => '0.0050',
+            'scale_package_name' => 'Scale',
+            'scale_package_shares_count' => '10',
+            'scale_package_units_limit' => '10',
+            'scale_package_price_multiplier' => '10',
+            'scale_package_rate_bonus' => '0.0100',
+        ];
+    }
+
+    public static function platformSettings(): array
+    {
+        self::ensureDefaults();
+
+        return PlatformSetting::query()
+            ->whereIn('key', array_keys(self::defaultPlatformSettings()))
+            ->pluck('value', 'key')
+            ->all();
+    }
+
+    public static function platformSetting(string $key): string
+    {
+        return self::platformSettings()[$key] ?? self::defaultPlatformSettings()[$key] ?? '';
+    }
+
+    public static function updatePlatformSettings(array $settings): void
+    {
+        foreach ($settings as $key => $value) {
+            PlatformSetting::updateOrCreate(
+                ['key' => $key],
+                ['value' => (string) $value],
+            );
+        }
+    }
+
+    public static function networkLevelRewardRate(int $depth): float
+    {
+        return match ($depth) {
+            1 => (float) self::rewardSetting('team_direct_subscription_reward_rate'),
+            2 => (float) self::rewardSetting('team_indirect_subscription_reward_rate'),
+            3 => (float) self::rewardSetting('team_level_3_subscription_reward_rate'),
+            4 => (float) self::rewardSetting('team_level_4_subscription_reward_rate'),
+            5 => (float) self::rewardSetting('team_level_5_subscription_reward_rate'),
+            default => 0.0000,
+        };
+    }
 
     public static function ensureDefaults(): void
     {
@@ -41,6 +155,13 @@ class MiningPlatform
             User::query()->oldest('id')->first()?->forceFill(['role' => 'admin'])->save();
         }
 
+        foreach (array_merge(self::defaultRewardSettings(), self::defaultPlatformSettings()) as $key => $value) {
+            PlatformSetting::firstOrCreate(
+                ['key' => $key],
+                ['value' => $value],
+            );
+        }
+
         $alphaOne = self::seedMiner(
             [
                 'slug' => 'alpha-one',
@@ -55,7 +176,8 @@ class MiningPlatform
                 'started_at' => now()->subMonths(3),
             ],
             [
-                ['name' => 'Starter 100', 'slug' => 'starter-100', 'price' => 100, 'shares_count' => 1, 'units_limit' => 1, 'monthly_return_rate' => 0.0800, 'display_order' => 1],
+                ['name' => 'Starter Free', 'slug' => self::FREE_STARTER_PACKAGE_SLUG, 'price' => 0, 'shares_count' => 0, 'units_limit' => 1, 'monthly_return_rate' => 0.0000, 'display_order' => 0],
+                ['name' => 'Basic 100', 'slug' => self::BASIC_UPGRADE_PACKAGE_SLUG, 'price' => 100, 'shares_count' => 1, 'units_limit' => 1, 'monthly_return_rate' => 0.0800, 'display_order' => 1],
                 ['name' => 'Growth 500', 'slug' => 'growth-500', 'price' => 500, 'shares_count' => 5, 'units_limit' => 5, 'monthly_return_rate' => 0.0850, 'display_order' => 2],
                 ['name' => 'Scale 1000', 'slug' => 'scale-1000', 'price' => 1000, 'shares_count' => 10, 'units_limit' => 10, 'monthly_return_rate' => 0.0900, 'display_order' => 3],
             ],
@@ -107,6 +229,68 @@ class MiningPlatform
             ->firstOrFail();
     }
 
+    public static function freeStarterPackage(): InvestmentPackage
+    {
+        self::ensureDefaults();
+
+        return InvestmentPackage::with('miner')->where('slug', self::FREE_STARTER_PACKAGE_SLUG)->firstOrFail();
+    }
+
+    public static function basicUpgradePackage(): InvestmentPackage
+    {
+        self::ensureDefaults();
+
+        return InvestmentPackage::with('miner')->where('slug', self::BASIC_UPGRADE_PACKAGE_SLUG)->firstOrFail();
+    }
+
+    public static function ensureStarterPackage(User $user): UserInvestment
+    {
+        self::ensureDefaults();
+
+        $existingStarter = $user->investments()
+            ->whereHas('package', fn ($query) => $query->where('slug', self::FREE_STARTER_PACKAGE_SLUG))
+            ->first();
+
+        if ($existingStarter) {
+            return $existingStarter;
+        }
+
+        $package = self::freeStarterPackage();
+        $level = self::syncUserLevel($user);
+
+        $shareholder = Shareholder::updateOrCreate(
+            ['user_id' => $user->id],
+            [
+                'package_name' => $package->name,
+                'price' => $package->price,
+                'billing_cycle' => 'monthly',
+                'units_limit' => $package->units_limit,
+                'status' => 'starter',
+                'subscribed_at' => now(),
+            ],
+        );
+
+        $investment = UserInvestment::create([
+            'user_id' => $user->id,
+            'miner_id' => $package->miner_id,
+            'package_id' => $package->id,
+            'shareholder_id' => $shareholder->id,
+            'amount' => $package->price,
+            'shares_owned' => $package->shares_count,
+            'monthly_return_rate' => $package->monthly_return_rate,
+            'level_bonus_rate' => $level->bonus_rate,
+            'team_bonus_rate' => 0,
+            'status' => 'active',
+            'subscribed_at' => now(),
+        ]);
+
+        if (! $user->account_type || $user->account_type === 'user') {
+            $user->forceFill(['account_type' => 'starter'])->save();
+        }
+
+        return $investment;
+    }
+
     public static function createMiner(array $attributes): Miner
     {
         self::ensureDefaults();
@@ -145,7 +329,7 @@ class MiningPlatform
         self::ensureDefaults();
 
         $registeredReferrals = $user->friendInvitations()->whereNotNull('registered_at')->count();
-        $totalInvestment = (float) $user->investments()->sum('amount');
+        $totalInvestment = (float) $user->investments()->where('amount', '>', 0)->sum('amount');
 
         $level = UserLevel::query()->orderByDesc('rank')->get()->first(function (UserLevel $candidate) use ($registeredReferrals, $totalInvestment) {
             return $registeredReferrals >= $candidate->minimum_referrals && $totalInvestment >= $candidate->minimum_investment;
@@ -158,18 +342,32 @@ class MiningPlatform
         return $level;
     }
 
+    public static function invitationBonusRate(User $user): float
+    {
+        $verifiedInvites = $user->friendInvitations()->whereNotNull('verified_at')->count();
+
+        return match (true) {
+            $verifiedInvites >= 50 => (float) self::rewardSetting('invitation_bonus_after_50_rate'),
+            $verifiedInvites >= 20 => (float) self::rewardSetting('invitation_bonus_after_20_rate'),
+            $verifiedInvites >= 10 => (float) self::rewardSetting('invitation_bonus_after_10_rate'),
+            default => 0.0000,
+        };
+    }
+
     public static function teamBonusRate(User $user): float
     {
         $activeDirectInvestors = $user->sponsoredUsers()
-            ->whereHas('investments', fn ($query) => $query->where('status', 'active'))
+            ->whereHas('investments', fn ($query) => $query->where('status', 'active')->where('amount', '>', 0))
             ->count();
 
-        return match (true) {
+        $teamInvestorBonus = match (true) {
             $activeDirectInvestors >= 5 => 0.0100,
             $activeDirectInvestors >= 3 => 0.0050,
             $activeDirectInvestors >= 1 => 0.0025,
             default => 0.0000,
         };
+
+        return round(self::invitationBonusRate($user) + $teamInvestorBonus, 4);
     }
 
     public static function refreshInvestmentBonusRates(User $user): User
@@ -185,6 +383,105 @@ class MiningPlatform
             ]);
 
         return $user->fresh(['userLevel', 'investments.package', 'investments.miner']);
+    }
+
+    public static function starterUpgradeProgress(User $user): array
+    {
+        $verifiedInvites = $user->friendInvitations()->whereNotNull('verified_at')->count();
+        $directBasicSubscribers = UserInvestment::query()
+            ->where('status', 'active')
+            ->where('amount', '>', 0)
+            ->whereHas('user', fn ($query) => $query->where('sponsor_user_id', $user->id))
+            ->whereHas('package', fn ($query) => $query->where('slug', self::BASIC_UPGRADE_PACKAGE_SLUG))
+            ->count();
+        $hasFreeStarter = $user->investments()
+            ->whereHas('package', fn ($query) => $query->where('slug', self::FREE_STARTER_PACKAGE_SLUG))
+            ->exists();
+        $hasUnlockedBasic = $user->investments()
+            ->where('status', 'active')
+            ->where('amount', '>', 0)
+            ->whereHas('package', fn ($query) => $query->where('slug', self::BASIC_UPGRADE_PACKAGE_SLUG))
+            ->exists();
+
+        return [
+            'verified_invites' => $verifiedInvites,
+            'required_verified_invites' => (int) self::rewardSetting('free_starter_verified_invites_required'),
+            'direct_basic_subscribers' => $directBasicSubscribers,
+            'required_direct_basic_subscribers' => (int) self::rewardSetting('free_starter_direct_basic_required'),
+            'has_free_starter' => $hasFreeStarter,
+            'has_unlocked_basic' => $hasUnlockedBasic,
+            'qualifies' => $verifiedInvites >= (int) self::rewardSetting('free_starter_verified_invites_required') && $directBasicSubscribers >= (int) self::rewardSetting('free_starter_direct_basic_required'),
+        ];
+    }
+
+    public static function attemptStarterUpgrade(User $user): ?UserInvestment
+    {
+        self::ensureDefaults();
+
+        $progress = self::starterUpgradeProgress($user);
+
+        if (! $progress['qualifies'] || $progress['has_unlocked_basic']) {
+            return null;
+        }
+
+        $package = self::basicUpgradePackage();
+        $level = self::syncUserLevel($user);
+        $teamBonusRate = self::teamBonusRate($user);
+
+        $shareholder = Shareholder::updateOrCreate(
+            ['user_id' => $user->id],
+            [
+                'package_name' => $package->name,
+                'price' => $package->price,
+                'billing_cycle' => 'monthly',
+                'units_limit' => $package->units_limit,
+                'status' => 'active',
+                'subscribed_at' => now(),
+            ],
+        );
+
+        $investment = UserInvestment::create([
+            'user_id' => $user->id,
+            'miner_id' => $package->miner_id,
+            'package_id' => $package->id,
+            'shareholder_id' => $shareholder->id,
+            'amount' => $package->price,
+            'shares_owned' => $package->shares_count,
+            'monthly_return_rate' => $package->monthly_return_rate,
+            'level_bonus_rate' => $level->bonus_rate,
+            'team_bonus_rate' => $teamBonusRate,
+            'status' => 'active',
+            'subscribed_at' => now(),
+        ]);
+
+        $user->forceFill(['account_type' => 'shareholder'])->save();
+        self::refreshInvestmentBonusRates($user->fresh());
+        $investment->refresh();
+
+        Earning::firstOrCreate(
+            [
+                'user_id' => $user->id,
+                'investment_id' => $investment->id,
+                'earned_on' => now()->toDateString(),
+                'source' => 'projected_return',
+                'notes' => 'Starter upgrade unlocked '.$package->name.' automatically.',
+            ],
+            [
+                'amount' => round((float) $investment->amount * ((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate + (float) $investment->team_bonus_rate), 2),
+                'status' => 'pending',
+            ],
+        );
+
+        self::recordReferralEvent(
+            $user,
+            'starter_upgrade_unlocked',
+            'Free starter upgraded',
+            'You unlocked '.$package->name.' after completing the referral mission.',
+            $user,
+            $investment,
+        );
+
+        return $investment;
     }
 
     public static function assignSponsorFromInvitations(User $user): ?User
@@ -232,14 +529,19 @@ class MiningPlatform
     {
         $period = ($month ?? now())->copy()->startOfMonth();
 
-        return $user->investments()->with('package')->where('status', 'active')->get()->map(function (UserInvestment $investment) use ($user, $period) {
-            $amount = round((float) $investment->amount * ((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate + (float) $investment->team_bonus_rate), 2);
+        return $user->investments()
+            ->with('package')
+            ->where('status', 'active')
+            ->where('amount', '>', 0)
+            ->get()
+            ->map(function (UserInvestment $investment) use ($user, $period) {
+                $amount = round((float) $investment->amount * ((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate + (float) $investment->team_bonus_rate), 2);
 
-            return Earning::firstOrCreate(
-                ['user_id' => $user->id, 'investment_id' => $investment->id, 'earned_on' => $period->toDateString(), 'source' => 'mining_return'],
-                ['amount' => $amount, 'status' => 'available', 'notes' => 'Monthly mining return generated for '.$period->format('F Y').'.'],
-            );
-        });
+                return Earning::firstOrCreate(
+                    ['user_id' => $user->id, 'investment_id' => $investment->id, 'earned_on' => $period->toDateString(), 'source' => 'mining_return'],
+                    ['amount' => $amount, 'status' => 'available', 'notes' => 'Monthly mining return generated for '.$period->format('F Y').'.'],
+                );
+            });
     }
 
     public static function awardReferralRegistration(User $registeredUser): Collection
@@ -247,14 +549,14 @@ class MiningPlatform
         return FriendInvitation::query()->with('user')->where('email', $registeredUser->email)->get()->map(function (FriendInvitation $invitation) use ($registeredUser) {
             return Earning::firstOrCreate(
                 ['user_id' => $invitation->user_id, 'investment_id' => null, 'earned_on' => now()->toDateString(), 'source' => 'referral_registration', 'notes' => 'Referral registration reward for '.$registeredUser->email.'.'],
-                ['amount' => self::REFERRAL_REGISTRATION_REWARD, 'status' => 'available'],
+                ['amount' => (float) self::rewardSetting('referral_registration_reward'), 'status' => 'available'],
             );
         });
     }
 
     public static function awardReferralSubscription(User $referredUser, UserInvestment $investment): Collection
     {
-        $rewardAmount = round((float) $investment->amount * self::REFERRAL_SUBSCRIPTION_REWARD_RATE, 2);
+        $rewardAmount = round((float) $investment->amount * (float) self::rewardSetting('referral_subscription_reward_rate'), 2);
 
         $rewards = FriendInvitation::query()->with('user')->where('email', $referredUser->email)->get()->map(function (FriendInvitation $invitation) use ($referredUser, $investment, $rewardAmount) {
             return Earning::firstOrCreate(
@@ -270,63 +572,71 @@ class MiningPlatform
 
     public static function awardTeamSubscriptionRewards(User $referredUser, UserInvestment $investment): void
     {
-        $sponsor = $referredUser->sponsor()->first();
+        $depth = 1;
+        $currentSponsor = $referredUser->sponsor()->first();
 
-        if ($sponsor) {
-            $directRewardAmount = round((float) $investment->amount * self::TEAM_DIRECT_SUBSCRIPTION_REWARD_RATE, 2);
+        while ($currentSponsor && $depth <= 5) {
+            $rewardRate = self::networkLevelRewardRate($depth);
 
-            Earning::firstOrCreate(
-                [
-                    'user_id' => $sponsor->id,
-                    'investment_id' => null,
-                    'earned_on' => now()->toDateString(),
-                    'source' => 'team_subscription_bonus',
-                    'notes' => 'Team subscription bonus for '.$referredUser->email.' on investment #'.$investment->id.'.',
-                ],
-                [
-                    'amount' => $directRewardAmount,
-                    'status' => 'available',
-                ],
-            );
-
-            self::recordReferralEvent(
-                $sponsor,
-                'team_subscription',
-                'A team investor subscribed',
-                $referredUser->name.' subscribed to '.$investment->package?->name.' under your team.',
-                $referredUser,
-                $investment,
-            );
-
-            self::refreshInvestmentBonusRates($sponsor->fresh());
-
-            $secondLevelSponsor = $sponsor->sponsor()->first();
-            if ($secondLevelSponsor) {
-                $indirectRewardAmount = round((float) $investment->amount * self::TEAM_INDIRECT_SUBSCRIPTION_REWARD_RATE, 2);
+            if ($rewardRate > 0) {
+                $rewardAmount = round((float) $investment->amount * $rewardRate, 2);
+                $source = match ($depth) {
+                    1 => 'team_subscription_bonus',
+                    2 => 'team_downline_bonus',
+                    default => 'team_level_'.$depth.'_bonus',
+                };
+                $notes = match ($depth) {
+                    1 => 'Team subscription bonus for '.$referredUser->email.' on investment #'.$investment->id.'.',
+                    2 => 'Second-level team bonus for '.$referredUser->email.' on investment #'.$investment->id.'.',
+                    default => 'Level '.$depth.' team bonus for '.$referredUser->email.' on investment #'.$investment->id.'.',
+                };
+                $title = match ($depth) {
+                    1 => 'A team investor subscribed',
+                    2 => 'A second-level investor subscribed',
+                    default => 'A level '.$depth.' investor subscribed',
+                };
+                $message = match ($depth) {
+                    1 => $referredUser->name.' subscribed to '.$investment->package?->name.' under your team.',
+                    2 => $referredUser->name.' subscribed in your extended network.',
+                    default => $referredUser->name.' subscribed in level '.$depth.' of your network.',
+                };
+                $type = match ($depth) {
+                    1 => 'team_subscription',
+                    2 => 'team_downline_subscription',
+                    default => 'team_level_'.$depth.'_subscription',
+                };
 
                 Earning::firstOrCreate(
                     [
-                        'user_id' => $secondLevelSponsor->id,
+                        'user_id' => $currentSponsor->id,
                         'investment_id' => null,
                         'earned_on' => now()->toDateString(),
-                        'source' => 'team_downline_bonus',
-                        'notes' => 'Second-level team bonus for '.$referredUser->email.' on investment #'.$investment->id.'.',
+                        'source' => $source,
+                        'notes' => $notes,
                     ],
                     [
-                        'amount' => $indirectRewardAmount,
+                        'amount' => $rewardAmount,
                         'status' => 'available',
                     ],
                 );
 
                 self::recordReferralEvent(
-                    $secondLevelSponsor,
-                    'team_downline_subscription',
-                    'A second-level investor subscribed',
-                    $referredUser->name.' subscribed in your extended network.',
+                    $currentSponsor,
+                    $type,
+                    $title,
+                    $message,
                     $referredUser,
                     $investment,
                 );
             }
+
+            if ($depth === 1) {
+                self::refreshInvestmentBonusRates($currentSponsor->fresh());
+                self::attemptStarterUpgrade($currentSponsor->fresh());
+            }
+
+            $currentSponsor = $currentSponsor->sponsor()->first();
+            $depth++;
         }
     }
 
@@ -449,13 +759,39 @@ class MiningPlatform
     protected static function createDefaultPackagesForMiner(Miner $miner): void
     {
         $definitions = [
-            ['name' => 'Launch', 'suffix' => 'launch', 'shares_count' => 1, 'units_limit' => 1, 'price_multiplier' => 1, 'rate_bonus' => 0.0000, 'display_order' => 1],
-            ['name' => 'Growth', 'suffix' => 'growth', 'shares_count' => 5, 'units_limit' => 5, 'price_multiplier' => 5, 'rate_bonus' => 0.0050, 'display_order' => 2],
-            ['name' => 'Scale', 'suffix' => 'scale', 'shares_count' => 10, 'units_limit' => 10, 'price_multiplier' => 10, 'rate_bonus' => 0.0100, 'display_order' => 3],
+            [
+                'name' => self::platformSetting('launch_package_name'),
+                'suffix' => 'launch',
+                'shares_count' => (int) self::platformSetting('launch_package_shares_count'),
+                'units_limit' => (int) self::platformSetting('launch_package_units_limit'),
+                'price_multiplier' => (float) self::platformSetting('launch_package_price_multiplier'),
+                'rate_bonus' => (float) self::platformSetting('launch_package_rate_bonus'),
+                'display_order' => 1,
+            ],
+            [
+                'name' => self::platformSetting('growth_package_name'),
+                'suffix' => 'growth',
+                'shares_count' => (int) self::platformSetting('growth_package_shares_count'),
+                'units_limit' => (int) self::platformSetting('growth_package_units_limit'),
+                'price_multiplier' => (float) self::platformSetting('growth_package_price_multiplier'),
+                'rate_bonus' => (float) self::platformSetting('growth_package_rate_bonus'),
+                'display_order' => 2,
+            ],
+            [
+                'name' => self::platformSetting('scale_package_name'),
+                'suffix' => 'scale',
+                'shares_count' => (int) self::platformSetting('scale_package_shares_count'),
+                'units_limit' => (int) self::platformSetting('scale_package_units_limit'),
+                'price_multiplier' => (float) self::platformSetting('scale_package_price_multiplier'),
+                'rate_bonus' => (float) self::platformSetting('scale_package_rate_bonus'),
+                'display_order' => 3,
+            ],
         ];
 
         foreach ($definitions as $definition) {
-            $price = round((float) $miner->share_price * $definition['price_multiplier'], 2);
+            $price = round((float) $miner->share_price * max($definition['price_multiplier'], 0), 2);
+            $sharesCount = max($definition['shares_count'], 1);
+            $unitsLimit = max($definition['units_limit'], 1);
 
             InvestmentPackage::updateOrCreate(
                 ['slug' => $miner->slug.'-'.$definition['suffix']],
@@ -463,9 +799,9 @@ class MiningPlatform
                     'miner_id' => $miner->id,
                     'name' => $definition['name'].' '.number_format($price, 0, '.', ''),
                     'price' => $price,
-                    'shares_count' => $definition['shares_count'],
-                    'units_limit' => $definition['units_limit'],
-                    'monthly_return_rate' => round((float) $miner->base_monthly_return_rate + $definition['rate_bonus'], 4),
+                    'shares_count' => $sharesCount,
+                    'units_limit' => $unitsLimit,
+                    'monthly_return_rate' => round((float) $miner->base_monthly_return_rate + max($definition['rate_bonus'], 0), 4),
                     'display_order' => $definition['display_order'],
                     'is_active' => true,
                 ],
@@ -517,3 +853,11 @@ class MiningPlatform
         }
     }
 }
+
+
+
+
+
+
+
+

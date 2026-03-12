@@ -11,7 +11,12 @@
     <p class="text-secondary mb-0">Track live production, share availability, and your personal mining position.</p>
   </div>
   <div class="text-md-end">
-    <div class="fw-semibold">Current level: <span class="text-primary">{{ $level->name }}</span></div>
+    @php
+      $displayTierName = $user->account_type === 'starter'
+        ? ($user->investments->firstWhere('package.slug', \App\Support\MiningPlatform::FREE_STARTER_PACKAGE_SLUG)?->package?->name ?? 'Free Starter')
+        : $level->name;
+    @endphp
+    <div class="fw-semibold">Current level: <span class="text-primary">{{ $displayTierName }}</span></div>
     <div class="text-secondary small">Bonus rate: {{ number_format((float) $level->bonus_rate * 100, 2) }}%</div>
   </div>
 </div>
@@ -70,6 +75,69 @@
         <h3 class="mb-2">${{ number_format($expectedMonthlyEarnings, 2) }}</h3>
         <div class="text-secondary small">
           Active investment on this miner: {{ $activeInvestment?->package?->name ?? 'No active package yet' }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+@php
+  $starterPackage = $starterPackage ?? \App\Support\MiningPlatform::freeStarterPackage();
+  $starterProgress = $starterProgress ?? \App\Support\MiningPlatform::starterUpgradeProgress($user);
+@endphp
+
+<div class="row">
+  <div class="col-12 grid-margin stretch-card">
+    <div class="card {{ $starterProgress['has_unlocked_basic'] ? 'border border-success' : 'border border-warning' }}">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+          <div>
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <h6 class="card-title mb-0">Free Starter Mission</h6>
+              <span class="badge {{ $starterProgress['has_unlocked_basic'] ? 'bg-success' : 'bg-warning text-dark' }}">
+                {{ $starterProgress['has_unlocked_basic'] ? 'Basic 100 unlocked' : 'Upgrade in progress' }}
+              </span>
+            </div>
+            <p class="text-secondary mb-0">
+              Start from {{ $starterPackage?->name ?? 'Free Starter' }} and unlock Basic 100 by growing your direct network.
+            </p>
+          </div>
+          <div class="text-md-end">
+            <div class="fw-semibold">Current package path: {{ $displayTierName }}</div>
+            <div class="text-secondary small">
+              Team bonus on paid investments: {{ number_format((float) \App\Support\MiningPlatform::teamBonusRate($user) * 100, 2) }}%
+            </div>
+          </div>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="border rounded p-3 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-secondary">Verified invites</span>
+                <span class="fw-semibold">{{ $starterProgress['verified_invites'] }} / {{ $starterProgress['required_verified_invites'] }}</span>
+              </div>
+              <div class="progress" style="height: 8px;">
+                <div class="progress-bar bg-primary" role="progressbar" style="width: {{ min(($starterProgress['verified_invites'] / max($starterProgress['required_verified_invites'], 1)) * 100, 100) }}%"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="border rounded p-3 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="text-secondary">Direct Basic 100 subscribers</span>
+                <span class="fw-semibold">{{ $starterProgress['direct_basic_subscribers'] }} / {{ $starterProgress['required_direct_basic_subscribers'] }}</span>
+              </div>
+              <div class="progress" style="height: 8px;">
+                <div class="progress-bar bg-success" role="progressbar" style="width: {{ min(($starterProgress['direct_basic_subscribers'] / max($starterProgress['required_direct_basic_subscribers'], 1)) * 100, 100) }}%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="alert {{ $starterProgress['has_unlocked_basic'] ? 'alert-success' : 'alert-light border' }} mt-3 mb-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span>
+            {{ $starterProgress['has_unlocked_basic'] ? 'Your referral mission is complete. Basic 100 is active on your account.' : 'Complete both goals to unlock Basic 100 automatically on your account.' }}
+          </span>
+          <a href="{{ route('dashboard.network') }}" class="btn btn-sm btn-outline-primary">Open referral network</a>
         </div>
       </div>
     </div>
@@ -243,3 +311,7 @@
     });
   </script>
 @endpush
+
+
+
+

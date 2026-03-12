@@ -8,9 +8,14 @@
         <h4 class="mb-1">Admin Analytics</h4>
         <p class="text-secondary mb-0">Business overview of investments, payout exposure, wallet liabilities, referral performance, and miner traction.</p>
       </div>
-      <a href="{{ route('dashboard.users') }}" class="btn btn-outline-primary btn-icon-text">
-        <i data-lucide="users-round" class="btn-icon-prepend"></i> Manage users
-      </a>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ route('dashboard.analytics.export') }}" class="btn btn-outline-success btn-icon-text">
+          <i data-lucide="download" class="btn-icon-prepend"></i> Export CSV
+        </a>
+        <a href="{{ route('dashboard.users') }}" class="btn btn-outline-primary btn-icon-text">
+          <i data-lucide="users-round" class="btn-icon-prepend"></i> Manage users
+        </a>
+      </div>
     </div>
   </div>
 </div>
@@ -129,6 +134,71 @@
 </div>
 
 <div class="row mb-4">
+  <div class="col-12 grid-margin stretch-card">
+    <div class="card">
+      <div class="card-body">
+        @php
+          $mlmTotalRewards = (float) $mlmRewardBreakdown->sum('overall_total');
+        @endphp
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
+            <h5 class="mb-1">MLM payout breakdown</h5>
+            <p class="text-secondary mb-0">Track how much the network engine is paying across reward levels 1 through 5.</p>
+          </div>
+          <span class="badge bg-dark">{{ $mlmRewardBreakdown->sum('count') }} rewards</span>
+        </div>
+        <div class="row g-3 mb-4">
+          @foreach ($mlmRewardBreakdown as $rewardLevel)
+            @php
+              $shareOfPool = $mlmTotalRewards > 0 ? ($rewardLevel['overall_total'] / $mlmTotalRewards) * 100 : 0;
+            @endphp
+            <div class="col-md-6 col-xl">
+              <div class="border rounded p-3 h-100 bg-light">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <span class="badge bg-primary">Level {{ $rewardLevel['level'] }}</span>
+                  <span class="text-secondary small">{{ number_format($shareOfPool, 1) }}%</span>
+                </div>
+                <div class="fw-semibold mb-1">${{ number_format($rewardLevel['overall_total'], 2) }}</div>
+                <div class="text-secondary small mb-2">{{ $rewardLevel['count'] }} reward entries</div>
+                <div class="progress" style="height: 8px;">
+                  <div class="progress-bar bg-primary" role="progressbar" style="width: {{ min($shareOfPool, 100) }}%"></div>
+                </div>
+              </div>
+            </div>
+          @endforeach
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Level</th>
+                <th>Reward source</th>
+                <th>Entries</th>
+                <th>Available</th>
+                <th>Paid</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              @foreach ($mlmRewardBreakdown as $rewardLevel)
+                <tr>
+                  <td><span class="badge bg-light text-dark">Level {{ $rewardLevel['level'] }}</span></td>
+                  <td>{{ str($rewardLevel['source'])->replace('_', ' ')->title() }}</td>
+                  <td>{{ $rewardLevel['count'] }}</td>
+                  <td>${{ number_format($rewardLevel['available_total'], 2) }}</td>
+                  <td>${{ number_format($rewardLevel['paid_total'], 2) }}</td>
+                  <td class="fw-semibold">${{ number_format($rewardLevel['overall_total'], 2) }}</td>
+                </tr>
+              @endforeach
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-4">
   <div class="col-xl-6 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
@@ -168,3 +238,5 @@
   </div>
 </div>
 @endsection
+
+

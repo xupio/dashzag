@@ -1,6 +1,16 @@
 @extends('layout.master')
 
 @section('content')
+@php
+  $formatEventDepth = function (string $type, string $title): string {
+      return match (true) {
+          $type === 'team_subscription' => 'Level 1',
+          $type === 'team_downline_subscription' => 'Level 2',
+          str_starts_with($type, 'team_level_') && str_ends_with($type, '_subscription') => 'Level '.str($type)->between('team_level_', '_subscription'),
+          default => $title,
+      };
+  };
+@endphp
 <div class="row">
   <div class="col-12 grid-margin">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
@@ -23,7 +33,7 @@
 <div class="row mb-4">
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Users in tree</p><h4 class="mb-0">{{ $users->count() }}</h4></div></div></div>
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Sponsored users</p><h4 class="mb-0">{{ $users->whereNotNull('sponsor_user_id')->count() }}</h4></div></div></div>
-  <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Active team investors</p><h4 class="mb-0">{{ $users->filter(fn ($user) => $user->investments->where('status', 'active')->isNotEmpty())->count() }}</h4></div></div></div>
+  <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Active team investors</p><h4 class="mb-0">{{ $users->filter(fn ($user) => $user->investments->where('status', 'active')->where('amount', '>', 0)->isNotEmpty())->count() }}</h4></div></div></div>
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Tracked events</p><h4 class="mb-0">{{ $events->count() }}</h4></div></div></div>
 </div>
 
@@ -60,8 +70,8 @@
                   <td>{{ $networkUser->sponsor?->email ?? 'Top-level' }}</td>
                   <td>{{ $networkUser->userLevel?->name ?? 'Starter' }}</td>
                   <td>{{ $networkUser->sponsoredUsers->count() }}</td>
-                  <td>{{ $networkUser->sponsoredUsers->filter(fn ($member) => $member->investments->where('status', 'active')->isNotEmpty())->count() }}</td>
-                  <td>${{ number_format((float) $networkUser->sponsoredUsers->sum(fn ($member) => $member->investments->where('status', 'active')->sum('amount')), 2) }}</td>
+                  <td>{{ $networkUser->sponsoredUsers->filter(fn ($member) => $member->investments->where('status', 'active')->where('amount', '>', 0)->isNotEmpty())->count() }}</td>
+                  <td>${{ number_format((float) $networkUser->sponsoredUsers->sum(fn ($member) => $member->investments->where('status', 'active')->where('amount', '>', 0)->sum('amount')), 2) }}</td>
                 </tr>
               @endforeach
             </tbody>
@@ -92,6 +102,7 @@
                 <tr>
                   <th>When</th>
                   <th>Sponsor</th>
+                  <th>Reward level</th>
                   <th>Event</th>
                   <th>Related user</th>
                 </tr>
@@ -101,6 +112,7 @@
                   <tr>
                     <td>{{ $event->created_at?->format('M d, Y h:i A') }}</td>
                     <td>{{ $event->sponsor?->email ?? '—' }}</td>
+                    <td><span class="badge bg-light text-dark">{{ $formatEventDepth($event->type, $event->title) }}</span></td>
                     <td>
                       <div class="fw-semibold">{{ $event->title }}</div>
                       <div class="text-secondary small">{{ $event->message }}</div>

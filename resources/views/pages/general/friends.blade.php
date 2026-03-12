@@ -62,6 +62,7 @@
                   <th>Country</th>
                   <th>Status</th>
                   <th>Invited</th>
+                  <th class="text-end">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -81,6 +82,16 @@
                       @endif
                     </td>
                     <td>{{ $friendInvitation->created_at?->format('M d, Y h:i A') }}</td>
+                    <td class="text-end">
+                      @if (! $friendInvitation->verified_at)
+                        <form method="POST" action="{{ route('dashboard.friends.resend', $friendInvitation) }}" class="d-inline">
+                          @csrf
+                          <button type="submit" class="btn btn-sm btn-outline-secondary">Resend email</button>
+                        </form>
+                      @else
+                        <span class="text-secondary small">No action</span>
+                      @endif
+                    </td>
                   </tr>
                 @endforeach
               </tbody>
@@ -159,4 +170,3 @@
     </script>
   @endif
 @endpush
-

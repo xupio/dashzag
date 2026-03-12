@@ -67,3 +67,4 @@ test('non admin user cannot access analytics page', function () {
 
     $this->actingAs($user)->get(route('dashboard.analytics'))->assertForbidden();
 });
+

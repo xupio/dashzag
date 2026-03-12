@@ -22,10 +22,14 @@ test('new users can register', function () {
     ]);
 
     $user = User::where('email', 'test@example.com')->first();
+    $user->load(['shareholder', 'investments.package']);
 
     $this->assertAuthenticated();
     expect($user)->not->toBeNull();
     expect($user->hasVerifiedEmail())->toBeFalse();
+    expect($user->account_type)->toBe('starter');
+    expect($user->shareholder?->package_name)->toBe('Starter Free');
+    expect($user->investments->first()?->package?->slug)->toBe('starter-free');
     Notification::assertSentTo($user, InvitationAwareVerifyEmail::class);
     $response->assertRedirect(route('verification.notice', absolute: false));
 });

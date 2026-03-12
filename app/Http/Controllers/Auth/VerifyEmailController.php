@@ -28,7 +28,9 @@ class VerifyEmailController extends Controller
             MiningPlatform::awardReferralRegistration($user);
 
             if ($user->sponsor) {
-                MiningPlatform::refreshInvestmentBonusRates($user->sponsor->fresh());
+                $sponsor = $user->sponsor->fresh();
+                MiningPlatform::refreshInvestmentBonusRates($sponsor);
+                MiningPlatform::attemptStarterUpgrade($sponsor);
             }
 
             event(new Verified($user));

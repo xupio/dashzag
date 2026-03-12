@@ -65,10 +65,38 @@ test('admin can export payout operations report as csv', function () {
     expect($csv)->toContain('pending');
 });
 
+
+test('admin can export analytics report as csv', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $investor = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+    ]);
+
+    $this->actingAs($investor)->post(route('general.sell-products.subscribe'), [
+        'package' => 'growth-500',
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('dashboard.analytics.export'));
+
+    $response->assertOk();
+    $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    $csv = $response->streamedContent();
+
+    expect($csv)->toContain('Section');
+    expect($csv)->toContain('Total invested');
+    expect($csv)->toContain('MLM payout breakdown');
+    expect($csv)->toContain('Level 3 total');
+});
 test('non admin user cannot export admin reports', function () {
     User::factory()->admin()->create(['email_verified_at' => now()]);
     $user = User::factory()->create(['email_verified_at' => now()]);
 
     $this->actingAs($user)->get(route('dashboard.shareholders.export'))->assertForbidden();
     $this->actingAs($user)->get(route('dashboard.operations.export'))->assertForbidden();
+    $this->actingAs($user)->get(route('dashboard.analytics.export'))->assertForbidden();
 });

@@ -198,6 +198,8 @@
             <a href="{{ route('dashboard.shareholders') }}" class="btn btn-light text-start"><i data-lucide="badge-dollar-sign" class="icon-sm me-2"></i> Shareholders</a>
             <a href="{{ route('dashboard.users') }}" class="btn btn-light text-start"><i data-lucide="users-round" class="icon-sm me-2"></i> Users</a>
             <a href="{{ route('dashboard.operations') }}" class="btn btn-light text-start"><i data-lucide="shield-check" class="icon-sm me-2"></i> Operations</a>
+            <a href="{{ route('dashboard.rewards') }}" class="btn btn-light text-start"><i data-lucide="percent" class="icon-sm me-2"></i> Rewards</a>
+            <a href="{{ route('dashboard.settings') }}" class="btn btn-light text-start"><i data-lucide="sliders-horizontal" class="icon-sm me-2"></i> Settings</a>
             <a href="{{ route('dashboard.packages') }}" class="btn btn-light text-start"><i data-lucide="package" class="icon-sm me-2"></i> Packages</a>
             <a href="{{ route('dashboard.miners') }}" class="btn btn-light text-start"><i data-lucide="server" class="icon-sm me-2"></i> Miners</a>
             <a href="{{ route('dashboard.miner') }}" class="btn btn-light text-start"><i data-lucide="cpu" class="icon-sm me-2"></i> Miner</a>
@@ -212,3 +214,5 @@
   </div>
 </div>
 @endsection
+
+

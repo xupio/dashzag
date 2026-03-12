@@ -51,6 +51,8 @@ Route::get('/dashboard', function (Request $request) {
         'miners' => $miners,
         'miner' => $miner,
         'level' => $level,
+        'starterPackage' => MiningPlatform::freeStarterPackage(),
+        'starterProgress' => MiningPlatform::starterUpgradeProgress($user),
         'sharesSold' => $sharesSold,
         'availableShares' => max($miner->total_shares - $sharesSold, 0),
         'expectedMonthlyEarnings' => MiningPlatform::expectedMonthlyEarnings($user),
@@ -108,11 +110,40 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
 
         $friendInvitations = $user->friendInvitations->sortByDesc('created_at')->values();
+        $invitedEmails = $friendInvitations->pluck('email')->filter()->unique()->values();
+        $activeInvestorEmails = UserInvestment::query()
+            ->where('status', 'active')
+            ->whereHas('user', fn ($query) => $query->whereIn('email', $invitedEmails))
+            ->with('user:id,email')
+            ->get()
+            ->pluck('user.email')
+            ->filter()
+            ->unique()
+            ->values();
+
         $directTeam = $user->sponsoredUsers->values();
         $secondLevelTeam = $directTeam
             ->flatMap(fn ($member) => $member->sponsoredUsers)
             ->unique('id')
             ->values();
+
+        $directTeamBranches = $directTeam->map(function ($member) {
+            $activeInvestments = $member->investments->where('status', 'active')->where('amount', '>', 0);
+            $branchSecondLevel = $member->sponsoredUsers->values();
+            $branchSecondLevelActive = $branchSecondLevel->filter(fn ($downline) => $downline->investments->where('status', 'active')->where('amount', '>', 0)->isNotEmpty());
+
+            return [
+                'member' => $member,
+                'active_investments' => $activeInvestments,
+                'active_capital' => (float) $activeInvestments->sum('amount'),
+                'active_package' => $activeInvestments->sortByDesc('subscribed_at')->first()?->package?->name,
+                'is_active_investor' => $activeInvestments->isNotEmpty(),
+                'downline_count' => $branchSecondLevel->count(),
+                'downline_active_count' => $branchSecondLevelActive->count(),
+                'downline_capital' => (float) $branchSecondLevel->sum(fn ($downline) => $downline->investments->where('status', 'active')->where('amount', '>', 0)->sum('amount')),
+                'downline_members' => $branchSecondLevel,
+            ];
+        })->values();
 
         $referralRewards = $user->earnings
             ->whereIn('source', ['referral_registration', 'referral_subscription', 'team_subscription_bonus', 'team_downline_bonus'])
@@ -126,6 +157,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'user' => $user,
             'friendInvitations' => $friendInvitations,
             'directTeam' => $directTeam,
+            'directTeamBranches' => $directTeamBranches,
             'secondLevelTeam' => $secondLevelTeam,
             'teamEvents' => $user->referralEvents->sortByDesc('created_at')->values(),
             'teamBonusRate' => MiningPlatform::teamBonusRate($user),
@@ -134,7 +166,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'invitedCount' => $friendInvitations->count(),
             'verifiedCount' => $friendInvitations->whereNotNull('verified_at')->count(),
             'registeredCount' => $friendInvitations->whereNotNull('registered_at')->count(),
-            'subscribedCount' => $activeTeamInvestors,
+            'subscribedCount' => $activeInvestorEmails->count(),
+            'activeInvestorEmails' => $activeInvestorEmails,
             'referralRewards' => $referralRewards,
             'referralRewardsTotal' => (float) $referralRewards->sum('amount'),
         ]);
@@ -201,6 +234,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             return view('pages.general.miners', [
                 'miners' => Miner::with(['packages', 'investments'])->orderBy('name')->get(),
+                'defaults' => MiningPlatform::platformSettings(),
             ]);
         })->name('dashboard.miners');
 
@@ -233,6 +267,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             $topInvestors = $users->sortByDesc(fn ($user) => $user->investments->where('status', 'active')->sum('amount'))->take(5)->values();
             $topReferrers = $users->sortByDesc(fn ($user) => $user->friendInvitations->whereNotNull('registered_at')->count())->take(5)->values();
+            $mlmRewardBreakdown = collect([
+                1 => 'team_subscription_bonus',
+                2 => 'team_downline_bonus',
+                3 => 'team_level_3_bonus',
+                4 => 'team_level_4_bonus',
+                5 => 'team_level_5_bonus',
+            ])->map(function ($source, $level) {
+                return [
+                    'level' => $level,
+                    'source' => $source,
+                    'count' => Earning::where('source', $source)->count(),
+                    'available_total' => (float) Earning::where('source', $source)->where('status', 'available')->sum('amount'),
+                    'paid_total' => (float) Earning::where('source', $source)->where('status', 'paid')->sum('amount'),
+                    'overall_total' => (float) Earning::where('source', $source)->sum('amount'),
+                ];
+            })->values();
 
             return view('pages.general.analytics', [
                 'totalInvested' => (float) UserInvestment::where('status', 'active')->sum('amount'),
@@ -244,10 +294,55 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'packages' => $packages,
                 'topInvestors' => $topInvestors,
                 'topReferrers' => $topReferrers,
+                'mlmRewardBreakdown' => $mlmRewardBreakdown,
                 'miner' => $miner,
                 'miners' => $miners,
             ]);
         })->name('dashboard.analytics');
+
+        Route::get('/dashboard/analytics/export', function () {
+            MiningPlatform::ensureDefaults();
+
+            $mlmRewardBreakdown = collect([
+                1 => 'team_subscription_bonus',
+                2 => 'team_downline_bonus',
+                3 => 'team_level_3_bonus',
+                4 => 'team_level_4_bonus',
+                5 => 'team_level_5_bonus',
+            ])->map(function ($source, $level) {
+                return [
+                    'level' => $level,
+                    'source' => $source,
+                    'count' => Earning::where('source', $source)->count(),
+                    'available_total' => (float) Earning::where('source', $source)->where('status', 'available')->sum('amount'),
+                    'paid_total' => (float) Earning::where('source', $source)->where('status', 'paid')->sum('amount'),
+                    'overall_total' => (float) Earning::where('source', $source)->sum('amount'),
+                ];
+            })->values();
+
+            $filename = 'analytics-report-'.now()->format('Ymd-His').'.csv';
+
+            return response()->streamDownload(function () use ($mlmRewardBreakdown) {
+                $handle = fopen('php://output', 'w');
+                fputcsv($handle, ['Section', 'Label', 'Value']);
+                fputcsv($handle, ['Summary', 'Total invested', number_format((float) UserInvestment::where('status', 'active')->sum('amount'), 2, '.', '')]);
+                fputcsv($handle, ['Summary', 'Shares sold', (int) UserInvestment::where('status', 'active')->sum('shares_owned')]);
+                fputcsv($handle, ['Summary', 'Available liability', number_format((float) Earning::where('status', 'available')->sum('amount'), 2, '.', '')]);
+                fputcsv($handle, ['Summary', 'Pending payouts', number_format((float) PayoutRequest::whereIn('status', ['pending', 'approved'])->sum('amount'), 2, '.', '')]);
+                fputcsv($handle, ['Summary', 'Paid out', number_format((float) Earning::where('status', 'paid')->sum('amount'), 2, '.', '')]);
+                fputcsv($handle, ['Summary', 'Active shareholders', (int) User::where('account_type', 'shareholder')->count()]);
+
+                foreach ($mlmRewardBreakdown as $rewardLevel) {
+                    fputcsv($handle, ['MLM payout breakdown', 'Level '.$rewardLevel['level'].' source', $rewardLevel['source']]);
+                    fputcsv($handle, ['MLM payout breakdown', 'Level '.$rewardLevel['level'].' entries', $rewardLevel['count']]);
+                    fputcsv($handle, ['MLM payout breakdown', 'Level '.$rewardLevel['level'].' available', number_format($rewardLevel['available_total'], 2, '.', '')]);
+                    fputcsv($handle, ['MLM payout breakdown', 'Level '.$rewardLevel['level'].' paid', number_format($rewardLevel['paid_total'], 2, '.', '')]);
+                    fputcsv($handle, ['MLM payout breakdown', 'Level '.$rewardLevel['level'].' total', number_format($rewardLevel['overall_total'], 2, '.', '')]);
+                }
+
+                fclose($handle);
+            }, $filename, ['Content-Type' => 'text/csv']);
+        })->name('dashboard.analytics.export');
 
         Route::get('/dashboard/network-admin', function () {
             MiningPlatform::ensureDefaults();
@@ -404,6 +499,79 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             return redirect()->route('dashboard.operations')->with('operations_success', 'Payout request marked as paid.');
         })->name('dashboard.operations.payouts.pay');
+
+        Route::get('/dashboard/rewards', function () {
+            MiningPlatform::ensureDefaults();
+
+            return view('pages.general.rewards', [
+                'settings' => MiningPlatform::rewardSettings(),
+            ]);
+        })->name('dashboard.rewards');
+
+        Route::post('/dashboard/rewards', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $validated = $request->validate([
+                'free_starter_verified_invites_required' => ['required', 'integer', 'min:1'],
+                'free_starter_direct_basic_required' => ['required', 'integer', 'min:1'],
+                'referral_registration_reward' => ['required', 'numeric', 'min:0'],
+                'referral_subscription_reward_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'team_direct_subscription_reward_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'team_indirect_subscription_reward_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'invitation_bonus_after_10_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'invitation_bonus_after_20_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'invitation_bonus_after_50_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'team_bonus_after_1_investor_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'team_bonus_after_3_investor_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'team_bonus_after_5_investor_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'team_level_3_subscription_reward_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'team_level_4_subscription_reward_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'team_level_5_subscription_reward_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+            ]);
+
+            MiningPlatform::updateRewardSettings($validated);
+
+            return redirect()->route('dashboard.rewards')->with('rewards_success', 'Reward settings updated successfully.');
+        })->name('dashboard.rewards.update');
+
+        Route::get('/dashboard/settings', function () {
+            MiningPlatform::ensureDefaults();
+
+            return view('pages.general.settings', [
+                'settings' => MiningPlatform::platformSettings(),
+            ]);
+        })->name('dashboard.settings');
+
+        Route::post('/dashboard/settings', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $validated = $request->validate([
+                'new_miner_total_shares' => ['required', 'integer', 'min:1'],
+                'new_miner_share_price' => ['required', 'numeric', 'min:1'],
+                'new_miner_daily_output_usd' => ['required', 'numeric', 'min:0'],
+                'new_miner_monthly_output_usd' => ['required', 'numeric', 'min:0'],
+                'new_miner_base_monthly_return_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'launch_package_name' => ['required', 'string', 'max:255'],
+                'launch_package_shares_count' => ['required', 'integer', 'min:1'],
+                'launch_package_units_limit' => ['required', 'integer', 'min:1'],
+                'launch_package_price_multiplier' => ['required', 'numeric', 'min:0.1'],
+                'launch_package_rate_bonus' => ['required', 'numeric', 'min:0', 'max:1'],
+                'growth_package_name' => ['required', 'string', 'max:255'],
+                'growth_package_shares_count' => ['required', 'integer', 'min:1'],
+                'growth_package_units_limit' => ['required', 'integer', 'min:1'],
+                'growth_package_price_multiplier' => ['required', 'numeric', 'min:0.1'],
+                'growth_package_rate_bonus' => ['required', 'numeric', 'min:0', 'max:1'],
+                'scale_package_name' => ['required', 'string', 'max:255'],
+                'scale_package_shares_count' => ['required', 'integer', 'min:1'],
+                'scale_package_units_limit' => ['required', 'integer', 'min:1'],
+                'scale_package_price_multiplier' => ['required', 'numeric', 'min:0.1'],
+                'scale_package_rate_bonus' => ['required', 'numeric', 'min:0', 'max:1'],
+            ]);
+
+            MiningPlatform::updatePlatformSettings($validated);
+
+            return redirect()->route('dashboard.settings')->with('settings_success', 'Platform defaults updated successfully.');
+        })->name('dashboard.settings.update');
 
         Route::get('/dashboard/packages', function () {
             MiningPlatform::ensureDefaults();
@@ -607,6 +775,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->with('invite_success', $validated['name'].' has been invited successfully and the email has been sent.');
     })->name('dashboard.friends.invite');
 
+    Route::post('/dashboard/friends/{friendInvitation}/resend', function (Request $request, FriendInvitation $friendInvitation) {
+        abort_unless($friendInvitation->user_id === $request->user()->id, 403);
+
+        if ($friendInvitation->verified_at) {
+            return redirect()->route('dashboard.friends')->with('invite_success', $friendInvitation->name.' is already verified, so no resend was needed.');
+        }
+
+        $verificationUrl = URL::temporarySignedRoute(
+            'friend-invitations.verify',
+            now()->addDays(7),
+            ['friendInvitation' => $friendInvitation->id],
+        );
+
+        Mail::to($friendInvitation->email)->send(
+            new FriendInvitationMail($friendInvitation, $request->user(), $verificationUrl)
+        );
+
+        return redirect()
+            ->route('dashboard.friends')
+            ->with('invite_success', 'Invitation email resent to '.$friendInvitation->email.'.');
+    })->name('dashboard.friends.resend');
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -792,6 +982,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

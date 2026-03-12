@@ -12,13 +12,13 @@
   <div class="sidebar-body">
     <ul class="nav" id="sidebarNav">
       <li class="nav-item nav-category">Main</li>
-      <li class="nav-item {{ active_class(['dashboard', 'dashboard/profile', 'dashboard/investments', 'dashboard/network', 'dashboard/network-admin', 'dashboard/wallet', 'dashboard/analytics', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/friends']) }}">
-        <a class="nav-link" data-bs-toggle="collapse" href="#dashboardMenu" role="button" aria-expanded="{{ is_active_route(['dashboard', 'dashboard/profile', 'dashboard/investments', 'dashboard/network', 'dashboard/network-admin', 'dashboard/wallet', 'dashboard/analytics', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/friends']) }}" aria-controls="dashboardMenu">
+      <li class="nav-item {{ active_class(['dashboard', 'dashboard/profile', 'dashboard/investments', 'dashboard/network', 'dashboard/network-admin', 'dashboard/wallet', 'dashboard/analytics', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/rewards', 'dashboard/settings', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/friends']) }}">
+        <a class="nav-link" data-bs-toggle="collapse" href="#dashboardMenu" role="button" aria-expanded="{{ is_active_route(['dashboard', 'dashboard/profile', 'dashboard/investments', 'dashboard/network', 'dashboard/network-admin', 'dashboard/wallet', 'dashboard/analytics', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/rewards', 'dashboard/settings', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/friends']) }}" aria-controls="dashboardMenu">
           <i class="link-icon" data-lucide="home"></i>
           <span class="link-title">Dashboard</span>
           <i class="link-arrow" data-lucide="chevron-down"></i>
         </a>
-        <div class="collapse {{ show_class(['dashboard', 'dashboard/profile', 'dashboard/investments', 'dashboard/network', 'dashboard/network-admin', 'dashboard/wallet', 'dashboard/analytics', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/friends']) }}" data-bs-parent="#sidebarNav" id="dashboardMenu">
+        <div class="collapse {{ show_class(['dashboard', 'dashboard/profile', 'dashboard/investments', 'dashboard/network', 'dashboard/network-admin', 'dashboard/wallet', 'dashboard/analytics', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/rewards', 'dashboard/settings', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/friends']) }}" data-bs-parent="#sidebarNav" id="dashboardMenu">
           <ul class="nav sub-menu">
             <li class="nav-item">
               <a href="{{ route('dashboard') }}" class="nav-link {{ active_class(['dashboard']) }}">Overview</a>
@@ -50,6 +50,12 @@
               </li>
               <li class="nav-item">
                 <a href="{{ route('dashboard.operations') }}" class="nav-link {{ active_class(['dashboard/operations']) }}">Operations</a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ route('dashboard.rewards') }}" class="nav-link {{ active_class(['dashboard/rewards']) }}">Rewards</a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ route('dashboard.settings') }}" class="nav-link {{ active_class(['dashboard/settings']) }}">Settings</a>
               </li>
               <li class="nav-item">
                 <a href="{{ route('dashboard.packages') }}" class="nav-link {{ active_class(['dashboard/packages']) }}">Packages</a>
@@ -388,6 +394,8 @@
     </ul>
   </div>
 </nav>
+
+
 
 
 

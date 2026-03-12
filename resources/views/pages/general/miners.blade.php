@@ -8,9 +8,14 @@
         <h4 class="mb-1">Miner Catalog</h4>
         <p class="text-secondary mb-0">Create new mining units, review share capacity, and jump into detailed miner operations.</p>
       </div>
-      <a href="{{ route('dashboard.miner') }}" class="btn btn-outline-primary btn-icon-text">
-        <i data-lucide="cpu" class="btn-icon-prepend"></i> Open selected miner
-      </a>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ route('dashboard.settings') }}" class="btn btn-outline-secondary btn-icon-text">
+          <i data-lucide="sliders-horizontal" class="btn-icon-prepend"></i> Platform defaults
+        </a>
+        <a href="{{ route('dashboard.miner') }}" class="btn btn-outline-primary btn-icon-text">
+          <i data-lucide="cpu" class="btn-icon-prepend"></i> Open selected miner
+        </a>
+      </div>
     </div>
   </div>
 </div>
@@ -44,27 +49,27 @@
             </div>
             <div class="col-md-6">
               <label class="form-label">Total shares</label>
-              <input type="number" min="1" name="total_shares" class="form-control @error('total_shares') is-invalid @enderror" value="{{ old('total_shares', 1000) }}" required>
+              <input type="number" min="1" name="total_shares" class="form-control @error('total_shares') is-invalid @enderror" value="{{ old('total_shares', $defaults['new_miner_total_shares']) }}" required>
               @error('total_shares')<div class="invalid-feedback">{{ $message }}</div>@enderror
             </div>
             <div class="col-md-6">
               <label class="form-label">Share price</label>
-              <input type="number" step="0.01" min="1" name="share_price" class="form-control @error('share_price') is-invalid @enderror" value="{{ old('share_price', 100) }}" required>
+              <input type="number" step="0.01" min="1" name="share_price" class="form-control @error('share_price') is-invalid @enderror" value="{{ old('share_price', $defaults['new_miner_share_price']) }}" required>
               @error('share_price')<div class="invalid-feedback">{{ $message }}</div>@enderror
             </div>
             <div class="col-md-6">
               <label class="form-label">Daily output (USD)</label>
-              <input type="number" step="0.01" min="0" name="daily_output_usd" class="form-control @error('daily_output_usd') is-invalid @enderror" value="{{ old('daily_output_usd', 1200) }}" required>
+              <input type="number" step="0.01" min="0" name="daily_output_usd" class="form-control @error('daily_output_usd') is-invalid @enderror" value="{{ old('daily_output_usd', $defaults['new_miner_daily_output_usd']) }}" required>
               @error('daily_output_usd')<div class="invalid-feedback">{{ $message }}</div>@enderror
             </div>
             <div class="col-md-6">
               <label class="form-label">Monthly output (USD)</label>
-              <input type="number" step="0.01" min="0" name="monthly_output_usd" class="form-control @error('monthly_output_usd') is-invalid @enderror" value="{{ old('monthly_output_usd', 36000) }}" required>
+              <input type="number" step="0.01" min="0" name="monthly_output_usd" class="form-control @error('monthly_output_usd') is-invalid @enderror" value="{{ old('monthly_output_usd', $defaults['new_miner_monthly_output_usd']) }}" required>
               @error('monthly_output_usd')<div class="invalid-feedback">{{ $message }}</div>@enderror
             </div>
             <div class="col-md-6">
               <label class="form-label">Base monthly return rate</label>
-              <input type="number" step="0.0001" min="0" max="1" name="base_monthly_return_rate" class="form-control @error('base_monthly_return_rate') is-invalid @enderror" value="{{ old('base_monthly_return_rate', 0.08) }}" required>
+              <input type="number" step="0.0001" min="0" max="1" name="base_monthly_return_rate" class="form-control @error('base_monthly_return_rate') is-invalid @enderror" value="{{ old('base_monthly_return_rate', $defaults['new_miner_base_monthly_return_rate']) }}" required>
               @error('base_monthly_return_rate')<div class="invalid-feedback">{{ $message }}</div>@enderror
             </div>
             <div class="col-md-6">
@@ -131,3 +136,4 @@
   </div>
 </div>
 @endsection
+

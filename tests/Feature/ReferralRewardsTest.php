@@ -52,7 +52,7 @@ test('inviter receives subscription rewards and team bonus rate when referred us
     ]);
 
     $this->actingAs($inviter)->post(route('general.sell-products.subscribe'), [
-        'package' => 'starter-100',
+        'package' => 'growth-500',
     ])->assertRedirect();
 
     FriendInvitation::create([
@@ -81,4 +81,75 @@ test('inviter receives subscription rewards and team bonus rate when referred us
         ->and((float) $inviter->earnings->firstWhere('source', 'team_subscription_bonus')->amount)->toBe(15.0)
         ->and((float) $inviter->investments->first()->fresh()->team_bonus_rate)->toBe(0.0025)
         ->and($inviter->referralEvents->where('type', 'team_subscription'))->toHaveCount(1);
+});
+
+test('starter user unlocks basic 100 after referral mission is completed', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'starter',
+    ]);
+
+    MiningPlatform::ensureStarterPackage($user);
+
+    foreach (range(1, 20) as $index) {
+        FriendInvitation::create([
+            'user_id' => $user->id,
+            'name' => 'Invite '.$index,
+            'email' => 'invite'.$index.'@example.com',
+            'verified_at' => now(),
+        ]);
+    }
+
+    $referredBuyer = User::factory()->create([
+        'email_verified_at' => now(),
+        'email' => 'basic-referral@example.com',
+        'sponsor_user_id' => $user->id,
+    ]);
+
+    $this->actingAs($referredBuyer)->post(route('general.sell-products.subscribe'), [
+        'package' => 'starter-100',
+    ]);
+
+    $user->refresh();
+    $user->load(['shareholder', 'investments.package']);
+
+    expect($user->account_type)->toBe('shareholder');
+    expect($user->shareholder?->package_name)->toBe('Basic 100');
+    expect($user->investments->where('package.slug', 'starter-100')->count())->toBeGreaterThan(0);
+});
+
+test('third level sponsor receives configured mlm subscription reward', function () {
+    MiningPlatform::updateRewardSettings([
+        'team_level_3_subscription_reward_rate' => '0.0050',
+    ]);
+
+    $levelOne = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $levelTwo = User::factory()->create([
+        'email_verified_at' => now(),
+        'sponsor_user_id' => $levelOne->id,
+    ]);
+
+    $levelThree = User::factory()->create([
+        'email_verified_at' => now(),
+        'sponsor_user_id' => $levelTwo->id,
+    ]);
+
+    $buyer = User::factory()->create([
+        'email_verified_at' => now(),
+        'email' => 'deepbuyer@example.com',
+        'sponsor_user_id' => $levelThree->id,
+    ]);
+
+    $this->actingAs($buyer)->post(route('general.sell-products.subscribe'), [
+        'package' => 'growth-500',
+    ])->assertRedirect();
+
+    $levelOne->refresh();
+    $levelOne->load('earnings', 'referralEvents');
+
+    expect((float) $levelOne->earnings->firstWhere('source', 'team_level_3_bonus')->amount)->toBe(2.5)
+        ->and($levelOne->referralEvents->where('type', 'team_level_3_subscription'))->toHaveCount(1);
 });
