@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use App\Http\Controllers\ProfileController;
 use App\Mail\FriendInvitationMail;
@@ -734,6 +734,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 $segment = 'all';
             }
 
+
             $digestRows = User::query()
                 ->whereNotNull('email_verified_at')
                 ->orderBy('name')
@@ -786,6 +787,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     'daily_only' => 'Daily only',
                     'weekly_only' => 'Weekly only',
                 ],
+                'investmentPaymentMethodReviews' => collect([
+                    'btc_transfer' => MiningPlatform::platformSetting('payment_btc_transfer_admin_review_note'),
+                    'usdt_transfer' => MiningPlatform::platformSetting('payment_usdt_transfer_admin_review_note'),
+                    'bank_transfer' => MiningPlatform::platformSetting('payment_bank_transfer_admin_review_note'),
+                ]),
             ]);
         })->name('dashboard.digests');
 
@@ -1125,9 +1131,33 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $status = $request->query('investment_status', 'all');
             $allowedStatuses = ['all', 'pending', 'approved', 'rejected', 'cancelled'];
             $search = trim((string) $request->query('investment_search', ''));
+            $paymentMethod = (string) $request->query('investment_payment_method', 'all');
+            $allowedPaymentMethods = ['all', 'btc_transfer', 'usdt_transfer', 'bank_transfer'];
+            $proofState = (string) $request->query('investment_proof_state', 'all');
+            $allowedProofStates = ['all', 'proof_needed', 'proof_uploaded'];
+            $riskState = (string) $request->query('investment_risk_state', 'all');
+            $allowedRiskStates = ['all', 'high_risk'];
+            $riskFocus = (string) $request->query('investment_risk_focus', 'all');
+            $allowedRiskFocuses = ['all', 'missing_proof', 'bank_without_notes', 'resubmitted', 'override_history'];
 
             if (! in_array($status, $allowedStatuses, true)) {
                 $status = 'all';
+            }
+
+            if (! in_array($paymentMethod, $allowedPaymentMethods, true)) {
+                $paymentMethod = 'all';
+            }
+
+            if (! in_array($proofState, $allowedProofStates, true)) {
+                $proofState = 'all';
+            }
+
+            if (! in_array($riskState, $allowedRiskStates, true)) {
+                $riskState = 'all';
+            }
+
+            if (! in_array($riskFocus, $allowedRiskFocuses, true)) {
+                $riskFocus = 'all';
             }
 
             $investmentOrdersQuery = InvestmentOrder::with(['user', 'package', 'miner', 'approver'])->latest('submitted_at');
@@ -1148,15 +1178,130 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 });
             }
 
+            $investmentPaymentMethodCounts = (clone $investmentOrdersQuery)
+                ->pluck('payment_method')
+                ->filter()
+                ->countBy();
+
+            $investmentProofStateCounts = collect([
+                'all' => (clone $investmentOrdersQuery)->count(),
+                'proof_needed' => (clone $investmentOrdersQuery)->whereNull('payment_proof_path')->count(),
+                'proof_uploaded' => (clone $investmentOrdersQuery)->whereNotNull('payment_proof_path')->count(),
+            ]);
+
+            $investmentRiskStateCounts = collect([
+                'all' => (clone $investmentOrdersQuery)->count(),
+                'high_risk' => (clone $investmentOrdersQuery)
+                    ->where(function ($query) {
+                        $query->where(function ($riskQuery) {
+                            $riskQuery->where('status', 'pending')->whereNull('payment_proof_path');
+                        })->orWhere(function ($riskQuery) {
+                            $riskQuery->where('payment_method', 'bank_transfer')->where(function ($notesQuery) {
+                                $notesQuery->whereNull('notes')->orWhere('notes', '');
+                            });
+                        })->orWhere(function ($riskQuery) {
+                            $riskQuery->whereNotNull('rejected_at')->where('status', 'pending');
+                        })->orWhere(function ($riskQuery) {
+                            $riskQuery->whereNotNull('approved_at')->whereNotNull('admin_notes')->whereNull('payment_proof_path');
+                        });
+                    })
+                    ->count(),
+            ]);
+
+            $investmentRiskBreakdown = collect([
+                'missing_proof' => (clone $investmentOrdersQuery)
+                    ->where('status', 'pending')
+                    ->whereNull('payment_proof_path')
+                    ->count(),
+                'bank_without_notes' => (clone $investmentOrdersQuery)
+                    ->where('payment_method', 'bank_transfer')
+                    ->where(function ($notesQuery) {
+                        $notesQuery->whereNull('notes')->orWhere('notes', '');
+                    })
+                    ->count(),
+                'resubmitted' => (clone $investmentOrdersQuery)
+                    ->whereNotNull('rejected_at')
+                    ->where('status', 'pending')
+                    ->count(),
+                'override_history' => (clone $investmentOrdersQuery)
+                    ->whereNotNull('approved_at')
+                    ->whereNotNull('admin_notes')
+                    ->whereNull('payment_proof_path')
+                    ->count(),
+            ]);
+
+            if ($paymentMethod !== 'all') {
+                $investmentOrdersQuery->where('payment_method', $paymentMethod);
+            }
+
+            if ($proofState === 'proof_needed') {
+                $investmentOrdersQuery->whereNull('payment_proof_path');
+            } elseif ($proofState === 'proof_uploaded') {
+                $investmentOrdersQuery->whereNotNull('payment_proof_path');
+            }
+
+            if ($riskState === 'high_risk') {
+                $investmentOrdersQuery->where(function ($query) {
+                    $query->where(function ($riskQuery) {
+                        $riskQuery->where('status', 'pending')->whereNull('payment_proof_path');
+                    })->orWhere(function ($riskQuery) {
+                        $riskQuery->where('payment_method', 'bank_transfer')->where(function ($notesQuery) {
+                            $notesQuery->whereNull('notes')->orWhere('notes', '');
+                        });
+                    })->orWhere(function ($riskQuery) {
+                        $riskQuery->whereNotNull('rejected_at')->where('status', 'pending');
+                    })->orWhere(function ($riskQuery) {
+                        $riskQuery->whereNotNull('approved_at')->whereNotNull('admin_notes')->whereNull('payment_proof_path');
+                    });
+                });
+            }
+
+            if ($riskFocus === 'missing_proof') {
+                $investmentOrdersQuery->where('status', 'pending')->whereNull('payment_proof_path');
+            } elseif ($riskFocus === 'bank_without_notes') {
+                $investmentOrdersQuery->where('payment_method', 'bank_transfer')->where(function ($notesQuery) {
+                    $notesQuery->whereNull('notes')->orWhere('notes', '');
+                });
+            } elseif ($riskFocus === 'resubmitted') {
+                $investmentOrdersQuery->whereNotNull('rejected_at')->where('status', 'pending');
+            } elseif ($riskFocus === 'override_history') {
+                $investmentOrdersQuery->whereNotNull('approved_at')->whereNotNull('admin_notes')->whereNull('payment_proof_path');
+            }
+
             $allInvestmentStatuses = InvestmentOrder::query()->pluck('status');
+            $investmentOrders = $investmentOrdersQuery->get();
+            $investmentPaymentMethodSummaries = $investmentOrders
+                ->groupBy('payment_method')
+                ->map(function ($orders, $method) {
+                    return [
+                        'key' => $method,
+                        'label' => str_replace('_', ' ', (string) $method),
+                        'count' => $orders->count(),
+                        'note' => MiningPlatform::platformSetting('payment_'.$method.'_admin_review_note'),
+                    ];
+                })
+                ->sortByDesc('count')
+                ->values();
 
             return view('pages.general.operations', [
                 'payoutRequests' => PayoutRequest::with(['user', 'earnings'])->latest('requested_at')->get(),
-                'investmentOrders' => $investmentOrdersQuery->get(),
+                'investmentOrders' => $investmentOrders,
+                'investmentPaymentMethodSummaries' => $investmentPaymentMethodSummaries,
                 'investmentFilters' => [
                     'status' => $status,
                     'search' => $search,
+                    'payment_method' => $paymentMethod,
+                    'proof_state' => $proofState,
+                    'risk_state' => $riskState,
                 ],
+                'investmentPaymentMethodCounts' => collect([
+                    'all' => $investmentPaymentMethodCounts->sum(),
+                    'btc_transfer' => $investmentPaymentMethodCounts->get('btc_transfer', 0),
+                    'usdt_transfer' => $investmentPaymentMethodCounts->get('usdt_transfer', 0),
+                    'bank_transfer' => $investmentPaymentMethodCounts->get('bank_transfer', 0),
+                ]),
+                'investmentProofStateCounts' => $investmentProofStateCounts,
+                'investmentRiskStateCounts' => $investmentRiskStateCounts,
                 'investmentOrderCounts' => [
                     'all' => $allInvestmentStatuses->count(),
                     'pending' => $allInvestmentStatuses->filter(fn ($orderStatus) => $orderStatus === 'pending')->count(),
@@ -1164,6 +1309,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     'rejected' => $allInvestmentStatuses->filter(fn ($orderStatus) => $orderStatus === 'rejected')->count(),
                     'cancelled' => $allInvestmentStatuses->filter(fn ($orderStatus) => $orderStatus === 'cancelled')->count(),
                 ],
+                'investmentPaymentMethodReviews' => collect([
+                    'btc_transfer' => MiningPlatform::platformSetting('payment_btc_transfer_admin_review_note'),
+                    'usdt_transfer' => MiningPlatform::platformSetting('payment_usdt_transfer_admin_review_note'),
+                    'bank_transfer' => MiningPlatform::platformSetting('payment_bank_transfer_admin_review_note'),
+                ]),
             ]);
         })->name('dashboard.operations');
 
@@ -1203,11 +1353,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $status = $request->query('investment_status', 'all');
             $allowedStatuses = ['all', 'pending', 'approved', 'rejected', 'cancelled'];
             $search = trim((string) $request->query('investment_search', ''));
+            $paymentMethod = (string) $request->query('investment_payment_method', 'all');
+            $allowedPaymentMethods = ['all', 'btc_transfer', 'usdt_transfer', 'bank_transfer'];
 
             if (! in_array($status, $allowedStatuses, true)) {
                 $status = 'all';
             }
 
+
+            if (! in_array($paymentMethod, $allowedPaymentMethods, true)) {
+                $paymentMethod = 'all';
+            }
             $investmentOrdersQuery = InvestmentOrder::with(['user', 'package', 'miner', 'approver'])->latest('submitted_at');
 
             if ($status !== 'all') {
@@ -1224,6 +1380,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
                         ->orWhereHas('package', fn ($packageQuery) => $packageQuery->where('name', 'like', "%$search%"))
                         ->orWhereHas('miner', fn ($minerQuery) => $minerQuery->where('name', 'like', "%$search%"));
                 });
+            }
+
+            if ($paymentMethod !== 'all') {
+                $investmentOrdersQuery->where('payment_method', $paymentMethod);
             }
 
             $investmentOrders = $investmentOrdersQuery->get();
@@ -1519,6 +1679,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'payout_bank_transfer_percentage_fee_rate' => ['required', 'numeric', 'min:0', 'max:1'],
                 'payout_bank_transfer_instruction' => ['required', 'string', 'max:255'],
                 'payout_bank_transfer_processing_time' => ['required', 'string', 'max:255'],
+                'payment_btc_transfer_enabled' => ['required', 'boolean'],
+                'payment_btc_transfer_label' => ['required', 'string', 'max:255'],
+                'payment_btc_transfer_destination' => ['required', 'string', 'max:255'],
+                'payment_btc_transfer_reference_hint' => ['required', 'string', 'max:255'],
+                'payment_btc_transfer_instruction' => ['required', 'string', 'max:255'],
+                'payment_btc_transfer_admin_review_note' => ['required', 'string', 'max:255'],
+                'payment_usdt_transfer_enabled' => ['required', 'boolean'],
+                'payment_usdt_transfer_label' => ['required', 'string', 'max:255'],
+                'payment_usdt_transfer_destination' => ['required', 'string', 'max:255'],
+                'payment_usdt_transfer_reference_hint' => ['required', 'string', 'max:255'],
+                'payment_usdt_transfer_instruction' => ['required', 'string', 'max:255'],
+                'payment_usdt_transfer_admin_review_note' => ['required', 'string', 'max:255'],
+                'payment_bank_transfer_enabled' => ['required', 'boolean'],
+                'payment_bank_transfer_label' => ['required', 'string', 'max:255'],
+                'payment_bank_transfer_destination' => ['required', 'string', 'max:255'],
+                'payment_bank_transfer_reference_hint' => ['required', 'string', 'max:255'],
+                'payment_bank_transfer_instruction' => ['required', 'string', 'max:255'],
+                'payment_bank_transfer_admin_review_note' => ['required', 'string', 'max:255'],
             ]);
 
             MiningPlatform::updatePlatformSettings($validated);
@@ -1958,6 +2136,32 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         $sharesSold = MiningPlatform::totalSharesSold($miner);
 
+        $paymentMethods = collect([
+            [
+                'key' => 'btc_transfer',
+                'label' => MiningPlatform::platformSetting('payment_btc_transfer_label'),
+                'enabled' => MiningPlatform::platformSetting('payment_btc_transfer_enabled') === '1',
+                'destination' => MiningPlatform::platformSetting('payment_btc_transfer_destination'),
+                'reference_hint' => MiningPlatform::platformSetting('payment_btc_transfer_reference_hint'),
+                'instruction' => MiningPlatform::platformSetting('payment_btc_transfer_instruction'),
+            ],
+            [
+                'key' => 'usdt_transfer',
+                'label' => MiningPlatform::platformSetting('payment_usdt_transfer_label'),
+                'enabled' => MiningPlatform::platformSetting('payment_usdt_transfer_enabled') === '1',
+                'destination' => MiningPlatform::platformSetting('payment_usdt_transfer_destination'),
+                'reference_hint' => MiningPlatform::platformSetting('payment_usdt_transfer_reference_hint'),
+                'instruction' => MiningPlatform::platformSetting('payment_usdt_transfer_instruction'),
+            ],
+            [
+                'key' => 'bank_transfer',
+                'label' => MiningPlatform::platformSetting('payment_bank_transfer_label'),
+                'enabled' => MiningPlatform::platformSetting('payment_bank_transfer_enabled') === '1',
+                'destination' => MiningPlatform::platformSetting('payment_bank_transfer_destination'),
+                'reference_hint' => MiningPlatform::platformSetting('payment_bank_transfer_reference_hint'),
+                'instruction' => MiningPlatform::platformSetting('payment_bank_transfer_instruction'),
+            ],
+        ])->filter(fn (array $method) => $method['enabled'])->values();
         return view('pages.general.buy-shares', [
             'user' => $user,
             'level' => $level,
@@ -1969,6 +2173,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'pendingInvestmentOrder' => InvestmentOrder::query()->where('user_id', $user->id)->where('miner_id', $miner->id)->where('status', 'pending')->latest('submitted_at')->first(),
             'rejectedInvestmentOrder' => InvestmentOrder::query()->where('user_id', $user->id)->where('miner_id', $miner->id)->where('status', 'rejected')->latest('rejected_at')->first(),
             'sharesSold' => $sharesSold,
+            'paymentMethods' => $paymentMethods,
             'availableShares' => max($miner->total_shares - $sharesSold, 0),
         ]);
     })->name('dashboard.buy-shares');
@@ -1976,9 +2181,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/dashboard/buy-shares/subscribe', function (Request $request) {
         MiningPlatform::ensureDefaults();
 
+        $paymentMethodKeys = collect([
+            MiningPlatform::platformSetting('payment_btc_transfer_enabled') === '1' ? 'btc_transfer' : null,
+            MiningPlatform::platformSetting('payment_usdt_transfer_enabled') === '1' ? 'usdt_transfer' : null,
+            MiningPlatform::platformSetting('payment_bank_transfer_enabled') === '1' ? 'bank_transfer' : null,
+        ])->filter()->values()->all();
+
         $validated = $request->validate([
             'package' => ['required', 'string', 'exists:investment_packages,slug'],
-            'payment_method' => ['required', 'string', 'in:btc_transfer,usdt_transfer,bank_transfer'],
+            'payment_method' => ['required', 'string', Rule::in($paymentMethodKeys)],
             'payment_reference' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
@@ -2133,6 +2344,10 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
+
+
+
+
 
 
 

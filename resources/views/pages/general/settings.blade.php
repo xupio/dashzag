@@ -1,4 +1,4 @@
-@extends('layout.master')
+﻿@extends('layout.master')
 
 @section('content')
 <div class="row">
@@ -171,6 +171,57 @@
             @endforeach
           </div>
 
+            <div class="border rounded p-3 mb-4 bg-white">
+              <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <div>
+                  <h6 class="mb-1">Incoming payment methods</h6>
+                  <p class="text-secondary mb-0">Define the wallet or bank details investors should use when submitting share payments.</p>
+                </div>
+                <span class="badge bg-warning text-dark">Buy Shares instructions</span>
+              </div>
+
+              @foreach ([
+                'btc_transfer' => 'BTC transfer',
+                'usdt_transfer' => 'USDT transfer',
+                'bank_transfer' => 'Bank transfer',
+              ] as $prefix => $label)
+                <div class="border rounded p-3 mb-3 bg-light">
+                  <div class="form-check form-switch mb-3">
+                    <input type="hidden" name="payment_{{ $prefix }}_enabled" value="0">
+                    <input class="form-check-input" type="checkbox" role="switch" id="payment_{{ $prefix }}_enabled" name="payment_{{ $prefix }}_enabled" value="1" @checked(old('payment_'.$prefix.'_enabled', $settings['payment_'.$prefix.'_enabled']) == '1')>
+                    <label class="form-check-label fw-semibold" for="payment_{{ $prefix }}_enabled">Enable {{ $label }}</label>
+                  </div>
+                  <div class="row g-3">
+                    <div class="col-md-4">
+                      <label class="form-label">Label</label>
+                      <input type="text" name="payment_{{ $prefix }}_label" class="form-control @error('payment_'.$prefix.'_label') is-invalid @enderror" value="{{ old('payment_'.$prefix.'_label', $settings['payment_'.$prefix.'_label']) }}" required>
+                      @error('payment_'.$prefix.'_label')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="col-md-8">
+                      <label class="form-label">Destination details</label>
+                      <input type="text" name="payment_{{ $prefix }}_destination" class="form-control @error('payment_'.$prefix.'_destination') is-invalid @enderror" value="{{ old('payment_'.$prefix.'_destination', $settings['payment_'.$prefix.'_destination']) }}" required>
+                      @error('payment_'.$prefix.'_destination')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Reference hint</label>
+                      <input type="text" name="payment_{{ $prefix }}_reference_hint" class="form-control @error('payment_'.$prefix.'_reference_hint') is-invalid @enderror" value="{{ old('payment_'.$prefix.'_reference_hint', $settings['payment_'.$prefix.'_reference_hint']) }}" required>
+                      @error('payment_'.$prefix.'_reference_hint')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Instruction text</label>
+                      <input type="text" name="payment_{{ $prefix }}_instruction" class="form-control @error('payment_'.$prefix.'_instruction') is-invalid @enderror" value="{{ old('payment_'.$prefix.'_instruction', $settings['payment_'.$prefix.'_instruction']) }}" required>
+                      @error('payment_'.$prefix.'_instruction')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    <div class="col-12">
+                      <label class="form-label">Admin review note</label>
+                      <input type="text" name="payment_{{ $prefix }}_admin_review_note" class="form-control @error('payment_'.$prefix.'_admin_review_note') is-invalid @enderror" value="{{ old('payment_'.$prefix.'_admin_review_note', $settings['payment_'.$prefix.'_admin_review_note']) }}" required>
+                      <div class="form-text">Shown only in Operations to help the admin team review this payment method.</div>
+                      @error('payment_'.$prefix.'_admin_review_note')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    </div>
+                  </div>
+                </div>
+              @endforeach
+            </div>
           <div class="d-flex justify-content-end">
             <button type="submit" class="btn btn-primary">Save platform defaults</button>
           </div>
@@ -180,6 +231,7 @@
   </div>
 </form>
 @endsection
+
 
 
 

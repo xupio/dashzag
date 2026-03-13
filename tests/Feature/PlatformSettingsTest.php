@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use App\Models\InvestmentPackage;
 use App\Models\Miner;
@@ -74,6 +74,24 @@ test('admin can update platform settings and miner creation uses them', function
             'payout_bank_transfer_percentage_fee_rate' => 0.02,
             'payout_bank_transfer_instruction' => 'Include beneficiary and IBAN details.',
             'payout_bank_transfer_processing_time' => '3 business days',
+            'payment_btc_transfer_enabled' => 1,
+            'payment_btc_transfer_label' => 'Bitcoin Deposit',
+            'payment_btc_transfer_destination' => 'bc1qexamplecompanywallet',
+            'payment_btc_transfer_reference_hint' => 'Paste the BTC hash after sending',
+            'payment_btc_transfer_instruction' => 'Send the exact package amount to the BTC wallet, then submit the hash.',
+            'payment_btc_transfer_admin_review_note' => 'Confirm the BTC wallet and hash amount before approval.',
+            'payment_usdt_transfer_enabled' => 1,
+            'payment_usdt_transfer_label' => 'USDT Deposit',
+            'payment_usdt_transfer_destination' => 'TXYZcompanyusdtwallet',
+            'payment_usdt_transfer_reference_hint' => 'Paste the USDT TRC20 hash',
+            'payment_usdt_transfer_instruction' => 'Send only on the configured network and submit the hash.',
+            'payment_usdt_transfer_admin_review_note' => 'Match the network and amount with the treasury wallet before approval.',
+            'payment_bank_transfer_enabled' => 1,
+            'payment_bank_transfer_label' => 'Company Bank Transfer',
+            'payment_bank_transfer_destination' => 'Beneficiary: Zag Mining | IBAN: AE00 0000 0000 0000 0000 000',
+            'payment_bank_transfer_reference_hint' => 'Enter your bank transfer receipt or trace number',
+            'payment_bank_transfer_instruction' => 'Use your full name in the transfer note and submit the bank trace number.',
+            'payment_bank_transfer_admin_review_note' => 'Check the beneficiary name, receipt date, and bank trace before approval.',
         ])
         ->assertRedirect(route('dashboard.settings'));
 
@@ -84,6 +102,9 @@ test('admin can update platform settings and miner creation uses them', function
     expect(MiningPlatform::platformSetting('payout_bank_transfer_enabled'))->toBe('0');
     expect(MiningPlatform::platformSetting('payout_btc_wallet_fixed_fee'))->toBe('2');
     expect(MiningPlatform::platformSetting('payout_bank_transfer_processing_time'))->toBe('3 business days');
+    expect(MiningPlatform::platformSetting('payment_btc_transfer_destination'))->toBe('bc1qexamplecompanywallet');
+    expect(MiningPlatform::platformSetting('payment_bank_transfer_label'))->toBe('Company Bank Transfer');
+    expect(MiningPlatform::platformSetting('payment_usdt_transfer_admin_review_note'))->toBe('Match the network and amount with the treasury wallet before approval.');
 
     $this->actingAs($admin)
         ->post(route('dashboard.miners.store'), [
@@ -120,6 +141,7 @@ test('non admin cannot access platform settings page', function () {
         ->get(route('dashboard.settings'))
         ->assertForbidden();
 });
+
 
 
 

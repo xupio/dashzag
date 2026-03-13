@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use App\Models\InvestmentOrder;
 use App\Models\InvestmentPackage;
@@ -85,6 +85,10 @@ test('admin can filter operations investment queue by status and search term', f
         ->get(route('dashboard.operations', ['investment_status' => 'pending', 'investment_search' => 'Alpha']))
         ->assertOk()
         ->assertSee('FILTER-PENDING-100')
+        ->assertSee('Missing proof')
+        ->assertSee('Bulk review reminders')
+        ->assertSee('Admin review note')
+        ->assertSee('Confirm the wallet matches the active BTC treasury address')
         ->assertDontSee('FILTER-REJECTED-200');
 });
 
@@ -172,3 +176,75 @@ test('admin can bulk reject pending investment orders with one shared note', fun
 });
 
 
+
+test('admin can filter operations investment queue by payment method', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'admin',
+    ]);
+
+    $btcUser = User::factory()->create(['email_verified_at' => now(), 'name' => 'Bitcoin Investor']);
+    $usdtUser = User::factory()->create(['email_verified_at' => now(), 'name' => 'Tether Investor']);
+
+    pendingInvestmentOrderFor($btcUser, 'METHOD-BTC-001', 'pending');
+    $usdtOrder = pendingInvestmentOrderFor($usdtUser, 'METHOD-USDT-002', 'pending');
+    $usdtOrder->forceFill(['payment_method' => 'usdt_transfer'])->save();
+
+    $this->actingAs($admin)
+        ->get(route('dashboard.operations', ['investment_status' => 'pending', 'investment_payment_method' => 'usdt_transfer']))
+        ->assertOk()
+        ->assertSee('METHOD-USDT-002')
+        ->assertSee('USDT: 1')
+        ->assertDontSee('METHOD-BTC-001');
+});
+
+test('admin can filter operations investment queue by proof state', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'admin',
+    ]);
+
+    $missingProofUser = User::factory()->create(['email_verified_at' => now(), 'name' => 'Missing Proof Investor']);
+    $proofUser = User::factory()->create(['email_verified_at' => now(), 'name' => 'Uploaded Proof Investor']);
+
+    $missingProofOrder = pendingInvestmentOrderFor($missingProofUser, 'PROOF-MISSING-001', 'pending');
+    $uploadedProofOrder = pendingInvestmentOrderFor($proofUser, 'PROOF-UPLOADED-002', 'pending');
+    $uploadedProofOrder->forceFill([
+        'payment_proof_path' => 'investment-proofs/proof-filter.pdf',
+        'payment_proof_original_name' => 'proof-filter.pdf',
+        'proof_uploaded_at' => now(),
+    ])->save();
+
+    $this->actingAs($admin)
+        ->get(route('dashboard.operations', ['investment_status' => 'pending', 'investment_proof_state' => 'proof_needed']))
+        ->assertOk()
+        ->assertSee('PROOF-MISSING-001')
+        ->assertSee('Proof needed: 1')
+        ->assertDontSee('PROOF-UPLOADED-002');
+});
+
+test('admin can filter operations investment queue by high risk state', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'admin',
+    ]);
+
+    $highRiskUser = User::factory()->create(['email_verified_at' => now(), 'name' => 'High Risk Investor']);
+    $cleanUser = User::factory()->create(['email_verified_at' => now(), 'name' => 'Clean Investor']);
+
+    pendingInvestmentOrderFor($highRiskUser, 'RISK-HIGH-001', 'pending');
+    $cleanOrder = pendingInvestmentOrderFor($cleanUser, 'RISK-CLEAN-002', 'pending');
+    $cleanOrder->forceFill([
+        'payment_proof_path' => 'investment-proofs/risk-clean.pdf',
+        'payment_proof_original_name' => 'risk-clean.pdf',
+        'proof_uploaded_at' => now(),
+        'notes' => 'Valid proof uploaded for review.',
+    ])->save();
+
+    $this->actingAs($admin)
+        ->get(route('dashboard.operations', ['investment_status' => 'pending', 'investment_risk_state' => 'high_risk']))
+        ->assertOk()
+        ->assertSee('RISK-HIGH-001')
+        ->assertSee('High risk only: 1')
+        ->assertDontSee('RISK-CLEAN-002');
+});

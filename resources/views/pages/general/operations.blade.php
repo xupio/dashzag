@@ -12,7 +12,7 @@
         <a href="{{ route('dashboard.operations.export') }}" class="btn btn-outline-success btn-icon-text">
           <i data-lucide="download" class="btn-icon-prepend"></i> Export payouts CSV
         </a>
-        <a href="{{ route('dashboard.operations.investment-orders.export', ['investment_status' => $investmentFilters['status'] ?? 'all', 'investment_search' => $investmentFilters['search'] ?? '']) }}" class="btn btn-outline-primary btn-icon-text">
+        <a href="{{ route('dashboard.operations.investment-orders.export', ['investment_status' => $investmentFilters['status'] ?? 'all', 'investment_search' => $investmentFilters['search'] ?? '', 'investment_payment_method' => $investmentFilters['payment_method'] ?? 'all', 'investment_proof_state' => $investmentFilters['proof_state'] ?? 'all']) }}" class="btn btn-outline-primary btn-icon-text">
           <i data-lucide="file-spreadsheet" class="btn-icon-prepend"></i> Export investment orders CSV
         </a>
       </div>
@@ -41,6 +41,19 @@
             @php
               $counts = $investmentOrderCounts ?? ['all' => 0, 'pending' => 0, 'approved' => 0, 'rejected' => 0, 'cancelled' => 0];
               $activeStatus = $investmentFilters['status'] ?? 'all';
+              $activePaymentMethod = $investmentFilters['payment_method'] ?? 'all';
+              $paymentMethodCounts = $investmentPaymentMethodCounts ?? collect(['all' => 0, 'btc_transfer' => 0, 'usdt_transfer' => 0, 'bank_transfer' => 0]);
+              $activeProofState = $investmentFilters['proof_state'] ?? 'all';
+              $proofStateCounts = $investmentProofStateCounts ?? collect(['all' => 0, 'proof_needed' => 0, 'proof_uploaded' => 0]);
+              $activeRiskState = $investmentFilters['risk_state'] ?? 'all';
+              $riskStateCounts = $investmentRiskStateCounts ?? collect(['all' => 0, 'high_risk' => 0]);
+              $activeRiskFocus = request()->query('investment_risk_focus', 'all');
+              $riskBreakdown = collect([
+                'missing_proof' => $investmentOrders->where('status', 'pending')->whereNull('payment_proof_path')->count(),
+                'bank_without_notes' => $investmentOrders->where('payment_method', 'bank_transfer')->filter(fn ($order) => blank($order->notes))->count(),
+                'resubmitted' => $investmentOrders->filter(fn ($order) => filled($order->rejected_at) && $order->status === 'pending')->count(),
+                'override_history' => $investmentOrders->filter(fn ($order) => filled($order->approved_at) && filled($order->admin_notes) && blank($order->payment_proof_path))->count(),
+              ]);
             @endphp
             @foreach (['all' => 'All', 'pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected', 'cancelled' => 'Cancelled'] as $statusKey => $label)
               <span class="badge {{ $activeStatus === $statusKey ? 'bg-primary' : 'bg-light text-dark border' }}">{{ $label }}: {{ $counts[$statusKey] ?? 0 }}</span>
@@ -48,11 +61,34 @@
           </div>
         </div>
 
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          @foreach (['all' => 'All methods', 'btc_transfer' => 'BTC', 'usdt_transfer' => 'USDT', 'bank_transfer' => 'Bank'] as $methodKey => $methodLabel)
+            <a href="{{ route('dashboard.operations', ['investment_status' => $investmentFilters['status'] ?? 'all', 'investment_search' => $investmentFilters['search'] ?? '', 'investment_payment_method' => $methodKey]) }}" class="btn btn-sm {{ $activePaymentMethod === $methodKey ? 'btn-primary' : 'btn-outline-primary' }}">
+              {{ $methodLabel }}: {{ $paymentMethodCounts[$methodKey] ?? 0 }}
+            </a>
+          @endforeach
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          @foreach (['all' => 'All proof states', 'proof_needed' => 'Proof needed', 'proof_uploaded' => 'Proof uploaded'] as $proofKey => $proofLabel)
+            <a href="{{ route('dashboard.operations', ['investment_status' => $investmentFilters['status'] ?? 'all', 'investment_search' => $investmentFilters['search'] ?? '', 'investment_payment_method' => $investmentFilters['payment_method'] ?? 'all', 'investment_proof_state' => $proofKey]) }}" class="btn btn-sm {{ $activeProofState === $proofKey ? 'btn-dark' : 'btn-outline-dark' }}">
+              {{ $proofLabel }}: {{ $proofStateCounts[$proofKey] ?? 0 }}
+            </a>
+          @endforeach
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          @foreach (['all' => 'All risks', 'high_risk' => 'High risk only'] as $riskKey => $riskLabel)
+            <a href="{{ route('dashboard.operations', ['investment_status' => $investmentFilters['status'] ?? 'all', 'investment_search' => $investmentFilters['search'] ?? '', 'investment_payment_method' => $investmentFilters['payment_method'] ?? 'all', 'investment_proof_state' => $investmentFilters['proof_state'] ?? 'all', 'investment_risk_state' => $riskKey]) }}" class="btn btn-sm {{ $activeRiskState === $riskKey ? 'btn-danger' : 'btn-outline-danger' }}">
+              {{ $riskLabel }}: {{ $riskStateCounts[$riskKey] ?? 0 }}
+            </a>
+          @endforeach
+        </div>
         <form method="GET" action="{{ route('dashboard.operations') }}" class="row g-2 mb-3">
-          <div class="col-md-4">
+          <div class="col-md-2">
             <input type="text" name="investment_search" class="form-control" placeholder="Search by user, email, package, miner, reference" value="{{ $investmentFilters['search'] ?? '' }}">
           </div>
-          <div class="col-md-3">
+          <div class="col-md-2">
             <select name="investment_status" class="form-select">
               <option value="all" @selected(($investmentFilters['status'] ?? 'all') === 'all')>All statuses</option>
               <option value="pending" @selected(($investmentFilters['status'] ?? '') === 'pending')>Pending</option>
@@ -61,7 +97,37 @@
               <option value="cancelled" @selected(($investmentFilters['status'] ?? '') === 'cancelled')>Cancelled</option>
             </select>
           </div>
-          <div class="col-md-5 d-flex gap-2">
+          <div class="col-md-3">
+            <select name="investment_payment_method" class="form-select">
+              <option value="all" @selected(($investmentFilters['payment_method'] ?? 'all') === 'all')>All methods</option>
+              <option value="btc_transfer" @selected(($investmentFilters['payment_method'] ?? '') === 'btc_transfer')>BTC</option>
+              <option value="usdt_transfer" @selected(($investmentFilters['payment_method'] ?? '') === 'usdt_transfer')>USDT</option>
+              <option value="bank_transfer" @selected(($investmentFilters['payment_method'] ?? '') === 'bank_transfer')>Bank</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select name="investment_proof_state" class="form-select">
+              <option value="all" @selected(($investmentFilters['proof_state'] ?? 'all') === 'all')>All proof states</option>
+              <option value="proof_needed" @selected(($investmentFilters['proof_state'] ?? '') === 'proof_needed')>Proof needed</option>
+              <option value="proof_uploaded" @selected(($investmentFilters['proof_state'] ?? '') === 'proof_uploaded')>Proof uploaded</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select name="investment_risk_state" class="form-select">
+              <option value="all" @selected(($investmentFilters['risk_state'] ?? 'all') === 'all')>All risks</option>
+              <option value="high_risk" @selected(($investmentFilters['risk_state'] ?? '') === 'high_risk')>High risk only</option>
+            </select>
+          </div>
+          <div class="col-md-2 d-flex gap-2">
+          <div class="col-md-2">
+            <select name="investment_risk_focus" class="form-select">
+              <option value="all" @selected(request()->query('investment_risk_focus', 'all') === 'all')>All risk details</option>
+              <option value="missing_proof" @selected(request()->query('investment_risk_focus') === 'missing_proof')>Missing proof</option>
+              <option value="bank_without_notes" @selected(request()->query('investment_risk_focus') === 'bank_without_notes')>Bank without notes</option>
+              <option value="resubmitted" @selected(request()->query('investment_risk_focus') === 'resubmitted')>Resubmitted</option>
+              <option value="override_history" @selected(request()->query('investment_risk_focus') === 'override_history')>Override history</option>
+            </select>
+          </div>
             <button type="submit" class="btn btn-primary">Apply filters</button>
             <a href="{{ route('dashboard.operations') }}" class="btn btn-outline-secondary">Reset</a>
           </div>
@@ -70,6 +136,24 @@
         @if ($investmentOrders->isEmpty())
           <p class="text-secondary mb-0">No investment orders match the current filter.</p>
         @else
+          @if (($investmentPaymentMethodSummaries ?? collect())->isNotEmpty())
+            <div class="alert alert-light border mb-3">
+              <div class="fw-semibold mb-2">Bulk review reminders</div>
+              <div class="row g-2">
+                @foreach ($investmentPaymentMethodSummaries as $methodSummary)
+                  <div class="col-md-4">
+                    <div class="border rounded p-3 h-100 bg-white">
+                      <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                        <span class="fw-semibold text-capitalize">{{ $methodSummary['label'] }}</span>
+                        <span class="badge bg-light text-dark border">{{ $methodSummary['count'] }}</span>
+                      </div>
+                      <div class="text-secondary small">{{ $methodSummary['note'] ?: 'Follow the configured review checklist for this payment method.' }}</div>
+                    </div>
+                  </div>
+                @endforeach
+              </div>
+            </div>
+          @endif
           <form id="bulkInvestmentOrderForm" method="POST" action="{{ route('dashboard.operations.investment-orders.bulk') }}" class="row g-2 mb-3">
             @csrf
             <div class="col-md-3">
@@ -119,6 +203,23 @@
                       'cancelled' => 'bg-secondary',
                       default => 'bg-warning text-dark',
                     };
+                    $riskFlags = collect();
+
+                    if ($order->status === 'pending' && blank($order->payment_proof_path)) {
+                      $riskFlags->push(['label' => 'Missing proof', 'class' => 'bg-danger-subtle text-danger border border-danger-subtle']);
+                    }
+
+                    if ($order->payment_method === 'bank_transfer' && blank($order->notes)) {
+                      $riskFlags->push(['label' => 'No bank notes', 'class' => 'bg-warning-subtle text-warning border border-warning-subtle']);
+                    }
+
+                    if ($order->rejected_at && $order->status === 'pending') {
+                      $riskFlags->push(['label' => 'Resubmitted', 'class' => 'bg-info-subtle text-info border border-info-subtle']);
+                    }
+
+                    if (filled($order->approved_at) && filled($order->admin_notes) && blank($order->payment_proof_path)) {
+                      $riskFlags->push(['label' => 'Override approval history', 'class' => 'bg-dark-subtle text-dark border']);
+                    }
                   @endphp
                   <tr>
                     <td>
@@ -133,8 +234,25 @@
                       <div class="text-secondary small">{{ $order->miner?->name }} | {{ $order->shares_owned }} shares | ${{ number_format((float) $order->amount, 2) }}</div>
                     </td>
                     <td>
-                      <div class="fw-semibold text-capitalize">{{ str_replace('_', ' ', $order->payment_method) }}</div>
+                      <div class="fw-semibold text-capitalize d-flex align-items-center gap-2">
+                        @if (
+                          ($activeRiskFocus === 'missing_proof' && $order->status === 'pending' && blank($order->payment_proof_path))
+                          || ($activeRiskFocus === 'bank_without_notes' && $order->payment_method === 'bank_transfer' && blank($order->notes))
+                          || ($activeRiskFocus === 'resubmitted' && filled($order->rejected_at) && $order->status === 'pending')
+                          || ($activeRiskFocus === 'override_history' && filled($order->approved_at) && filled($order->admin_notes) && blank($order->payment_proof_path))
+                        )
+                          <i data-lucide="alert-triangle" class="icon-sm text-danger"></i>
+                        @endif
+                        <span>{{ str_replace('_', ' ', $order->payment_method) }}</span>
+                      </div>
                       <div class="text-secondary small">Reference: {{ $order->payment_reference }}</div>
+                      @if ($riskFlags->isNotEmpty())
+                        <div class="mt-2 d-flex flex-wrap gap-2">
+                          @foreach ($riskFlags as $riskFlag)
+                            <span class="badge {{ $riskFlag['class'] }}">{{ $riskFlag['label'] }}</span>
+                          @endforeach
+                        </div>
+                      @endif
                       <div class="mt-2 d-flex gap-2 flex-wrap align-items-center">
                         <span class="badge {{ $order->payment_proof_path ? 'bg-success-subtle text-success border border-success-subtle' : 'bg-warning-subtle text-warning border border-warning-subtle' }}">
                           {{ $order->payment_proof_path ? 'Proof uploaded' : 'Missing proof' }}
@@ -145,6 +263,12 @@
                         @endif
                       </div>
                       <div class="text-secondary small mt-2">{{ $order->notes ?: 'No user notes' }}</div>
+                      @if (filled($investmentPaymentMethodReviews[$order->payment_method] ?? null))
+                        <div class="alert alert-light border small mt-2 mb-0">
+                          <div class="fw-semibold mb-1">Admin review note</div>
+                          <div class="text-secondary">{{ $investmentPaymentMethodReviews[$order->payment_method] }}</div>
+                        </div>
+                      @endif
 
                       @if ($proofUrl)
                         <div class="modal fade" id="{{ $proofModalId }}" tabindex="-1" aria-hidden="true">
@@ -305,5 +429,4 @@
   </div>
 </div>
 @endsection
-
 

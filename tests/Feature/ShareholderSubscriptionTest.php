@@ -311,3 +311,26 @@ test('authorized users can open the secure payment proof file route', function (
         ->assertOk();
 });
 
+
+test('user sees configured payment destination details on buy shares page', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+    ]);
+
+    MiningPlatform::updatePlatformSettings([
+        'payment_btc_transfer_enabled' => '1',
+        'payment_btc_transfer_label' => 'Bitcoin Deposit',
+        'payment_btc_transfer_destination' => 'bc1qexamplecompanywallet',
+        'payment_btc_transfer_reference_hint' => 'Paste the BTC hash after sending',
+        'payment_btc_transfer_instruction' => 'Send the exact package amount to the BTC wallet, then submit the hash.',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard.buy-shares', ['miner' => 'alpha-one']))
+        ->assertOk()
+        ->assertSee('Bitcoin Deposit')
+        ->assertSee('bc1qexamplecompanywallet')
+        ->assertSee('Send the exact package amount to the BTC wallet');
+});
+

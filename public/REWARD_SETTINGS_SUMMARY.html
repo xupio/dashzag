@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Reward Settings Summary</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      color: #1f2937;
+      margin: 40px;
+      line-height: 1.45;
+      font-size: 14px;
+    }
+    h1 {
+      font-size: 28px;
+      margin: 0 0 8px;
+      color: #1d4ed8;
+    }
+    h2 {
+      font-size: 18px;
+      margin: 28px 0 10px;
+      color: #111827;
+      border-bottom: 1px solid #dbeafe;
+      padding-bottom: 6px;
+    }
+    p.subtitle {
+      margin: 0 0 18px;
+      color: #6b7280;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    th, td {
+      border: 1px solid #d1d5db;
+      padding: 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+    th {
+      background: #eff6ff;
+      color: #1e3a8a;
+      font-size: 13px;
+    }
+    .note {
+      background: #f8fafc;
+      border: 1px solid #dbeafe;
+      padding: 12px 14px;
+      border-radius: 8px;
+      margin-top: 14px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 12px;
+    }
+    .card {
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 12px;
+      background: #ffffff;
+    }
+    .label {
+      font-size: 12px;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+    .value {
+      font-size: 20px;
+      font-weight: bold;
+      color: #111827;
+    }
+    ul {
+      margin: 8px 0 0 18px;
+      padding: 0;
+    }
+    .small {
+      color: #6b7280;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Reward Settings Summary</h1>
+  <p class="subtitle">Live business explanation of the current reward rules configured in the platform.</p>
+
+  <div class="grid">
+    <div class="card">
+      <div class="label">Free Starter Mission</div>
+      <div class="value">20 verified + 1 direct Basic</div>
+      <div class="small">Unlocks Basic 100 for free.</div>
+    </div>
+    <div class="card">
+      <div class="label">Registration Reward</div>
+      <div class="value">$25.00</div>
+      <div class="small">Paid when an invited user completes registration/verification.</div>
+    </div>
+  </div>
+
+  <h2>Current Values</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Setting</th>
+        <th>Current Value</th>
+        <th>Meaning</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Verified invites required</td><td>20</td><td>User needs 20 verified invited contacts.</td></tr>
+      <tr><td>Direct Basic 100 subscribers required</td><td>1</td><td>User also needs 1 direct referral who buys Basic 100.</td></tr>
+      <tr><td>Referral registration reward</td><td>$25.00</td><td>Fixed amount paid to sponsor after registration/verification.</td></tr>
+      <tr><td>Referral subscription reward rate</td><td>5.00%</td><td>Direct sponsor reward when a direct referral invests.</td></tr>
+      <tr><td>Level 1 team reward rate</td><td>3.00%</td><td>MLM reward from direct downline investment.</td></tr>
+      <tr><td>Level 2 team reward rate</td><td>1.00%</td><td>MLM reward from second-level investment.</td></tr>
+      <tr><td>Level 3 team reward rate</td><td>0.50%</td><td>MLM reward from third-level investment.</td></tr>
+      <tr><td>Level 4 team reward rate</td><td>0.25%</td><td>MLM reward from fourth-level investment.</td></tr>
+      <tr><td>Level 5 team reward rate</td><td>0.10%</td><td>MLM reward from fifth-level investment.</td></tr>
+      <tr><td>Invite bonus after 10 verified</td><td>0.30%</td><td>Boost to user's own return rate.</td></tr>
+      <tr><td>Invite bonus after 20 verified</td><td>0.75%</td><td>Boost to user's own return rate.</td></tr>
+      <tr><td>Invite bonus after 50 verified</td><td>1.50%</td><td>Boost to user's own return rate.</td></tr>
+      <tr><td>Team bonus after 1 active investor</td><td>0.25%</td><td>Boost to user's own return rate.</td></tr>
+      <tr><td>Team bonus after 3 active investors</td><td>0.50%</td><td>Boost to user's own return rate.</td></tr>
+      <tr><td>Team bonus after 5 active investors</td><td>1.00%</td><td>Boost to user's own return rate.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Simple Reward Examples</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Action</th>
+        <th>Condition</th>
+        <th>Reward</th>
+        <th>Example</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Free Starter upgrade</td>
+        <td>20 verified invites + 1 direct Basic 100 buyer</td>
+        <td>Basic 100 unlocked for free</td>
+        <td>User completes both goals and gets upgraded automatically.</td>
+      </tr>
+      <tr>
+        <td>Referral registration</td>
+        <td>Invited user verifies account</td>
+        <td>$25.00</td>
+        <td>1 invited user verifies = sponsor earns $25.</td>
+      </tr>
+      <tr>
+        <td>Direct referral investment</td>
+        <td>Direct referral buys a package</td>
+        <td>5.00%</td>
+        <td>$100 package = $5 reward. $500 package = $25 reward.</td>
+      </tr>
+      <tr>
+        <td>Level 1 MLM reward</td>
+        <td>Direct team member invests</td>
+        <td>3.00%</td>
+        <td>$100 package = $3 reward.</td>
+      </tr>
+      <tr>
+        <td>Level 2 MLM reward</td>
+        <td>Second-level member invests</td>
+        <td>1.00%</td>
+        <td>$500 package = $5 reward.</td>
+      </tr>
+      <tr>
+        <td>Level 3 MLM reward</td>
+        <td>Third-level member invests</td>
+        <td>0.50%</td>
+        <td>$1000 package = $5 reward.</td>
+      </tr>
+      <tr>
+        <td>Level 4 MLM reward</td>
+        <td>Fourth-level member invests</td>
+        <td>0.25%</td>
+        <td>$2000 package = $5 reward.</td>
+      </tr>
+      <tr>
+        <td>Level 5 MLM reward</td>
+        <td>Fifth-level member invests</td>
+        <td>0.10%</td>
+        <td>$3000 package = $3 reward.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Return Bonus Examples</h2>
+  <div class="note">
+    These bonuses do not pay cash directly. They improve the user's own investment return rate.
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Trigger</th>
+        <th>Bonus</th>
+        <th>Example</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>10 verified invites</td><td>+0.30%</td><td>Base 8.00% becomes 8.30%.</td></tr>
+      <tr><td>20 verified invites</td><td>+0.75%</td><td>Base 8.00% becomes 8.75%.</td></tr>
+      <tr><td>50 verified invites</td><td>+1.50%</td><td>Base 8.00% becomes 9.50%.</td></tr>
+      <tr><td>1 active investor in team</td><td>+0.25%</td><td>Base 8.00% becomes 8.25%.</td></tr>
+      <tr><td>3 active investors in team</td><td>+0.50%</td><td>Base 8.00% becomes 8.50%.</td></tr>
+      <tr><td>5 active investors in team</td><td>+1.00%</td><td>Base 8.00% becomes 9.00%.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Combined Example</h2>
+  <div class="note">
+    If the miner base monthly return is <strong>8.00%</strong>, and the user has <strong>20 verified invites</strong> plus <strong>5 active investors</strong>, then the user's personal return becomes:<br><br>
+    <strong>8.00% + 0.75% + 1.00% = 9.75%</strong>
+  </div>
+</body>
+</html>

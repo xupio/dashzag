@@ -1,4 +1,4 @@
-@extends('layout.master')
+﻿@extends('layout.master')
 
 @section('content')
 @php
@@ -8,6 +8,7 @@
     ? ($user->investments->firstWhere('package.slug', \App\Support\MiningPlatform::FREE_STARTER_PACKAGE_SLUG)?->package?->name ?? 'Free Starter')
     : $level->name;
   $proofUploadOrder = $pendingInvestmentOrder ?? $rejectedInvestmentOrder;
+  $paymentMethods = collect($paymentMethods ?? [])->values();
 @endphp
 
 <div class="d-flex justify-content-between align-items-center flex-wrap grid-margin gap-3">
@@ -151,6 +152,61 @@
   </div>
 @endif
 
+@php
+  $_currentOrder = $pendingInvestmentOrder ?? $rejectedInvestmentOrder;
+  $_timelineState = $activeInvestment
+    ? 'approved'
+    : ($_currentOrder
+        ? ($_currentOrder->rejected_at
+            ? 'rejected'
+            : ($_currentOrder->payment_proof_path ? 'proof_uploaded' : 'submitted'))
+        : null);
+@endphp
+
+@if ($_timelineState)
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card border-0 bg-light">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div>
+              <h5 class="mb-1">Order status timeline</h5>
+              <p class="text-secondary mb-0">Track the current investment order from submission to final review.</p>
+            </div>
+            <span class="badge bg-dark-subtle text-dark text-uppercase">{{ str_replace('_', ' ', $_timelineState) }}</span>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-3">
+              <div class="border rounded p-3 h-100 {{ in_array($_timelineState, ['submitted', 'proof_uploaded', 'approved', 'rejected'], true) ? 'border-primary bg-primary-subtle' : 'bg-white' }}">
+                <div class="fw-semibold mb-1">1. Submitted</div>
+                <div class="text-secondary small">Payment method selected and reference sent to the platform.</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="border rounded p-3 h-100 {{ in_array($_timelineState, ['proof_uploaded', 'approved'], true) ? 'border-info bg-info-subtle' : 'bg-white' }}">
+                <div class="fw-semibold mb-1">2. Proof uploaded</div>
+                <div class="text-secondary small">Receipt or transfer screenshot added for the admin team.</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="border rounded p-3 h-100 {{ $_timelineState === 'rejected' ? 'border-danger bg-danger-subtle' : ($_timelineState === 'approved' ? 'border-success bg-success-subtle' : 'bg-white') }}">
+                <div class="fw-semibold mb-1">3. Admin review</div>
+                <div class="text-secondary small">Operations checks the reference, proof, and payment details.</div>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="border rounded p-3 h-100 {{ $_timelineState === 'approved' ? 'border-success bg-success-subtle' : ($_timelineState === 'rejected' ? 'border-danger bg-danger-subtle' : 'bg-white') }}">
+                <div class="fw-semibold mb-1">4. Final result</div>
+                <div class="text-secondary small">{{ $_timelineState === 'rejected' ? 'Rejected. Review the admin note and submit again.' : 'Approved orders activate your package and earnings.' }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+@endif
+
 <div class="row mb-3">
   <div class="col-12">
     <div class="alert alert-info border d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -251,13 +307,36 @@
           <form method="POST" action="{{ route('dashboard.buy-shares.subscribe') }}" class="d-grid gap-2 mt-auto">
             @csrf
             <input type="hidden" name="package" value="{{ $package->slug }}">
-            <select name="payment_method" class="form-select form-select-sm" required>
+            <select name="payment_method" class="form-select form-select-sm" data-payment-method-select required>
               <option value="">Select payment method</option>
-              <option value="btc_transfer">BTC Transfer</option>
-              <option value="usdt_transfer">USDT Transfer</option>
-              <option value="bank_transfer">Bank Transfer</option>
+              @foreach ($paymentMethods as $paymentMethod)
+                <option value="{{ $paymentMethod['key'] }}">{{ $paymentMethod['label'] }}</option>
+              @endforeach
             </select>
-            <input type="text" name="payment_reference" class="form-control form-control-sm" placeholder="Transaction hash or payment reference" required>
+            <div class="border rounded p-2 bg-light small" data-payment-method-panel>
+              <div class="text-secondary">Select a payment method to see the destination details and transfer instructions.</div>
+              <div class="small text-success mt-2 d-none" data-payment-copy-feedback>Copied to clipboard.</div>
+            </div>
+            <div class="border rounded p-3 bg-white small">
+              <div class="fw-semibold mb-2">Payment completed checklist</div>
+              <div class="text-secondary d-flex align-items-start gap-2 mb-2">
+                <span class="badge bg-primary-subtle text-primary mt-1">1</span>
+                <span>Select a payment method and review the destination details carefully.</span>
+              </div>
+              <div class="text-secondary d-flex align-items-start gap-2 mb-2">
+                <span class="badge bg-primary-subtle text-primary mt-1">2</span>
+                <span>Send the transfer and keep the transaction hash or bank reference.</span>
+              </div>
+              <div class="text-secondary d-flex align-items-start gap-2 mb-2">
+                <span class="badge bg-primary-subtle text-primary mt-1">3</span>
+                <span>Submit the payment reference here, then upload payment proof after the transfer.</span>
+              </div>
+              <div class="text-secondary d-flex align-items-start gap-2">
+                <span class="badge bg-primary-subtle text-primary mt-1">4</span>
+                <span>Wait for admin review. You will be notified once the order is approved or rejected.</span>
+              </div>
+            </div>
+            <input type="text" name="payment_reference" class="form-control form-control-sm" data-payment-reference-input placeholder="Transaction hash or payment reference" required>
             <textarea name="notes" rows="2" class="form-control form-control-sm" placeholder="Optional payment notes"></textarea>
             <button class="btn btn-{{ $accent }}" type="submit" {{ $isPending ? 'disabled' : '' }}>{{ $isPending ? 'Pending approval' : ($isCurrent ? 'Buy again' : 'Submit payment') }}</button>
           </form>
@@ -286,5 +365,101 @@
   </div>
 @endif
 @endsection
+
+
+
+@push('custom-scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const paymentMethods = @json($paymentMethods->values());
+        const paymentMethodByKey = Object.fromEntries(paymentMethods.map((method) => [method.key, method]));
+        const cryptoMethods = ['btc_transfer', 'usdt_transfer'];
+
+        const renderMethod = (select) => {
+            const wrapper = select.closest('form');
+            const panel = wrapper?.querySelector('[data-payment-method-panel]');
+            const referenceInput = wrapper?.querySelector('[data-payment-reference-input]');
+
+            if (!panel || !referenceInput) {
+                return;
+            }
+
+            const method = paymentMethodByKey[select.value] ?? null;
+
+            if (!method) {
+                panel.innerHTML = '<span class="text-muted">Select a payment method to see transfer details and next steps.</span>';
+                referenceInput.placeholder = 'Transaction hash or payment reference';
+                return;
+            }
+
+            const destination = method.destination || 'Destination details will be shared by the team.';
+            const instructions = method.instruction || 'Follow the payment instructions from the admin team.';
+            const isCrypto = cryptoMethods.includes(method.key);
+            const qrUrl = isCrypto
+                ? `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(destination)}`
+                : null;
+
+            panel.innerHTML = `
+                <div class="d-flex flex-column gap-3">
+                    <div>
+                        <div class="fw-semibold text-dark">${method.label}</div>
+                        <div class="text-muted small">Use these details to complete your transfer.</div>
+                    </div>
+                    <div class="d-flex flex-column flex-md-row gap-3 align-items-start">
+                        <div class="flex-grow-1">
+                            <div class="text-muted text-uppercase small mb-1">Send payment to</div>
+                            <div class="fw-semibold text-dark mb-2" data-payment-destination>${destination}</div>
+                            <button type="button" class="btn btn-sm btn-outline-primary mb-3" data-copy-payment-destination>
+                                Copy details
+                            </button>
+                            <div class="text-success small d-none" data-payment-copy-feedback>Copied to clipboard.</div>
+                            <div class="text-muted text-uppercase small mb-1">Instructions</div>
+                            <div class="text-muted">${instructions}</div>
+                        </div>
+                        ${qrUrl ? `
+                            <div class="text-center border rounded p-2 bg-white">
+                                <div class="text-muted text-uppercase small mb-2">Scan QR</div>
+                                <img src="${qrUrl}" alt="${method.label} QR code" class="img-fluid" style="max-width: 160px;">
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+
+            referenceInput.placeholder = method.reference_hint || 'Transaction hash or payment reference';
+        };
+
+        document.querySelectorAll('[data-payment-method-select]').forEach((select) => {
+            renderMethod(select);
+            select.addEventListener('change', () => renderMethod(select));
+        });
+
+        document.addEventListener('click', async (event) => {
+            const button = event.target.closest('[data-copy-payment-destination]');
+            if (!button) {
+                return;
+            }
+
+            const panel = button.closest('[data-payment-method-panel]');
+            const destination = panel?.querySelector('[data-payment-destination]')?.textContent?.trim();
+            const feedback = panel?.querySelector('[data-payment-copy-feedback]');
+
+            if (!destination) {
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(destination);
+                if (feedback) {
+                    feedback.classList.remove('d-none');
+                    setTimeout(() => feedback.classList.add('d-none'), 1800);
+                }
+            } catch (error) {
+                console.error('Unable to copy payment destination.', error);
+            }
+        });
+    });
+</script>
+@endpush
 
 
