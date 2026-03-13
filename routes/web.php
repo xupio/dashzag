@@ -246,6 +246,53 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('dashboard.investments');
 
+    Route::get('/dashboard/investment-orders', function (Request $request) {
+        MiningPlatform::ensureDefaults();
+
+        $status = $request->query('status', 'all');
+        $allowedStatuses = ['all', 'pending', 'approved', 'rejected', 'cancelled'];
+
+        if (! in_array($status, $allowedStatuses, true)) {
+            $status = 'all';
+        }
+
+        $user = $request->user();
+        $orders = $user->investmentOrders()->with(['package', 'miner', 'approver'])->latest('submitted_at')->get();
+        $filteredOrders = $status === 'all'
+            ? $orders
+            : $orders->where('status', $status)->values();
+
+        return view('pages.general.investment-orders', [
+            'orders' => $filteredOrders,
+            'activeStatus' => $status,
+            'orderCounts' => [
+                'all' => $orders->count(),
+                'pending' => $orders->where('status', 'pending')->count(),
+                'approved' => $orders->where('status', 'approved')->count(),
+                'rejected' => $orders->where('status', 'rejected')->count(),
+                'cancelled' => $orders->where('status', 'cancelled')->count(),
+            ],
+        ]);
+    })->name('dashboard.investment-orders');
+
+    Route::post('/dashboard/investment-orders/{investmentOrder}/cancel', function (Request $request, InvestmentOrder $investmentOrder) {
+        abort_unless($investmentOrder->user_id === $request->user()->id, 403);
+
+        if ($investmentOrder->status !== 'pending') {
+            return redirect()->route('dashboard.investment-orders')->withErrors([
+                'cancel' => 'Only pending payment reviews can be cancelled.',
+            ]);
+        }
+
+        $investmentOrder->forceFill([
+            'status' => 'cancelled',
+            'cancelled_at' => now(),
+            'admin_notes' => $investmentOrder->admin_notes ?: 'Cancelled by user before review.',
+        ])->save();
+
+        return redirect()->route('dashboard.investment-orders')->with('orders_success', 'Pending investment order cancelled successfully.');
+    })->name('dashboard.investment-orders.cancel');
+
     Route::get('/dashboard/network', function () {
         MiningPlatform::ensureDefaults();
 
@@ -907,12 +954,51 @@ Route::middleware(['auth', 'verified'])->group(function () {
             return redirect()->route('dashboard.users')->with('users_success', $user->email.' role updated to '.$validated['role'].'.');
         })->name('dashboard.users.role');
 
-        Route::get('/dashboard/operations', function () {
+        Route::get('/dashboard/operations', function (Request $request) {
             MiningPlatform::ensureDefaults();
+
+            $status = $request->query('investment_status', 'all');
+            $allowedStatuses = ['all', 'pending', 'approved', 'rejected', 'cancelled'];
+            $search = trim((string) $request->query('investment_search', ''));
+
+            if (! in_array($status, $allowedStatuses, true)) {
+                $status = 'all';
+            }
+
+            $investmentOrdersQuery = InvestmentOrder::with(['user', 'package', 'miner', 'approver'])->latest('submitted_at');
+
+            if ($status !== 'all') {
+                $investmentOrdersQuery->where('status', $status);
+            }
+
+            if ($search !== '') {
+                $investmentOrdersQuery->where(function ($query) use ($search) {
+                    $query->where('payment_reference', 'like', "%$search%")
+                        ->orWhere('payment_method', 'like', "%$search%")
+                        ->orWhereHas('user', fn ($userQuery) => $userQuery
+                            ->where('name', 'like', "%$search%")
+                            ->orWhere('email', 'like', "%$search%"))
+                        ->orWhereHas('package', fn ($packageQuery) => $packageQuery->where('name', 'like', "%$search%"))
+                        ->orWhereHas('miner', fn ($minerQuery) => $minerQuery->where('name', 'like', "%$search%"));
+                });
+            }
+
+            $allInvestmentStatuses = InvestmentOrder::query()->pluck('status');
 
             return view('pages.general.operations', [
                 'payoutRequests' => PayoutRequest::with(['user', 'earnings'])->latest('requested_at')->get(),
-                'investmentOrders' => InvestmentOrder::with(['user', 'package', 'miner', 'approver'])->latest('submitted_at')->get(),
+                'investmentOrders' => $investmentOrdersQuery->get(),
+                'investmentFilters' => [
+                    'status' => $status,
+                    'search' => $search,
+                ],
+                'investmentOrderCounts' => [
+                    'all' => $allInvestmentStatuses->count(),
+                    'pending' => $allInvestmentStatuses->filter(fn ($orderStatus) => $orderStatus === 'pending')->count(),
+                    'approved' => $allInvestmentStatuses->filter(fn ($orderStatus) => $orderStatus === 'approved')->count(),
+                    'rejected' => $allInvestmentStatuses->filter(fn ($orderStatus) => $orderStatus === 'rejected')->count(),
+                    'cancelled' => $allInvestmentStatuses->filter(fn ($orderStatus) => $orderStatus === 'cancelled')->count(),
+                ],
             ]);
         })->name('dashboard.operations');
 
@@ -945,6 +1031,135 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 fclose($handle);
             }, $filename, ['Content-Type' => 'text/csv']);
         })->name('dashboard.operations.export');
+
+        Route::get('/dashboard/operations/investment-orders/export', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $status = $request->query('investment_status', 'all');
+            $allowedStatuses = ['all', 'pending', 'approved', 'rejected', 'cancelled'];
+            $search = trim((string) $request->query('investment_search', ''));
+
+            if (! in_array($status, $allowedStatuses, true)) {
+                $status = 'all';
+            }
+
+            $investmentOrdersQuery = InvestmentOrder::with(['user', 'package', 'miner', 'approver'])->latest('submitted_at');
+
+            if ($status !== 'all') {
+                $investmentOrdersQuery->where('status', $status);
+            }
+
+            if ($search !== '') {
+                $investmentOrdersQuery->where(function ($query) use ($search) {
+                    $query->where('payment_reference', 'like', "%$search%")
+                        ->orWhere('payment_method', 'like', "%$search%")
+                        ->orWhereHas('user', fn ($userQuery) => $userQuery
+                            ->where('name', 'like', "%$search%")
+                            ->orWhere('email', 'like', "%$search%"))
+                        ->orWhereHas('package', fn ($packageQuery) => $packageQuery->where('name', 'like', "%$search%"))
+                        ->orWhereHas('miner', fn ($minerQuery) => $minerQuery->where('name', 'like', "%$search%"));
+                });
+            }
+
+            $investmentOrders = $investmentOrdersQuery->get();
+            $filename = 'investment-orders-'.now()->format('Ymd-His').'.csv';
+
+            return response()->streamDownload(function () use ($investmentOrders) {
+                $handle = fopen('php://output', 'w');
+                fputcsv($handle, ['User Name', 'User Email', 'Package', 'Miner', 'Submitted At', 'Amount', 'Shares', 'Payment Method', 'Payment Reference', 'Proof Status', 'Status', 'Reviewed By', 'Approved At', 'Rejected At', 'Cancelled At', 'Admin Notes']);
+
+                foreach ($investmentOrders as $order) {
+                    fputcsv($handle, [
+                        $order->user?->name,
+                        $order->user?->email,
+                        $order->package?->name,
+                        $order->miner?->name,
+                        optional($order->submitted_at)->format('Y-m-d H:i:s'),
+                        number_format((float) $order->amount, 2, '.', ''),
+                        $order->shares_owned,
+                        $order->payment_method,
+                        $order->payment_reference,
+                        $order->payment_proof_path ? 'uploaded' : 'missing',
+                        $order->status,
+                        $order->approver?->name,
+                        optional($order->approved_at)->format('Y-m-d H:i:s'),
+                        optional($order->rejected_at)->format('Y-m-d H:i:s'),
+                        optional($order->cancelled_at)->format('Y-m-d H:i:s'),
+                        $order->admin_notes,
+                    ]);
+                }
+
+                fclose($handle);
+            }, $filename, ['Content-Type' => 'text/csv']);
+        })->name('dashboard.operations.investment-orders.export');
+
+        Route::post('/dashboard/operations/investment-orders/bulk', function (Request $request) {
+            $validated = $request->validate([
+                'action' => ['required', 'string', 'in:approve,reject'],
+                'order_ids' => ['required', 'array', 'min:1'],
+                'order_ids.*' => ['integer', 'exists:investment_orders,id'],
+                'admin_notes' => ['nullable', 'string', 'max:1000'],
+            ]);
+
+            $selectedOrders = InvestmentOrder::with(['user', 'package'])
+                ->whereIn('id', $validated['order_ids'])
+                ->get();
+
+            $pendingOrders = $selectedOrders->where('status', 'pending')->values();
+            $skippedCount = $selectedOrders->count() - $pendingOrders->count();
+
+            if ($pendingOrders->isEmpty()) {
+                return redirect()->route('dashboard.operations')->withErrors([
+                    'approval' => 'Only pending investment orders can be processed in bulk.',
+                ]);
+            }
+
+            if ($validated['action'] === 'approve') {
+                $approvableOrders = $pendingOrders->filter(fn ($order) => filled($order->payment_proof_path))->values();
+                $skippedCount += $pendingOrders->count() - $approvableOrders->count();
+
+                if ($approvableOrders->isEmpty()) {
+                    return redirect()->route('dashboard.operations')->withErrors([
+                        'approval' => 'No selected pending orders had uploaded proof for bulk approval.',
+                    ]);
+                }
+
+                foreach ($approvableOrders as $order) {
+                    MiningPlatform::approveInvestmentOrder($order, $request->user());
+
+                    $approvedOrder = $order->fresh(['user', 'package']);
+                    $approvedTemplate = MiningPlatform::activityTemplate('investment_payment_approved', [
+                        'package_name' => $approvedOrder->package?->name ?? 'investment',
+                    ]);
+
+                    $approvedOrder?->user?->notify(new ActivityFeedNotification([
+                        'category' => 'investment',
+                        'status' => 'success',
+                        'subject' => $approvedTemplate['subject'],
+                        'message' => $approvedTemplate['message'],
+                        'context_label' => 'Approved package',
+                        'context_value' => $approvedOrder->package?->name ?? 'Investment package',
+                        'amount' => (float) $approvedOrder->amount,
+                        'amount_label' => 'Approved amount',
+                        'force_mail' => true,
+                    ]));
+                }
+
+                return redirect()->route('dashboard.operations')->with('operations_success', 'Bulk approval complete: '.$approvableOrders->count().' approved, '.$skippedCount.' skipped.');
+            }
+
+            if (blank($validated['admin_notes'] ?? null)) {
+                return redirect()->route('dashboard.operations')->withErrors([
+                    'admin_notes' => 'Admin notes are required for bulk rejection.',
+                ]);
+            }
+
+            foreach ($pendingOrders as $order) {
+                MiningPlatform::rejectInvestmentOrder($order, $request->user(), $validated['admin_notes']);
+            }
+
+            return redirect()->route('dashboard.operations')->with('operations_success', 'Bulk rejection complete: '.$pendingOrders->count().' rejected, '.$skippedCount.' skipped.');
+        })->name('dashboard.operations.investment-orders.bulk');
 
         Route::post('/dashboard/operations/payouts/{payoutRequest}/approve', function (Request $request, PayoutRequest $payoutRequest) {
             $validated = $request->validate([
@@ -1693,6 +1908,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
+
+
+
+
 
 
 

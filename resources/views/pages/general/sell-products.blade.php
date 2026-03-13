@@ -30,6 +30,10 @@
 @php
   $starterPackage = $starterPackage ?? \App\Support\MiningPlatform::freeStarterPackage();
   $starterProgress = $starterProgress ?? \App\Support\MiningPlatform::starterUpgradeProgress($user);
+  $displayTierName = $user->account_type === 'starter'
+    ? ($user->investments->firstWhere('package.slug', \App\Support\MiningPlatform::FREE_STARTER_PACKAGE_SLUG)?->package?->name ?? 'Free Starter')
+    : $level->name;
+  $proofUploadOrder = $pendingInvestmentOrder ?? $rejectedInvestmentOrder;
 @endphp
 
 <div class="row mb-4">
@@ -41,11 +45,6 @@
           <p class="text-secondary mb-0">Every new user starts on the free starter package, then unlocks the Basic 100 package by building a qualifying referral network.</p>
         </div>
         <div class="text-md-end">
-          @php
-      $displayTierName = $user->account_type === 'starter'
-        ? ($user->investments->firstWhere('package.slug', \App\Support\MiningPlatform::FREE_STARTER_PACKAGE_SLUG)?->package?->name ?? 'Free Starter')
-        : $level->name;
-    @endphp
           <div class="fw-semibold">Account type: <span class="text-primary text-capitalize">{{ $user->account_type }}</span></div>
           <div class="text-secondary small">Current level: {{ $displayTierName }} | Level bonus {{ number_format((float) $level->bonus_rate * 100, 2) }}% | Team bonus {{ number_format((float) \App\Support\MiningPlatform::teamBonusRate($user) * 100, 2) }}%</div>
           <div class="text-secondary small">Current package on this miner: {{ $activeInvestment?->package?->name ?? 'No package yet' }}</div>
@@ -126,7 +125,10 @@
   <div class="col-12">
     <div class="alert alert-info border d-flex justify-content-between align-items-center flex-wrap gap-2">
       <span>More verified invitations and more investing referrals increase the bonus rate on your own paid investments.</span>
-      <a href="{{ route('dashboard.network') }}" class="btn btn-sm btn-outline-primary">Open my network</a>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ route('dashboard.network') }}" class="btn btn-sm btn-outline-primary">Open my network</a>
+        <a href="{{ route('dashboard.investment-orders') }}" class="btn btn-sm btn-outline-dark">Payment review history</a>
+      </div>
     </div>
   </div>
 </div>
@@ -136,7 +138,7 @@
     <div class="col-12">
       <div class="alert alert-warning border d-flex justify-content-between align-items-center flex-wrap gap-2">
         <span>Pending payment review: {{ $pendingInvestmentOrder->package?->name }} submitted on {{ $pendingInvestmentOrder->submitted_at?->format('M d, Y h:i A') }}. The admin team will activate it after approval.</span>
-        <a href="{{ route('dashboard.investments') }}" class="btn btn-sm btn-outline-dark">Open investments</a>
+        <a href="{{ route('dashboard.investment-orders', ['status' => 'pending']) }}" class="btn btn-sm btn-outline-dark">Open pending orders</a>
       </div>
     </div>
   </div>
@@ -147,15 +149,11 @@
     <div class="col-12">
       <div class="alert alert-danger border d-flex justify-content-between align-items-center flex-wrap gap-2">
         <span>Last payment rejected for {{ $rejectedInvestmentOrder->package?->name }} on {{ $rejectedInvestmentOrder->rejected_at?->format('M d, Y h:i A') }}. {{ $rejectedInvestmentOrder->admin_notes ?: 'Please review your payment reference and submit again.' }}</span>
-        <a href="{{ route('dashboard.investments') }}" class="btn btn-sm btn-outline-dark">Open investments</a>
+        <a href="{{ route('dashboard.investment-orders', ['status' => 'rejected']) }}" class="btn btn-sm btn-outline-dark">Open rejected orders</a>
       </div>
     </div>
   </div>
 @endif
-
-@php
-  $proofUploadOrder = $pendingInvestmentOrder ?? $rejectedInvestmentOrder;
-@endphp
 
 @if ($proofUploadOrder)
   <div class="row mb-4">
@@ -175,7 +173,7 @@
           </div>
           <div class="d-flex gap-2 flex-wrap align-items-center">
             @if ($proofUploadOrder->payment_proof_path)
-              <a href="{{ asset('storage/'.$proofUploadOrder->payment_proof_path) }}" class="btn btn-sm btn-outline-primary" target="_blank">View proof</a>
+              <a href="{{ route('investment-orders.proof-file', $proofUploadOrder) }}" class="btn btn-sm btn-outline-primary" target="_blank">View proof</a>
             @endif
             <form method="POST" action="{{ route('general.sell-products.proof', $proofUploadOrder) }}" enctype="multipart/form-data" class="d-flex gap-2 flex-wrap align-items-center">
               @csrf
@@ -249,7 +247,10 @@
             <h5 class="mb-1">Latest package on {{ $miner->name }}</h5>
             <p class="text-secondary mb-0">{{ $activeInvestment->package?->name }} | {{ $activeInvestment->shares_owned }} shares | {{ number_format(((float) $activeInvestment->monthly_return_rate + (float) $activeInvestment->level_bonus_rate + (float) $activeInvestment->team_bonus_rate) * 100, 2) }}% total monthly return target</p>
           </div>
-          <a href="{{ route('dashboard') }}?miner={{ $miner->slug }}" class="btn btn-outline-primary">View dashboard</a>
+          <div class="d-flex gap-2 flex-wrap">
+            <a href="{{ route('dashboard') }}?miner={{ $miner->slug }}" class="btn btn-outline-primary">View dashboard</a>
+            <a href="{{ route('dashboard.investment-orders') }}" class="btn btn-outline-secondary">Order history</a>
+          </div>
         </div>
       </div>
     </div>

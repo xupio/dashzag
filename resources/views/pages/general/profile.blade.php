@@ -73,6 +73,7 @@
             <a href="{{ route('profile.edit') }}" class="btn btn-outline-primary">Edit profile</a>
             <a href="{{ route('dashboard.notifications') }}" class="btn btn-outline-secondary">Notifications</a>
             <a href="{{ route('dashboard.notification-preferences') }}" class="btn btn-outline-secondary">Notification preferences</a>
+            <a href="{{ route('dashboard.investment-orders') }}" class="btn btn-outline-secondary">Investment orders</a>
             <a href="{{ url('/email/inbox') }}" class="btn btn-outline-secondary">Open inbox</a>
             <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary">Dashboard home</a>
           </div>
@@ -193,6 +194,7 @@
           <a href="{{ route('dashboard') }}" class="btn btn-light text-start"><i data-lucide="home" class="icon-sm me-2"></i> Dashboard</a>
           <a href="{{ route('dashboard.notifications') }}" class="btn btn-light text-start"><i data-lucide="bell" class="icon-sm me-2"></i> Notifications</a>
           <a href="{{ route('dashboard.notification-preferences') }}" class="btn btn-light text-start"><i data-lucide="bell-ring" class="icon-sm me-2"></i> Notification preferences</a>
+          <a href="{{ route('dashboard.investment-orders') }}" class="btn btn-light text-start"><i data-lucide="receipt-text" class="icon-sm me-2"></i> Investment Orders</a>
           <a href="{{ route('dashboard.investments') }}" class="btn btn-light text-start"><i data-lucide="chart-column" class="icon-sm me-2"></i> Investments</a>
           <a href="{{ route('dashboard.network') }}" class="btn btn-light text-start"><i data-lucide="network" class="icon-sm me-2"></i> Network</a>
           <a href="{{ route('dashboard.wallet') }}" class="btn btn-light text-start"><i data-lucide="wallet" class="icon-sm me-2"></i> Wallet</a>
@@ -221,5 +223,10 @@
   </div>
 </div>
 @endsection
+
+
+
+
+
 
 
