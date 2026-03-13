@@ -100,3 +100,4 @@ License: You must have a valid license to legally use this template for your pro
     @stack('custom-scripts')
 </body>
 </html>
+

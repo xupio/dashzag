@@ -71,13 +71,37 @@ Route::get('/dashboard', function (Request $request) {
         'performanceRevenueData' => $performanceLogs->map(fn ($log) => round((float) $log->revenue_usd, 2))->values(),
         'performanceHashrateData' => $performanceLogs->map(fn ($log) => round((float) $log->hashrate_th, 2))->values(),
         'performanceUptimeData' => $performanceLogs->map(fn ($log) => round((float) $log->uptime_percentage, 2))->values(),
+        'recentPerformanceLogs' => $miner->performanceLogs()->orderByDesc('logged_on')->limit(5)->get(),
     ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard/profile', function () {
+        MiningPlatform::ensureDefaults();
+
+        $user = request()->user()->load(['userLevel', 'shareholder', 'investments.package', 'investments.miner', 'friendInvitations', 'earnings']);
+        $level = MiningPlatform::syncUserLevel($user);
+        $user->load(['userLevel', 'shareholder', 'investments.package', 'investments.miner', 'friendInvitations', 'earnings']);
+        $starterProgress = MiningPlatform::starterUpgradeProgress($user);
+
+        $displayTierName = $user->account_type === 'starter'
+            ? ($user->investments->firstWhere('package.slug', MiningPlatform::FREE_STARTER_PACKAGE_SLUG)?->package?->name ?? 'Free Starter')
+            : $level->name;
+
         return view('pages.general.profile', [
-            'user' => request()->user(),
+            'user' => $user,
+            'level' => $level,
+            'displayTierName' => $displayTierName,
+            'starterPackage' => MiningPlatform::freeStarterPackage(),
+            'starterProgress' => $starterProgress,
+            'totalInvested' => (float) $user->investments->where('status', 'active')->sum('amount'),
+            'activeInvestments' => $user->investments->where('status', 'active')->values(),
+            'expectedMonthlyEarnings' => MiningPlatform::expectedMonthlyEarnings($user),
+            'availableEarnings' => (float) $user->earnings->where('status', 'available')->sum('amount'),
+            'pendingReferrals' => $user->friendInvitations->whereNull('verified_at')->count(),
+            'verifiedReferrals' => $user->friendInvitations->whereNotNull('verified_at')->count(),
+            'registeredReferrals' => $user->friendInvitations->whereNotNull('registered_at')->count(),
+            'teamBonusRate' => MiningPlatform::teamBonusRate($user),
         ]);
     })->name('dashboard.profile');
 
@@ -1764,7 +1788,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::view('mdi-icons', 'pages.icons.mdi-icons');
     });
 
-    Route::get('/general/sell-products', function (Request $request) {
+    Route::get('/dashboard/buy-shares', function (Request $request) {
         MiningPlatform::ensureDefaults();
 
         $user = $request->user()->load(['shareholder', 'userLevel', 'investments.package', 'investments.miner']);
@@ -1777,7 +1801,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         $sharesSold = MiningPlatform::totalSharesSold($miner);
 
-        return view('pages.general.sell-products', [
+        return view('pages.general.buy-shares', [
             'user' => $user,
             'level' => $level,
             'miners' => $miners,
@@ -1790,9 +1814,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'sharesSold' => $sharesSold,
             'availableShares' => max($miner->total_shares - $sharesSold, 0),
         ]);
-    })->name('general.sell-products');
+    })->name('dashboard.buy-shares');
 
-    Route::post('/general/sell-products/subscribe', function (Request $request) {
+    Route::post('/dashboard/buy-shares/subscribe', function (Request $request) {
         MiningPlatform::ensureDefaults();
 
         $validated = $request->validate([
@@ -1816,7 +1840,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         if ($existingPendingOrder) {
             return redirect()
-                ->route('general.sell-products', ['miner' => $package->miner?->slug])
+                ->route('dashboard.buy-shares', ['miner' => $package->miner?->slug])
                 ->with('subscription_success', 'You already have a pending payment review for the '.$package->name.' package.');
         }
 
@@ -1838,11 +1862,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]));
 
         return redirect()
-            ->route('general.sell-products', ['miner' => $package->miner?->slug])
+            ->route('dashboard.buy-shares', ['miner' => $package->miner?->slug])
             ->with('subscription_success', 'Your payment for '.$package->name.' has been submitted. Upload the payment proof after you complete the transfer.');
-    })->name('general.sell-products.subscribe');
+    })->name('dashboard.buy-shares.subscribe');
 
-    Route::post('/general/sell-products/{investmentOrder}/proof', function (Request $request, InvestmentOrder $investmentOrder) {
+    Route::post('/dashboard/buy-shares/{investmentOrder}/proof', function (Request $request, InvestmentOrder $investmentOrder) {
         MiningPlatform::ensureDefaults();
 
         abort_unless($investmentOrder->user_id === $request->user()->id, 403);
@@ -1881,9 +1905,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]));
 
         return redirect()
-            ->route('general.sell-products', ['miner' => $investmentOrder->miner?->slug])
+            ->route('dashboard.buy-shares', ['miner' => $investmentOrder->miner?->slug])
             ->with('subscription_success', 'Payment proof uploaded successfully. The admin team can review it now.');
-    })->name('general.sell-products.proof');
+    })->name('dashboard.buy-shares.proof');
 
     Route::get('/investment-orders/{investmentOrder}/proof-file', function (Request $request, InvestmentOrder $investmentOrder) {
         abort_unless($investmentOrder->payment_proof_path, 404);
@@ -1941,6 +1965,17 @@ require __DIR__.'/auth.php';
 
 
 
+
+
+
+
+
+
+
+
+
+
+Route::redirect('/general/sell-products', '/dashboard/buy-shares');
 
 
 

@@ -302,3 +302,4 @@
 @push('custom-scripts')
   <script src="{{ asset('build/assets/sortablejs-DX1VhsoB.js') }}"></script>
 @endpush
+

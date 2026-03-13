@@ -8,7 +8,7 @@
         <h4 class="mb-1">Packages</h4>
         <p class="text-secondary mb-0">Manage the public investment packages shown to users on the sell products page.</p>
       </div>
-      <a href="{{ route('general.sell-products') }}" class="btn btn-outline-primary btn-icon-text">
+      <a href="{{ route('dashboard.buy-shares') }}" class="btn btn-outline-primary btn-icon-text">
         <i data-lucide="shopping-bag" class="btn-icon-prepend"></i> View public packages
       </a>
     </div>
@@ -194,3 +194,5 @@
   </div>
 </div>
 @endsection
+
+

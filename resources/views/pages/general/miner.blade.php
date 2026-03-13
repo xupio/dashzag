@@ -5,14 +5,14 @@
   <div class="col-12 grid-margin">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
       <div>
-        <h4 class="mb-1">Manage {{ $miner->name }}</h4>
-        <p class="text-secondary mb-0">Update miner details and record daily cloud mining performance from one screen.</p>
+        <h4 class="mb-1">{{ $miner->name }} Miner Details</h4>
+        <p class="text-secondary mb-0">Use this page for the full technical, capacity, and admin-level management of the selected miner.</p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
         <a href="{{ route('dashboard') }}?miner={{ $miner->slug }}" class="btn btn-outline-primary btn-icon-text">
-          <i data-lucide="layout-dashboard" class="btn-icon-prepend"></i> Dashboard
+          <i data-lucide="layout-dashboard" class="btn-icon-prepend"></i> Back to overview
         </a>
-        <a href="{{ route('general.sell-products') }}?miner={{ $miner->slug }}" class="btn btn-primary btn-icon-text">
+        <a href="{{ route('dashboard.buy-shares') }}?miner={{ $miner->slug }}" class="btn btn-primary btn-icon-text">
           <i data-lucide="shopping-cart" class="btn-icon-prepend"></i> View packages
         </a>
       </div>
@@ -35,7 +35,7 @@
         <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
           <div>
             <h6 class="mb-1">Select miner</h6>
-            <p class="text-secondary mb-0">Switch between active miners and manage each one with the same admin screen.</p>
+            <p class="text-secondary mb-0">Switch between active miners and manage each one with the same technical/admin screen.</p>
           </div>
           <div class="d-flex flex-wrap gap-2">
             @foreach ($miners as $networkMiner)
@@ -51,7 +51,7 @@
 @endif
 
 <div class="row mb-4">
-  <div class="col-md-4 grid-margin stretch-card">
+  <div class="col-md-3 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
         <p class="text-secondary mb-1">Share price</p>
@@ -59,7 +59,7 @@
       </div>
     </div>
   </div>
-  <div class="col-md-4 grid-margin stretch-card">
+  <div class="col-md-3 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
         <p class="text-secondary mb-1">Shares sold</p>
@@ -67,7 +67,15 @@
       </div>
     </div>
   </div>
-  <div class="col-md-4 grid-margin stretch-card">
+  <div class="col-md-3 grid-margin stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <p class="text-secondary mb-1">Available shares</p>
+        <h4 class="mb-0">{{ number_format($availableShares) }}</h4>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
         <p class="text-secondary mb-1">Status</p>
@@ -191,7 +199,7 @@
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
           <div>
             <h5 class="mb-1">Recent performance logs</h5>
-            <p class="text-secondary mb-0">Latest recorded revenue, hashrate, and uptime values.</p>
+            <p class="text-secondary mb-0">Latest recorded revenue, hashrate, uptime, and notes for the technical/admin history.</p>
           </div>
           <span class="badge bg-primary">{{ $recentLogs->count() }} recent entries</span>
         </div>
@@ -224,3 +232,5 @@
   </div>
 </div>
 @endsection
+
+

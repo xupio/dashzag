@@ -40,7 +40,7 @@ test('network page shows direct team and team rewards', function () {
         'sponsor_user_id' => $inviter->id,
     ]);
 
-    $this->actingAs($buyer)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($buyer)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
     ]);
 
@@ -75,7 +75,7 @@ test('invitation pipeline marks invited email as active investor even without sp
         'sponsor_user_id' => null,
     ]);
 
-    $this->actingAs($legacyInvestor)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($legacyInvestor)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
     ]);
 
@@ -85,5 +85,6 @@ test('invitation pipeline marks invited email as active investor even without sp
     $response->assertSee('Legacy Investor');
     $response->assertSee('Yes');
 });
+
 
 

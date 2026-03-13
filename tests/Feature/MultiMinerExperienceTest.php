@@ -19,7 +19,7 @@ test('user can switch dashboard and sell pages between miners', function () {
         ->assertSee('Beta Flux Mining Dashboard');
 
     $this->actingAs($user)
-        ->get(route('general.sell-products').'?miner=beta-flux')
+        ->get(route('dashboard.buy-shares').'?miner=beta-flux')
         ->assertOk()
         ->assertSee('Buy shares in Beta Flux')
         ->assertSee('Momentum 300');
@@ -31,11 +31,11 @@ test('user can subscribe to a package on the secondary miner', function () {
         'account_type' => 'user',
     ]);
 
-    $response = $this->actingAs($user)->post(route('general.sell-products.subscribe'), [
+    $response = $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'momentum-300',
     ]);
 
-    $response->assertRedirect(route('general.sell-products', ['miner' => 'beta-flux']));
+    $response->assertRedirect(route('dashboard.buy-shares', ['miner' => 'beta-flux']));
 
     $user->refresh();
     $investment = $user->investments()->with(['miner', 'package'])->latest('id')->first();
@@ -45,4 +45,5 @@ test('user can subscribe to a package on the secondary miner', function () {
     expect($investment->package->slug)->toBe('momentum-300');
     expect((int) $investment->shares_owned)->toBe(4);
 });
+
 

@@ -57,3 +57,4 @@ test('user cannot resend someone else pending friend invitation', function () {
 
     Mail::assertNothingSent();
 });
+

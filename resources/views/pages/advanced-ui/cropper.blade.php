@@ -77,3 +77,4 @@
 @push('custom-scripts')
   <script src="{{ asset('build/assets/cropper-Dv1G1grO.js') }}"></script>
 @endpush
+

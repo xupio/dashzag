@@ -91,3 +91,4 @@
 @push('custom-scripts')
   <script src="{{ asset('build/assets/sparkline-BOx7x7gl.js') }}"></script>
 @endpush
+

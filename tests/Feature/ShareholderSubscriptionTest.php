@@ -17,14 +17,14 @@ test('verified user submits a package payment for admin approval', function () {
         'account_type' => 'user',
     ]);
 
-    $response = $this->actingAs($user)->post(route('general.sell-products.subscribe'), [
+    $response = $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
         'payment_method' => 'btc_transfer',
         'payment_reference' => 'TX-123456',
         'notes' => 'Sent from test wallet',
     ]);
 
-    $response->assertRedirect(route('general.sell-products', ['miner' => 'alpha-one']));
+    $response->assertRedirect(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
 
     $user->refresh();
 
@@ -50,7 +50,7 @@ test('user can upload payment proof after submitting the investment order', func
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($user)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
         'payment_method' => 'btc_transfer',
         'payment_reference' => 'TX-PROOF-001',
@@ -58,11 +58,11 @@ test('user can upload payment proof after submitting the investment order', func
 
     $order = InvestmentOrder::query()->firstOrFail();
 
-    $response = $this->actingAs($user)->post(route('general.sell-products.proof', $order), [
+    $response = $this->actingAs($user)->post(route('dashboard.buy-shares.proof', $order), [
         'payment_proof' => UploadedFile::fake()->create('receipt.pdf', 120, 'application/pdf'),
     ]);
 
-    $response->assertRedirect(route('general.sell-products', ['miner' => 'alpha-one']));
+    $response->assertRedirect(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
 
     $order->refresh();
 
@@ -84,13 +84,13 @@ test('admin can approve an investment order and activate shareholder package', f
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($user)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
         'payment_method' => 'btc_transfer',
         'payment_reference' => 'TX-APPROVE-001',
     ]);
 
-    $this->actingAs($user)->post(route('general.sell-products.proof', InvestmentOrder::query()->firstOrFail()), [
+    $this->actingAs($user)->post(route('dashboard.buy-shares.proof', InvestmentOrder::query()->firstOrFail()), [
         'payment_proof' => UploadedFile::fake()->create('approval-receipt.pdf', 120, 'application/pdf'),
     ]);
 
@@ -129,7 +129,7 @@ test('admin can reject an investment order and leave it inactive', function () {
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($user)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
         'payment_method' => 'usdt_transfer',
         'payment_reference' => 'TX-REJECT-001',
@@ -169,7 +169,7 @@ test('admin operations page shows proof preview controls for uploaded investment
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($user)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
         'payment_method' => 'btc_transfer',
         'payment_reference' => 'TX-PREVIEW-001',
@@ -177,7 +177,7 @@ test('admin operations page shows proof preview controls for uploaded investment
 
     $order = InvestmentOrder::query()->firstOrFail();
 
-    $this->actingAs($user)->post(route('general.sell-products.proof', $order), [
+    $this->actingAs($user)->post(route('dashboard.buy-shares.proof', $order), [
         'payment_proof' => UploadedFile::fake()->create('receipt.pdf', 120, 'application/pdf'),
     ]);
 
@@ -200,7 +200,7 @@ test('admin must provide rejection notes when rejecting an investment order', fu
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($user)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
         'payment_method' => 'btc_transfer',
         'payment_reference' => 'TX-REJECT-REQUIRED',
@@ -231,7 +231,7 @@ test('admin cannot approve an investment order without proof unless override is 
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($user)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
         'payment_method' => 'btc_transfer',
         'payment_reference' => 'TX-NO-PROOF-001',
@@ -259,7 +259,7 @@ test('admin can approve an investment order without proof using override notes',
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($user)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
         'payment_method' => 'btc_transfer',
         'payment_reference' => 'TX-OVERRIDE-001',
@@ -290,7 +290,7 @@ test('authorized users can open the secure payment proof file route', function (
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($user)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
         'payment_method' => 'btc_transfer',
         'payment_reference' => 'TX-FILE-001',
@@ -298,7 +298,7 @@ test('authorized users can open the secure payment proof file route', function (
 
     $order = InvestmentOrder::query()->firstOrFail();
 
-    $this->actingAs($user)->post(route('general.sell-products.proof', $order), [
+    $this->actingAs($user)->post(route('dashboard.buy-shares.proof', $order), [
         'payment_proof' => UploadedFile::fake()->create('proof.pdf', 120, 'application/pdf'),
     ]);
 
@@ -310,3 +310,4 @@ test('authorized users can open the secure payment proof file route', function (
         ->get(route('investment-orders.proof-file', $order))
         ->assertOk();
 });
+

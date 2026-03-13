@@ -115,3 +115,4 @@
 @push('custom-scripts')
   <script src="{{ asset('build/assets/apexcharts-N9wAlSvA.js') }}"></script>
 @endpush
+

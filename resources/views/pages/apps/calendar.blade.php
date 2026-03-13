@@ -87,3 +87,4 @@
 @push('custom-scripts')
   <script src="{{ asset('build/assets/fullcalendar-C3vZhAcP.js') }}"></script>
 @endpush
+

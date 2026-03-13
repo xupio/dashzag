@@ -55,7 +55,7 @@ test('inviter receives subscription rewards and team bonus rate when referred us
         'email_verified_at' => now(),
     ]);
 
-    $this->actingAs($inviter)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($inviter)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
     ])->assertRedirect();
 
@@ -74,7 +74,7 @@ test('inviter receives subscription rewards and team bonus rate when referred us
         'sponsor_user_id' => $inviter->id,
     ]);
 
-    $this->actingAs($buyer)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($buyer)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
     ])->assertRedirect();
 
@@ -115,7 +115,7 @@ test('starter user unlocks basic 100 after referral mission is completed', funct
         'sponsor_user_id' => $user->id,
     ]);
 
-    $this->actingAs($referredBuyer)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($referredBuyer)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'starter-100',
     ]);
 
@@ -153,7 +153,7 @@ test('third level sponsor receives configured mlm subscription reward', function
         'sponsor_user_id' => $levelThree->id,
     ]);
 
-    $this->actingAs($buyer)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($buyer)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
     ])->assertRedirect();
 
@@ -165,3 +165,4 @@ test('third level sponsor receives configured mlm subscription reward', function
 
     expect($levelOne->notifications->pluck('data.subject'))->toContain('A level 3 investor subscribed');
 });
+

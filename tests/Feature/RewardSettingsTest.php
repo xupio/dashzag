@@ -63,3 +63,4 @@ test('non admin cannot access reward settings page', function () {
         ->assertForbidden();
 });
 
+

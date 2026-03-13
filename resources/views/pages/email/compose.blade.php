@@ -166,3 +166,4 @@
 @push('custom-scripts')
   <script src="{{ asset('build/assets/email-CGOzH2XC.js') }}"></script>
 @endpush
+

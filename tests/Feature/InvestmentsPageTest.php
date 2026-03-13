@@ -25,9 +25,9 @@ test('investments page shows subscribed package history', function () {
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($user)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
-    ])->assertRedirect(route('general.sell-products', ['miner' => 'alpha-one']));
+    ])->assertRedirect(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
 
     $response = $this->actingAs($user)->get(route('dashboard.investments'));
 
@@ -35,4 +35,5 @@ test('investments page shows subscribed package history', function () {
     $response->assertSee('Growth 500');
     $response->assertSee('Alpha One');
 });
+
 

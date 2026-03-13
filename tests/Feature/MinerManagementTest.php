@@ -76,3 +76,4 @@ test('non admin user cannot manage miner data', function () {
         ])
         ->assertForbidden();
 });
+

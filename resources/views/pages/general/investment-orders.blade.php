@@ -9,7 +9,7 @@
         <p class="text-secondary mb-0">Track each payment review, upload proof, and cancel pending orders before they are reviewed.</p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <a href="{{ route('general.sell-products') }}" class="btn btn-primary btn-icon-text">
+        <a href="{{ route('dashboard.buy-shares') }}" class="btn btn-primary btn-icon-text">
           <i data-lucide="badge-dollar-sign" class="btn-icon-prepend"></i> Buy shares
         </a>
         <a href="{{ route('dashboard.investments') }}" class="btn btn-outline-secondary btn-icon-text">
@@ -91,7 +91,7 @@
                         @endif
 
                         @if (in_array($order->status, ['pending', 'rejected'], true))
-                          <a href="{{ route('general.sell-products', ['miner' => $order->miner?->slug]) }}" class="btn btn-sm btn-outline-secondary">Open payment page</a>
+                          <a href="{{ route('dashboard.buy-shares', ['miner' => $order->miner?->slug]) }}" class="btn btn-sm btn-outline-secondary">Open payment page</a>
                         @endif
 
                         @if ($order->status === 'pending')
@@ -113,3 +113,5 @@
   </div>
 </div>
 @endsection
+
+

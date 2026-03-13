@@ -47,3 +47,4 @@ test('user level upgrades when investment and referrals increase', function () {
     expect($level->slug)->toBe('silver');
     expect($user->fresh()->userLevel->slug)->toBe('silver');
 });
+

@@ -45,3 +45,4 @@ test('non admin user cannot access users page', function () {
 
     $this->actingAs($user)->get(route('dashboard.users'))->assertForbidden();
 });
+

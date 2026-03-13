@@ -112,3 +112,4 @@
 @push('custom-scripts')
   <script src="{{ asset('build/assets/sweet-alert-CMFBsl9h.js') }}"></script>
 @endpush
+

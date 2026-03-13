@@ -7,17 +7,12 @@
 @section('content')
 <div class="d-flex justify-content-between align-items-center flex-wrap grid-margin gap-3">
   <div>
-    <h4 class="mb-1">{{ $miner->name }} Mining Dashboard</h4>
-    <p class="text-secondary mb-0">Track live production, share availability, and your personal mining position.</p>
+    <h4 class="mb-1">{{ $miner->name }} Overview</h4>
+    <p class="text-secondary mb-0">Track live production, share pricing, miner capacity, and overall package performance.</p>
   </div>
-  <div class="text-md-end">
-    @php
-      $displayTierName = $user->account_type === 'starter'
-        ? ($user->investments->firstWhere('package.slug', \App\Support\MiningPlatform::FREE_STARTER_PACKAGE_SLUG)?->package?->name ?? 'Free Starter')
-        : $level->name;
-    @endphp
-    <div class="fw-semibold">Current level: <span class="text-primary">{{ $displayTierName }}</span></div>
-    <div class="text-secondary small">Bonus rate: {{ number_format((float) $level->bonus_rate * 100, 2) }}%</div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{{ route('dashboard.buy-shares') }}?miner={{ $miner->slug }}" class="btn btn-primary btn-sm">Buy shares</a>
+    <a href="{{ route('dashboard.profile') }}" class="btn btn-outline-primary btn-sm">Personal profile</a>
   </div>
 </div>
 
@@ -28,7 +23,7 @@
         <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
           <div>
             <h6 class="mb-1">Miner switcher</h6>
-            <p class="text-secondary mb-0">Compare available mining units and monitor each one separately.</p>
+            <p class="text-secondary mb-0">Compare all available mining units and review each one separately.</p>
           </div>
           <div class="d-flex flex-wrap gap-2">
             @foreach ($miners as $networkMiner)
@@ -44,10 +39,10 @@
 @endif
 
 <div class="row">
-  <div class="col-md-4 grid-margin stretch-card">
+  <div class="col-md-3 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
-        <p class="text-secondary mb-1">{{ $miner->name }} daily output</p>
+        <p class="text-secondary mb-1">Daily output</p>
         <h3 class="mb-2">${{ number_format((float) $miner->daily_output_usd, 2) }}</h3>
         <div class="d-flex align-items-center gap-2 text-success">
           <i data-lucide="activity" class="icon-sm"></i>
@@ -56,7 +51,16 @@
       </div>
     </div>
   </div>
-  <div class="col-md-4 grid-margin stretch-card">
+  <div class="col-md-3 grid-margin stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <p class="text-secondary mb-1">Share price</p>
+        <h3 class="mb-2">${{ number_format((float) $miner->share_price, 2) }}</h3>
+        <div class="text-secondary small">Base monthly return: {{ number_format((float) $miner->base_monthly_return_rate * 100, 2) }}%</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
         <p class="text-secondary mb-1">Shares available</p>
@@ -64,81 +68,16 @@
         <div class="progress" style="height: 8px;">
           <div class="progress-bar bg-primary" role="progressbar" style="width: {{ $miner->total_shares > 0 ? min(($sharesSold / $miner->total_shares) * 100, 100) : 0 }}%"></div>
         </div>
-        <div class="text-secondary small mt-2">{{ number_format($sharesSold) }} shares already sold</div>
+        <div class="text-secondary small mt-2">{{ number_format($sharesSold) }} shares sold</div>
       </div>
     </div>
   </div>
-  <div class="col-md-4 grid-margin stretch-card">
+  <div class="col-md-3 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
-        <p class="text-secondary mb-1">Your expected monthly earnings</p>
-        <h3 class="mb-2">${{ number_format($expectedMonthlyEarnings, 2) }}</h3>
-        <div class="text-secondary small">
-          Active investment on this miner: {{ $activeInvestment?->package?->name ?? 'No active package yet' }}
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-@php
-  $starterPackage = $starterPackage ?? \App\Support\MiningPlatform::freeStarterPackage();
-  $starterProgress = $starterProgress ?? \App\Support\MiningPlatform::starterUpgradeProgress($user);
-@endphp
-
-<div class="row">
-  <div class="col-12 grid-margin stretch-card">
-    <div class="card {{ $starterProgress['has_unlocked_basic'] ? 'border border-success' : 'border border-warning' }}">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
-          <div>
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <h6 class="card-title mb-0">Free Starter Mission</h6>
-              <span class="badge {{ $starterProgress['has_unlocked_basic'] ? 'bg-success' : 'bg-warning text-dark' }}">
-                {{ $starterProgress['has_unlocked_basic'] ? 'Basic 100 unlocked' : 'Upgrade in progress' }}
-              </span>
-            </div>
-            <p class="text-secondary mb-0">
-              Start from {{ $starterPackage?->name ?? 'Free Starter' }} and unlock Basic 100 by growing your direct network.
-            </p>
-          </div>
-          <div class="text-md-end">
-            <div class="fw-semibold">Current package path: {{ $displayTierName }}</div>
-            <div class="text-secondary small">
-              Team bonus on paid investments: {{ number_format((float) \App\Support\MiningPlatform::teamBonusRate($user) * 100, 2) }}%
-            </div>
-          </div>
-        </div>
-        <div class="row g-3">
-          <div class="col-md-6">
-            <div class="border rounded p-3 h-100">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="text-secondary">Verified invites</span>
-                <span class="fw-semibold">{{ $starterProgress['verified_invites'] }} / {{ $starterProgress['required_verified_invites'] }}</span>
-              </div>
-              <div class="progress" style="height: 8px;">
-                <div class="progress-bar bg-primary" role="progressbar" style="width: {{ min(($starterProgress['verified_invites'] / max($starterProgress['required_verified_invites'], 1)) * 100, 100) }}%"></div>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-6">
-            <div class="border rounded p-3 h-100">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <span class="text-secondary">Direct Basic 100 subscribers</span>
-                <span class="fw-semibold">{{ $starterProgress['direct_basic_subscribers'] }} / {{ $starterProgress['required_direct_basic_subscribers'] }}</span>
-              </div>
-              <div class="progress" style="height: 8px;">
-                <div class="progress-bar bg-success" role="progressbar" style="width: {{ min(($starterProgress['direct_basic_subscribers'] / max($starterProgress['required_direct_basic_subscribers'], 1)) * 100, 100) }}%"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="alert {{ $starterProgress['has_unlocked_basic'] ? 'alert-success' : 'alert-light border' }} mt-3 mb-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
-          <span>
-            {{ $starterProgress['has_unlocked_basic'] ? 'Your referral mission is complete. Basic 100 is active on your account.' : 'Complete both goals to unlock Basic 100 automatically on your account.' }}
-          </span>
-          <a href="{{ route('dashboard.network') }}" class="btn btn-sm btn-outline-primary">Open referral network</a>
-        </div>
+        <p class="text-secondary mb-1">Monthly output</p>
+        <h3 class="mb-2">${{ number_format((float) $miner->monthly_output_usd, 2) }}</h3>
+        <div class="text-secondary small">Active packages: {{ $miner->packages->count() }}</div>
       </div>
     </div>
   </div>
@@ -148,12 +87,12 @@
   <div class="col-xl-8 grid-margin stretch-card">
     <div class="card overflow-hidden">
       <div class="card-body">
-        <div class="d-flex justify-content-between align-items-baseline mb-3">
+        <div class="d-flex justify-content-between align-items-baseline mb-3 flex-wrap gap-2">
           <div>
             <h6 class="card-title mb-1">{{ $miner->name }} production trend</h6>
-            <p class="text-secondary mb-0">Last 7 days of revenue generated by the selected miner.</p>
+            <p class="text-secondary mb-0">Last 7 days of miner revenue generated by the selected unit.</p>
           </div>
-          <a href="{{ route('general.sell-products') }}?miner={{ $miner->slug }}" class="btn btn-primary btn-sm">Buy shares</a>
+          <a href="{{ route('dashboard.miner') }}?miner={{ $miner->slug }}" class="btn btn-outline-primary btn-sm">Open miner details</a>
         </div>
         <div id="minerRevenueChart"></div>
       </div>
@@ -162,22 +101,26 @@
   <div class="col-xl-4 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
-        <h6 class="card-title mb-3">Your investment summary</h6>
+        <h6 class="card-title mb-3">Miner summary</h6>
         <div class="mb-3">
-          <div class="text-secondary small">Total invested</div>
-          <div class="fs-4 fw-semibold">${{ number_format($totalInvested, 2) }}</div>
+          <div class="text-secondary small">Miner name</div>
+          <div class="fs-5 fw-semibold">{{ $miner->name }}</div>
         </div>
         <div class="mb-3">
-          <div class="text-secondary small">Owned shares in {{ $miner->name }}</div>
-          <div class="fs-4 fw-semibold">{{ number_format((int) $user->investments->where('status', 'active')->where('miner_id', $miner->id)->sum('shares_owned')) }}</div>
+          <div class="text-secondary small">Status</div>
+          <div class="fs-6 fw-semibold text-capitalize">{{ $miner->status }}</div>
         </div>
         <div class="mb-3">
-          <div class="text-secondary small">Base monthly return</div>
-          <div class="fs-4 fw-semibold">{{ number_format((float) $miner->base_monthly_return_rate * 100, 2) }}%</div>
+          <div class="text-secondary small">Total capacity</div>
+          <div class="fs-5 fw-semibold">{{ number_format($miner->total_shares) }} shares</div>
+        </div>
+        <div class="mb-3">
+          <div class="text-secondary small">Sold capacity</div>
+          <div class="fs-5 fw-semibold">{{ number_format($sharesSold) }} shares</div>
         </div>
         <div>
-          <div class="text-secondary small">Latest package on this miner</div>
-          <div class="fs-6 fw-semibold">{{ $activeInvestment?->package?->name ?? 'Not subscribed yet' }}</div>
+          <div class="text-secondary small">Utilization</div>
+          <div class="fs-5 fw-semibold">{{ $miner->total_shares > 0 ? number_format(min(($sharesSold / $miner->total_shares) * 100, 100), 2) : '0.00' }}%</div>
         </div>
       </div>
     </div>
@@ -196,39 +139,76 @@
   <div class="col-lg-6 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
-        <div class="d-flex justify-content-between align-items-baseline mb-3">
-          <h6 class="card-title mb-0">Referral progress</h6>
-          <div class="d-flex gap-2 flex-wrap">
-            <a href="{{ route('dashboard.investments') }}" class="btn btn-outline-info btn-sm">My investments</a>
-            <a href="{{ route('dashboard.network') }}" class="btn btn-outline-secondary btn-sm">Referral network</a>
-            <a href="{{ route('dashboard.wallet') }}" class="btn btn-outline-success btn-sm">Open wallet</a>
-            <a href="{{ route('dashboard.friends') }}" class="btn btn-outline-primary btn-sm">Manage friends</a>
-          </div>
+        <div class="d-flex justify-content-between align-items-baseline mb-3 flex-wrap gap-2">
+          <h6 class="card-title mb-0">Package highlights</h6>
+          <a href="{{ route('dashboard.buy-shares') }}?miner={{ $miner->slug }}" class="btn btn-outline-success btn-sm">View packages</a>
         </div>
         <div class="table-responsive">
           <table class="table table-borderless mb-0">
             <tbody>
+              @forelse ($miner->packages as $package)
+                <tr>
+                  <td class="ps-0">
+                    <div class="fw-semibold">{{ $package->name }}</div>
+                    <div class="text-secondary small">{{ $package->shares_count }} shares included</div>
+                  </td>
+                  <td class="text-end">
+                    <div class="fw-semibold">${{ number_format((float) $package->price, 2) }}</div>
+                    <div class="text-secondary small">{{ number_format((float) $package->monthly_return_rate * 100, 2) }}% monthly return</div>
+                  </td>
+                </tr>
+              @empty
+                <tr>
+                  <td colspan="2" class="ps-0 text-secondary">No active packages are assigned to this miner yet.</td>
+                </tr>
+              @endforelse
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12 grid-margin stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
+            <h6 class="card-title mb-1">Recent performance logs</h6>
+            <p class="text-secondary mb-0">A quick client-facing snapshot of the miner's most recent recorded performance.</p>
+          </div>
+          <a href="{{ route('dashboard.miner') }}?miner={{ $miner->slug }}" class="btn btn-outline-primary btn-sm">Open full miner page</a>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
               <tr>
-                <td class="ps-0 text-secondary">Pending invites</td>
-                <td class="text-end fw-semibold">{{ $pendingReferrals }}</td>
+                <th>Date</th>
+                <th>Revenue</th>
+                <th>Hashrate</th>
+                <th>Uptime</th>
               </tr>
-              <tr>
-                <td class="ps-0 text-secondary">Verified invites</td>
-                <td class="text-end fw-semibold">{{ $verifiedReferrals }}</td>
-              </tr>
-              <tr>
-                <td class="ps-0 text-secondary">Registered friends</td>
-                <td class="text-end fw-semibold text-success">{{ $registeredReferrals }}</td>
-              </tr>
-              <tr>
-                <td class="ps-0 text-secondary">Level bonus impact</td>
-                <td class="text-end fw-semibold">{{ number_format((float) $level->bonus_rate * 100, 2) }}%</td>
-              </tr>
+            </thead>
+            <tbody>
+              @forelse ($recentPerformanceLogs as $log)
+                <tr>
+                  <td>{{ $log->logged_on?->format('M d, Y') }}</td>
+                  <td>${{ number_format((float) $log->revenue_usd, 2) }}</td>
+                  <td>{{ number_format((float) $log->hashrate_th, 2) }} TH/s</td>
+                  <td>{{ number_format((float) $log->uptime_percentage, 2) }}%</td>
+                </tr>
+              @empty
+                <tr>
+                  <td colspan="4" class="text-secondary">No performance logs are available yet for this miner.</td>
+                </tr>
+              @endforelse
             </tbody>
           </table>
         </div>
         <div class="alert alert-light border mt-3 mb-0">
-          Every verified and registered friend helps unlock stronger monthly return bonuses.
+          This overview stays focused on miner-wide information. Personal investment and referral details live in your profile page, while the full technical/admin controls stay in the Miner page.
         </div>
       </div>
     </div>
@@ -311,7 +291,6 @@
     });
   </script>
 @endpush
-
 
 
 

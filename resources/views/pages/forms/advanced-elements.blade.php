@@ -383,3 +383,4 @@
   <script src="{{ asset('build/assets/pickr-C_ZVFCXN.js') }}"></script>
   <script src="{{ asset('build/assets/flatpickr-Da-BVptV.js') }}"></script>
 @endpush
+

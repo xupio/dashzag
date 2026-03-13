@@ -242,3 +242,4 @@
 @push('custom-scripts')
   <script src="{{ asset('build/assets/owl-carousel-BsZ8q_H2.js') }}"></script>
 @endpush
+

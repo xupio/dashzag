@@ -112,7 +112,7 @@ test('package with investments cannot be deleted', function () {
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($investor)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($investor)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
     ]);
 
@@ -155,3 +155,4 @@ test('non admin user cannot update investment packages', function () {
     $this->actingAs($user)->post(route('dashboard.packages.archive', $package))->assertForbidden();
     $this->actingAs($user)->post(route('dashboard.packages.delete', $package))->assertForbidden();
 });
+

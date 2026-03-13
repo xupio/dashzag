@@ -83,3 +83,4 @@
 @push('custom-scripts')
   <script src="{{ asset('build/assets/jquery.flot-B2dl1RnB.js') }}"></script>
 @endpush
+

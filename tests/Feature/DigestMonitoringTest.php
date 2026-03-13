@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use App\Models\User;
 use App\Notifications\ActivityFeedNotification;
@@ -289,5 +289,6 @@ test('non admin user cannot open digest monitoring page', function () {
         ->get(route('dashboard.digests'))
         ->assertForbidden();
 });
+
 
 

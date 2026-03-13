@@ -9,7 +9,7 @@
         <p class="text-secondary mb-0">Review every mining package you bought, your owned shares, expected return, and current status.</p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <a href="{{ route('general.sell-products') }}" class="btn btn-primary btn-icon-text">
+        <a href="{{ route('dashboard.buy-shares') }}" class="btn btn-primary btn-icon-text">
           <i data-lucide="shopping-cart" class="btn-icon-prepend"></i> Buy more shares
         </a>
         <a href="{{ route('dashboard.wallet') }}" class="btn btn-outline-primary btn-icon-text">
@@ -57,7 +57,7 @@
           <div class="text-center py-5">
             <h5 class="mb-2">No investments yet</h5>
             <p class="text-secondary mb-3">You have not subscribed to any mining package yet.</p>
-            <a href="{{ route('general.sell-products') }}" class="btn btn-primary">Start investing</a>
+            <a href="{{ route('dashboard.buy-shares') }}" class="btn btn-primary">Start investing</a>
           </div>
         @else
           <div class="table-responsive">
@@ -97,3 +97,5 @@
   </div>
 </div>
 @endsection
+
+

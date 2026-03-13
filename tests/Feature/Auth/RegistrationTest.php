@@ -57,3 +57,4 @@ test('invited users still receive verification email on registration', function 
     Notification::assertSentTo($user, InvitationAwareVerifyEmail::class);
     $response->assertRedirect(route('verification.notice', absolute: false));
 });
+

@@ -115,3 +115,4 @@
 @push('custom-scripts')
   <script src="{{ asset('build/assets/chartjs-D4ed9RRj.js') }}"></script>
 @endpush
+

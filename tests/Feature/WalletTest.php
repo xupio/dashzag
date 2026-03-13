@@ -13,11 +13,11 @@ function activateGrowthInvestment($test, User $user, ?User $admin = null): void
         'email_verified_at' => now(),
     ]);
 
-    $test->actingAs($user)->post(route('general.sell-products.subscribe'), [
+    $test->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
         'payment_method' => 'btc_transfer',
         'payment_reference' => 'TX-WALLET-'.str($user->id)->padLeft(4, '0'),
-    ])->assertRedirect(route('general.sell-products', ['miner' => 'alpha-one']));
+    ])->assertRedirect(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
 
     $order = InvestmentOrder::query()->latest('id')->firstOrFail();
 

@@ -225,3 +225,4 @@
 @push('custom-scripts')
   <script src="{{ asset('build/assets/data-table-CmuvSycJ.js') }}"></script>
 @endpush
+

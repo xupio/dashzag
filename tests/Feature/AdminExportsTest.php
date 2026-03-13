@@ -17,7 +17,7 @@ test('admin can export shareholders report as csv', function () {
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($investor)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($investor)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'momentum-300',
     ]);
 
@@ -43,7 +43,7 @@ test('admin can export payout operations report as csv', function () {
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($user)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
     ]);
     $this->actingAs($user)->post(route('dashboard.wallet.generate'));
@@ -76,7 +76,7 @@ test('admin can export analytics report as csv', function () {
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($investor)->post(route('general.sell-products.subscribe'), [
+    $this->actingAs($investor)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
     ]);
 
@@ -100,3 +100,4 @@ test('non admin user cannot export admin reports', function () {
     $this->actingAs($user)->get(route('dashboard.operations.export'))->assertForbidden();
     $this->actingAs($user)->get(route('dashboard.analytics.export'))->assertForbidden();
 });
+

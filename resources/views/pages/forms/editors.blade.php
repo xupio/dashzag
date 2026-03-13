@@ -265,3 +265,4 @@ class Alert {
   <script src="{{ asset('build/assets/easymde-C9JCvZL8.js') }}"></script>
   <script src="{{ asset('build/assets/ace-BSiLZnw0.js') }}"></script>
 @endpush
+

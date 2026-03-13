@@ -109,3 +109,4 @@ class="sidebar-dark">
     @stack('custom-scripts')
 </body>
 </html>
+

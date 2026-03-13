@@ -67,3 +67,4 @@ test('non admin user cannot create miners', function () {
         ])
         ->assertForbidden();
 });
+

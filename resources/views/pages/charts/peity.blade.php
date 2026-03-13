@@ -88,3 +88,4 @@
 @push('custom-scripts')
   <script src="{{ asset('build/assets/peity-BGDn0qVj.js') }}"></script>
 @endpush
+

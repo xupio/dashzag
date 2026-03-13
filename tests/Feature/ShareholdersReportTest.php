@@ -33,8 +33,8 @@ test('shareholders page can filter by miner', function () {
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($alphaInvestor)->post(route('general.sell-products.subscribe'), ['package' => 'growth-500']);
-    $this->actingAs($betaInvestor)->post(route('general.sell-products.subscribe'), ['package' => 'momentum-300']);
+    $this->actingAs($alphaInvestor)->post(route('dashboard.buy-shares.subscribe'), ['package' => 'growth-500']);
+    $this->actingAs($betaInvestor)->post(route('dashboard.buy-shares.subscribe'), ['package' => 'momentum-300']);
 
     $response = $this->actingAs($admin)->get(route('dashboard.shareholders', ['miner' => 'beta-flux']));
 
@@ -50,3 +50,4 @@ test('non admin user cannot access shareholders page', function () {
 
     $this->actingAs($user)->get(route('dashboard.shareholders'))->assertForbidden();
 });
+

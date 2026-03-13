@@ -72,3 +72,4 @@ var scrollbarExample = new PerfectScrollbar('.perfect-scrollbar-example');</scri
 @push('custom-scripts')
   <script src="{{ asset('build/assets/demo-BG1EwRNP.js') }}"></script>
 @endpush
+

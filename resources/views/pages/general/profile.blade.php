@@ -21,7 +21,7 @@
               <i data-lucide="edit" class="btn-icon-prepend"></i> Account settings
             </a>
             <a href="{{ route('dashboard') }}" class="btn btn-outline-primary btn-icon-text">
-              <i data-lucide="layout-dashboard" class="btn-icon-prepend"></i> Back to dashboard
+              <i data-lucide="layout-dashboard" class="btn-icon-prepend"></i> Back to overview
             </a>
           </div>
         </div>
@@ -30,15 +30,15 @@
         <ul class="d-flex align-items-center flex-wrap m-0 p-0 list-unstyled gap-3 gap-md-4">
           <li class="d-flex align-items-center active">
             <i class="me-1 icon-md text-primary" data-lucide="user-round"></i>
-            <span class="pt-1px text-primary">Profile overview</span>
+            <span class="pt-1px text-primary">Personal dashboard</span>
           </li>
           <li class="d-flex align-items-center">
             <i class="me-1 icon-md text-secondary" data-lucide="mail-check"></i>
             <span class="pt-1px text-body">{{ $user->hasVerifiedEmail() ? 'Verified email' : 'Verification pending' }}</span>
           </li>
           <li class="d-flex align-items-center">
-            <i class="me-1 icon-md text-secondary" data-lucide="calendar-days"></i>
-            <span class="pt-1px text-body">Joined {{ optional($user->created_at)->format('M d, Y') }}</span>
+            <i class="me-1 icon-md text-secondary" data-lucide="badge-dollar-sign"></i>
+            <span class="pt-1px text-body">Current level: {{ $displayTierName }}</span>
           </li>
         </ul>
       </div>
@@ -54,7 +54,7 @@
           <h6 class="card-title mb-0">Account summary</h6>
           <span class="badge {{ $user->hasVerifiedEmail() ? 'bg-success' : 'bg-warning text-dark' }}">{{ $user->hasVerifiedEmail() ? 'Verified' : 'Pending' }}</span>
         </div>
-        <p class="text-secondary mb-4">Manage your public details, security settings, and the main shortcuts you need from one place.</p>
+        <p class="text-secondary mb-4">Your profile page now holds the personal account, investment, and referral progress information.</p>
         <div class="mb-3">
           <label class="fs-11px fw-bolder mb-0 text-uppercase">Full name</label>
           <p class="text-secondary">{{ $user->name }}</p>
@@ -67,6 +67,10 @@
           <label class="fs-11px fw-bolder mb-0 text-uppercase">Member since</label>
           <p class="text-secondary">{{ optional($user->created_at)->format('F d, Y') }}</p>
         </div>
+        <div class="mb-3">
+          <label class="fs-11px fw-bolder mb-0 text-uppercase">Current level</label>
+          <p class="text-secondary">{{ $displayTierName }}</p>
+        </div>
         <div>
           <label class="fs-11px fw-bolder mb-0 text-uppercase">Profile tools</label>
           <div class="mt-3 d-grid gap-2">
@@ -74,8 +78,8 @@
             <a href="{{ route('dashboard.notifications') }}" class="btn btn-outline-secondary">Notifications</a>
             <a href="{{ route('dashboard.notification-preferences') }}" class="btn btn-outline-secondary">Notification preferences</a>
             <a href="{{ route('dashboard.investment-orders') }}" class="btn btn-outline-secondary">Investment orders</a>
-            <a href="{{ url('/email/inbox') }}" class="btn btn-outline-secondary">Open inbox</a>
-            <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary">Dashboard home</a>
+            <a href="{{ route('dashboard.investments') }}" class="btn btn-outline-secondary">My investments</a>
+            <a href="{{ route('dashboard.network') }}" class="btn btn-outline-secondary">Referral network</a>
           </div>
         </div>
       </div>
@@ -89,62 +93,141 @@
           <div class="card-body">
             <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
               <div>
-                <h6 class="card-title mb-1">Profile shortcuts</h6>
-                <p class="text-secondary mb-0">Fast access to the most common account actions.</p>
+                <h6 class="card-title mb-1">Investment summary</h6>
+                <p class="text-secondary mb-0">All personal mining and account performance stays here instead of the public overview.</p>
               </div>
             </div>
             <div class="row g-3">
-              <div class="col-sm-6">
-                <a href="{{ route('profile.edit') }}" class="card border h-100 text-decoration-none text-body">
-                  <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                      <div class="wd-40 ht-40 rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center me-3">
-                        <i data-lucide="settings" class="text-primary"></i>
-                      </div>
-                      <h6 class="mb-0">Account settings</h6>
-                    </div>
-                    <p class="text-secondary mb-0">Update your name, email address, and password from the built-in settings form.</p>
-                  </div>
-                </a>
+              <div class="col-md-4">
+                <div class="border rounded p-3 h-100">
+                  <p class="text-secondary mb-1">Total invested</p>
+                  <h4 class="mb-2">${{ number_format($totalInvested, 2) }}</h4>
+                  <small class="text-secondary">Across all active mining packages.</small>
+                </div>
               </div>
-              <div class="col-sm-6">
-                <a href="{{ route('dashboard') }}" class="card border h-100 text-decoration-none text-body">
-                  <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                      <div class="wd-40 ht-40 rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center me-3">
-                        <i data-lucide="layout-dashboard" class="text-success"></i>
-                      </div>
-                      <h6 class="mb-0">Dashboard overview</h6>
-                    </div>
-                    <p class="text-secondary mb-0">Jump back to the live metrics dashboard and your top-level activity cards.</p>
-                  </div>
-                </a>
+              <div class="col-md-4">
+                <div class="border rounded p-3 h-100">
+                  <p class="text-secondary mb-1">Expected monthly earnings</p>
+                  <h4 class="mb-2">${{ number_format($expectedMonthlyEarnings, 2) }}</h4>
+                  <small class="text-secondary">Projected from your active investments.</small>
+                </div>
               </div>
-              <div class="col-sm-6">
-                <a href="{{ route('dashboard.network') }}" class="card border h-100 text-decoration-none text-body">
-                  <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                      <div class="wd-40 ht-40 rounded-circle bg-info bg-opacity-10 d-flex align-items-center justify-content-center me-3">
-                        <i data-lucide="network" class="text-info"></i>
-                      </div>
-                      <h6 class="mb-0">My network</h6>
-                    </div>
-                    <p class="text-secondary mb-0">See your team structure, referral events, and downline performance in one place.</p>
-                  </div>
-                </a>
+              <div class="col-md-4">
+                <div class="border rounded p-3 h-100">
+                  <p class="text-secondary mb-1">Available wallet balance</p>
+                  <h4 class="mb-2">${{ number_format($availableEarnings, 2) }}</h4>
+                  <small class="text-secondary">Ready inside your earnings wallet.</small>
+                </div>
               </div>
-              <div class="col-sm-6">
-                <a href="{{ url('/apps/calendar') }}" class="card border h-100 text-decoration-none text-body">
-                  <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                      <div class="wd-40 ht-40 rounded-circle bg-warning bg-opacity-10 d-flex align-items-center justify-content-center me-3">
-                        <i data-lucide="calendar" class="text-warning"></i>
-                      </div>
-                      <h6 class="mb-0">Calendar</h6>
-                    </div>
-                    <p class="text-secondary mb-0">Use the built-in calendar as a quick navigation shortcut from the dashboard area.</p>
+            </div>
+            <div class="row g-3 mt-1">
+              <div class="col-md-6">
+                <div class="border rounded p-3 h-100">
+                  <p class="text-secondary mb-1">Active packages</p>
+                  <div class="fw-semibold mb-2">{{ $activeInvestments->count() }} active investment{{ $activeInvestments->count() === 1 ? '' : 's' }}</div>
+                  <div class="text-secondary small">
+                    {{ $activeInvestments->isNotEmpty() ? $activeInvestments->pluck('package.name')->unique()->implode(', ') : 'No active packages yet' }}
                   </div>
-                </a>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="border rounded p-3 h-100">
+                  <p class="text-secondary mb-1">Team bonus rate</p>
+                  <div class="fw-semibold mb-2">{{ number_format((float) $teamBonusRate * 100, 2) }}%</div>
+                  <div class="text-secondary small">This bonus improves your paid investment returns as your network grows.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 grid-margin stretch-card">
+        <div class="card rounded w-100 {{ $starterProgress['has_unlocked_basic'] ? 'border border-success' : 'border border-warning' }}">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+              <div>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <h6 class="card-title mb-0">Free Starter mission</h6>
+                  <span class="badge {{ $starterProgress['has_unlocked_basic'] ? 'bg-success' : 'bg-warning text-dark' }}">
+                    {{ $starterProgress['has_unlocked_basic'] ? 'Basic 100 unlocked' : 'Upgrade in progress' }}
+                  </span>
+                </div>
+                <p class="text-secondary mb-0">Your personal starter mission progress is tracked here because it belongs to your account journey.</p>
+              </div>
+              <div class="text-md-end">
+                <div class="fw-semibold">Current package path: {{ $displayTierName }}</div>
+                <div class="text-secondary small">Base level bonus: {{ number_format((float) $level->bonus_rate * 100, 2) }}%</div>
+              </div>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <div class="border rounded p-3 h-100">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-secondary">Verified invites</span>
+                    <span class="fw-semibold">{{ $starterProgress['verified_invites'] }} / {{ $starterProgress['required_verified_invites'] }}</span>
+                  </div>
+                  <div class="progress" style="height: 8px;">
+                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ min(($starterProgress['verified_invites'] / max($starterProgress['required_verified_invites'], 1)) * 100, 100) }}%"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="border rounded p-3 h-100">
+                  <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="text-secondary">Direct Basic 100 subscribers</span>
+                    <span class="fw-semibold">{{ $starterProgress['direct_basic_subscribers'] }} / {{ $starterProgress['required_direct_basic_subscribers'] }}</span>
+                  </div>
+                  <div class="progress" style="height: 8px;">
+                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ min(($starterProgress['direct_basic_subscribers'] / max($starterProgress['required_direct_basic_subscribers'], 1)) * 100, 100) }}%"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="alert {{ $starterProgress['has_unlocked_basic'] ? 'alert-success' : 'alert-light border' }} mt-3 mb-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+              <span>
+                {{ $starterProgress['has_unlocked_basic'] ? 'Your referral mission is complete. Basic 100 is active on your account.' : 'Complete both goals to unlock Basic 100 automatically on your account.' }}
+              </span>
+              <a href="{{ route('dashboard.network') }}" class="btn btn-sm btn-outline-primary">Open referral network</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-12 grid-margin stretch-card">
+        <div class="card rounded w-100">
+          <div class="card-body">
+            <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+              <div>
+                <h6 class="card-title mb-1">Referral progress</h6>
+                <p class="text-secondary mb-0">Your referral and network growth belongs to your personal account dashboard.</p>
+              </div>
+              <div class="d-flex gap-2 flex-wrap">
+                <a href="{{ route('dashboard.friends') }}" class="btn btn-outline-primary btn-sm">Manage friends</a>
+                <a href="{{ route('dashboard.network') }}" class="btn btn-outline-secondary btn-sm">Open network</a>
+              </div>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-4">
+                <div class="border rounded p-3 h-100">
+                  <p class="text-secondary mb-1">Pending invites</p>
+                  <h4 class="mb-2">{{ $pendingReferrals }}</h4>
+                  <small class="text-secondary">Invitations still waiting on verification.</small>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="border rounded p-3 h-100">
+                  <p class="text-secondary mb-1">Verified invites</p>
+                  <h4 class="mb-2">{{ $verifiedReferrals }}</h4>
+                  <small class="text-secondary">Confirmed contacts inside your pipeline.</small>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="border rounded p-3 h-100">
+                  <p class="text-secondary mb-1">Registered friends</p>
+                  <h4 class="mb-2">{{ $registeredReferrals }}</h4>
+                  <small class="text-secondary">Users who completed registration from your invites.</small>
+                </div>
               </div>
             </div>
           </div>
@@ -191,7 +274,7 @@
         <div class="d-grid gap-2">
           <a href="{{ route('dashboard.profile') }}" class="btn btn-light text-start"><i data-lucide="user" class="icon-sm me-2"></i> Profile home</a>
           <a href="{{ route('profile.edit') }}" class="btn btn-light text-start"><i data-lucide="edit-3" class="icon-sm me-2"></i> Edit profile</a>
-          <a href="{{ route('dashboard') }}" class="btn btn-light text-start"><i data-lucide="home" class="icon-sm me-2"></i> Dashboard</a>
+          <a href="{{ route('dashboard') }}" class="btn btn-light text-start"><i data-lucide="home" class="icon-sm me-2"></i> Overview</a>
           <a href="{{ route('dashboard.notifications') }}" class="btn btn-light text-start"><i data-lucide="bell" class="icon-sm me-2"></i> Notifications</a>
           <a href="{{ route('dashboard.notification-preferences') }}" class="btn btn-light text-start"><i data-lucide="bell-ring" class="icon-sm me-2"></i> Notification preferences</a>
           <a href="{{ route('dashboard.investment-orders') }}" class="btn btn-light text-start"><i data-lucide="receipt-text" class="icon-sm me-2"></i> Investment Orders</a>
@@ -223,10 +306,6 @@
   </div>
 </div>
 @endsection
-
-
-
-
 
 
 

@@ -47,8 +47,8 @@ test('analytics page shows investment referral and miner metrics', function () {
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($investor)->post(route('general.sell-products.subscribe'), ['package' => 'growth-500']);
-    $this->actingAs($buyer)->post(route('general.sell-products.subscribe'), ['package' => 'momentum-300']);
+    $this->actingAs($investor)->post(route('dashboard.buy-shares.subscribe'), ['package' => 'growth-500']);
+    $this->actingAs($buyer)->post(route('dashboard.buy-shares.subscribe'), ['package' => 'momentum-300']);
 
     $response = $this->actingAs($admin)->get(route('dashboard.analytics'));
 
@@ -67,4 +67,5 @@ test('non admin user cannot access analytics page', function () {
 
     $this->actingAs($user)->get(route('dashboard.analytics'))->assertForbidden();
 });
+
 

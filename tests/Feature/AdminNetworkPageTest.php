@@ -41,3 +41,4 @@ test('non admin cannot view the network admin page', function () {
         ->get(route('dashboard.network-admin'))
         ->assertForbidden();
 });
+

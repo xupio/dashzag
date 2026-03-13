@@ -648,3 +648,4 @@
 @push('custom-scripts')
   <script src="{{ asset('build/assets/chat-Dpraoj2f.js') }}"></script>
 @endpush
+
