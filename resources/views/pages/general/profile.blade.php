@@ -71,6 +71,8 @@
           <label class="fs-11px fw-bolder mb-0 text-uppercase">Profile tools</label>
           <div class="mt-3 d-grid gap-2">
             <a href="{{ route('profile.edit') }}" class="btn btn-outline-primary">Edit profile</a>
+            <a href="{{ route('dashboard.notifications') }}" class="btn btn-outline-secondary">Notifications</a>
+            <a href="{{ route('dashboard.notification-preferences') }}" class="btn btn-outline-secondary">Notification preferences</a>
             <a href="{{ url('/email/inbox') }}" class="btn btn-outline-secondary">Open inbox</a>
             <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary">Dashboard home</a>
           </div>
@@ -189,17 +191,22 @@
           <a href="{{ route('dashboard.profile') }}" class="btn btn-light text-start"><i data-lucide="user" class="icon-sm me-2"></i> Profile home</a>
           <a href="{{ route('profile.edit') }}" class="btn btn-light text-start"><i data-lucide="edit-3" class="icon-sm me-2"></i> Edit profile</a>
           <a href="{{ route('dashboard') }}" class="btn btn-light text-start"><i data-lucide="home" class="icon-sm me-2"></i> Dashboard</a>
+          <a href="{{ route('dashboard.notifications') }}" class="btn btn-light text-start"><i data-lucide="bell" class="icon-sm me-2"></i> Notifications</a>
+          <a href="{{ route('dashboard.notification-preferences') }}" class="btn btn-light text-start"><i data-lucide="bell-ring" class="icon-sm me-2"></i> Notification preferences</a>
           <a href="{{ route('dashboard.investments') }}" class="btn btn-light text-start"><i data-lucide="chart-column" class="icon-sm me-2"></i> Investments</a>
           <a href="{{ route('dashboard.network') }}" class="btn btn-light text-start"><i data-lucide="network" class="icon-sm me-2"></i> Network</a>
           <a href="{{ route('dashboard.wallet') }}" class="btn btn-light text-start"><i data-lucide="wallet" class="icon-sm me-2"></i> Wallet</a>
           @if ($user->isAdmin())
             <a href="{{ route('dashboard.analytics') }}" class="btn btn-light text-start"><i data-lucide="bar-chart-3" class="icon-sm me-2"></i> Analytics</a>
+            <a href="{{ route('dashboard.digests') }}" class="btn btn-light text-start"><i data-lucide="calendar-range" class="icon-sm me-2"></i> Digests</a>
             <a href="{{ route('dashboard.network-admin') }}" class="btn btn-light text-start"><i data-lucide="git-branch-plus" class="icon-sm me-2"></i> Network Admin</a>
             <a href="{{ route('dashboard.shareholders') }}" class="btn btn-light text-start"><i data-lucide="badge-dollar-sign" class="icon-sm me-2"></i> Shareholders</a>
             <a href="{{ route('dashboard.users') }}" class="btn btn-light text-start"><i data-lucide="users-round" class="icon-sm me-2"></i> Users</a>
             <a href="{{ route('dashboard.operations') }}" class="btn btn-light text-start"><i data-lucide="shield-check" class="icon-sm me-2"></i> Operations</a>
             <a href="{{ route('dashboard.rewards') }}" class="btn btn-light text-start"><i data-lucide="percent" class="icon-sm me-2"></i> Rewards</a>
             <a href="{{ route('dashboard.settings') }}" class="btn btn-light text-start"><i data-lucide="sliders-horizontal" class="icon-sm me-2"></i> Settings</a>
+            <a href="{{ route('dashboard.notification-rules') }}" class="btn btn-light text-start"><i data-lucide="bell-dot" class="icon-sm me-2"></i> Notification Rules</a>
+            <a href="{{ route('dashboard.notification-templates') }}" class="btn btn-light text-start"><i data-lucide="message-circle-more" class="icon-sm me-2"></i> Notification Templates</a>
             <a href="{{ route('dashboard.packages') }}" class="btn btn-light text-start"><i data-lucide="package" class="icon-sm me-2"></i> Packages</a>
             <a href="{{ route('dashboard.miners') }}" class="btn btn-light text-start"><i data-lucide="server" class="icon-sm me-2"></i> Miners</a>
             <a href="{{ route('dashboard.miner') }}" class="btn btn-light text-start"><i data-lucide="cpu" class="icon-sm me-2"></i> Miner</a>

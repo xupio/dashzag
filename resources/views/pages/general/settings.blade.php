@@ -110,6 +110,66 @@
               </div>
             </div>
           @endforeach
+          <div class="border rounded p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+              <div>
+                <h6 class="mb-1">Payout methods</h6>
+                <p class="text-secondary mb-0">Choose which withdrawal options users can request and define the destination hint for each one.</p>
+              </div>
+              <span class="badge bg-success">Wallet payout controls</span>
+            </div>
+
+            @foreach ([
+              'btc_wallet' => 'Bitcoin wallet',
+              'usdt_wallet' => 'USDT wallet',
+              'bank_transfer' => 'Bank transfer',
+            ] as $prefix => $label)
+              <div class="border rounded p-3 mb-3 bg-light">
+                <div class="form-check form-switch mb-3">
+                  <input type="hidden" name="payout_{{ $prefix }}_enabled" value="0">
+                  <input class="form-check-input" type="checkbox" role="switch" id="payout_{{ $prefix }}_enabled" name="payout_{{ $prefix }}_enabled" value="1" @checked(old('payout_'.$prefix.'_enabled', $settings['payout_'.$prefix.'_enabled']) == '1')>
+                  <label class="form-check-label fw-semibold" for="payout_{{ $prefix }}_enabled">Enable {{ $label }}</label>
+                </div>
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label class="form-label">Label</label>
+                    <input type="text" name="payout_{{ $prefix }}_label" class="form-control @error('payout_'.$prefix.'_label') is-invalid @enderror" value="{{ old('payout_'.$prefix.'_label', $settings['payout_'.$prefix.'_label']) }}" required>
+                    @error('payout_'.$prefix.'_label')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                  </div>
+                  <div class="col-md-8">
+                    <label class="form-label">Destination placeholder</label>
+                    <input type="text" name="payout_{{ $prefix }}_placeholder" class="form-control @error('payout_'.$prefix.'_placeholder') is-invalid @enderror" value="{{ old('payout_'.$prefix.'_placeholder', $settings['payout_'.$prefix.'_placeholder']) }}" required>
+                    @error('payout_'.$prefix.'_placeholder')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Minimum amount</label>
+                    <input type="number" step="0.01" min="0" name="payout_{{ $prefix }}_minimum_amount" class="form-control @error('payout_'.$prefix.'_minimum_amount') is-invalid @enderror" value="{{ old('payout_'.$prefix.'_minimum_amount', $settings['payout_'.$prefix.'_minimum_amount']) }}" required>
+                    @error('payout_'.$prefix.'_minimum_amount')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Fixed fee</label>
+                    <input type="number" step="0.01" min="0" name="payout_{{ $prefix }}_fixed_fee" class="form-control @error('payout_'.$prefix.'_fixed_fee') is-invalid @enderror" value="{{ old('payout_'.$prefix.'_fixed_fee', $settings['payout_'.$prefix.'_fixed_fee']) }}" required>
+                    @error('payout_'.$prefix.'_fixed_fee')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Percentage fee rate</label>
+                    <input type="number" step="0.0001" min="0" max="1" name="payout_{{ $prefix }}_percentage_fee_rate" class="form-control @error('payout_'.$prefix.'_percentage_fee_rate') is-invalid @enderror" value="{{ old('payout_'.$prefix.'_percentage_fee_rate', $settings['payout_'.$prefix.'_percentage_fee_rate']) }}" required>
+                    @error('payout_'.$prefix.'_percentage_fee_rate')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                  </div>
+                  <div class="col-md-8">
+                    <label class="form-label">Instruction text</label>
+                    <input type="text" name="payout_{{ $prefix }}_instruction" class="form-control @error('payout_'.$prefix.'_instruction') is-invalid @enderror" value="{{ old('payout_'.$prefix.'_instruction', $settings['payout_'.$prefix.'_instruction']) }}" required>
+                    @error('payout_'.$prefix.'_instruction')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Processing time</label>
+                    <input type="text" name="payout_{{ $prefix }}_processing_time" class="form-control @error('payout_'.$prefix.'_processing_time') is-invalid @enderror" value="{{ old('payout_'.$prefix.'_processing_time', $settings['payout_'.$prefix.'_processing_time']) }}" required>
+                    @error('payout_'.$prefix.'_processing_time')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                  </div>
+                </div>
+              </div>
+            @endforeach
+          </div>
 
           <div class="d-flex justify-content-end">
             <button type="submit" class="btn btn-primary">Save platform defaults</button>
@@ -120,3 +180,5 @@
   </div>
 </form>
 @endsection
+
+

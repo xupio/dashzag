@@ -19,6 +19,14 @@
   </div>
 @endif
 
+@if ($errors->any())
+  <div class="row">
+    <div class="col-12">
+      <div class="alert alert-danger">Please review the payment submission form and try again.</div>
+    </div>
+  </div>
+@endif
+
 @php
   $starterPackage = $starterPackage ?? \App\Support\MiningPlatform::freeStarterPackage();
   $starterProgress = $starterProgress ?? \App\Support\MiningPlatform::starterUpgradeProgress($user);
@@ -68,11 +76,6 @@
     </div>
   </div>
 @endif
-
-@php
-  $starterPackage = $starterPackage ?? \App\Support\MiningPlatform::freeStarterPackage();
-  $starterProgress = $starterProgress ?? \App\Support\MiningPlatform::starterUpgradeProgress($user);
-@endphp
 
 <div class="row mb-4">
   <div class="col-lg-4 grid-margin stretch-card">
@@ -128,6 +131,64 @@
   </div>
 </div>
 
+@if ($pendingInvestmentOrder)
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="alert alert-warning border d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span>Pending payment review: {{ $pendingInvestmentOrder->package?->name }} submitted on {{ $pendingInvestmentOrder->submitted_at?->format('M d, Y h:i A') }}. The admin team will activate it after approval.</span>
+        <a href="{{ route('dashboard.investments') }}" class="btn btn-sm btn-outline-dark">Open investments</a>
+      </div>
+    </div>
+  </div>
+@endif
+
+@if ($rejectedInvestmentOrder)
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="alert alert-danger border d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span>Last payment rejected for {{ $rejectedInvestmentOrder->package?->name }} on {{ $rejectedInvestmentOrder->rejected_at?->format('M d, Y h:i A') }}. {{ $rejectedInvestmentOrder->admin_notes ?: 'Please review your payment reference and submit again.' }}</span>
+        <a href="{{ route('dashboard.investments') }}" class="btn btn-sm btn-outline-dark">Open investments</a>
+      </div>
+    </div>
+  </div>
+@endif
+
+@php
+  $proofUploadOrder = $pendingInvestmentOrder ?? $rejectedInvestmentOrder;
+@endphp
+
+@if ($proofUploadOrder)
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card border {{ $proofUploadOrder->payment_proof_path ? 'border-success' : 'border-info' }}">
+        <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
+          <div>
+            <h5 class="mb-1">Upload payment proof after transfer</h5>
+            <p class="text-secondary mb-1">Order: {{ $proofUploadOrder->package?->name }} | Method: {{ str_replace('_', ' ', $proofUploadOrder->payment_method) }} | Reference: {{ $proofUploadOrder->payment_reference }}</p>
+            <p class="text-secondary mb-0">
+              @if ($proofUploadOrder->payment_proof_path)
+                Current proof: {{ $proofUploadOrder->payment_proof_original_name }} uploaded on {{ $proofUploadOrder->proof_uploaded_at?->format('M d, Y h:i A') }}.
+              @else
+                Complete the transfer first, then upload the payment screenshot or PDF receipt here for admin review.
+              @endif
+            </p>
+          </div>
+          <div class="d-flex gap-2 flex-wrap align-items-center">
+            @if ($proofUploadOrder->payment_proof_path)
+              <a href="{{ asset('storage/'.$proofUploadOrder->payment_proof_path) }}" class="btn btn-sm btn-outline-primary" target="_blank">View proof</a>
+            @endif
+            <form method="POST" action="{{ route('general.sell-products.proof', $proofUploadOrder) }}" enctype="multipart/form-data" class="d-flex gap-2 flex-wrap align-items-center">
+              @csrf
+              <input type="file" name="payment_proof" class="form-control form-control-sm" accept=".jpg,.jpeg,.png,.pdf" required>
+              <button type="submit" class="btn btn-sm btn-primary">{{ $proofUploadOrder->payment_proof_path ? 'Replace proof' : 'Upload proof' }}</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+@endif
+
 <div class="row">
   <div class="col-md-12">
     <p class="text-secondary text-center mb-4 pb-2">Paid packages below map directly to a fixed number of {{ $miner->name }} shares and a projected monthly return rate.</p>
@@ -138,7 +199,7 @@
             $accent = ['primary', 'success', 'warning'][$index] ?? 'primary';
             $icon = ['award', 'trending-up', 'briefcase'][$index] ?? 'award';
             $isCurrent = $activeInvestment?->package_id === $package->id;
-            $isLockedBasicUpgrade = $package->slug === \App\Support\MiningPlatform::BASIC_UPGRADE_PACKAGE_SLUG && ! $starterProgress['has_unlocked_basic'];
+            $isPending = $pendingInvestmentOrder?->package_id === $package->id;
             $isUnlockTarget = $package->slug === \App\Support\MiningPlatform::BASIC_UPGRADE_PACKAGE_SLUG;
           @endphp
           <div class="col-md-4 stretch-card {{ $index < count($packages) - 1 ? 'grid-margin grid-margin-md-0' : '' }}">
@@ -153,13 +214,21 @@
                   <tr><td><i data-lucide="check" class="icon-md text-primary me-2"></i></td><td><p class="mb-2">Projected monthly return {{ number_format((float) $package->monthly_return_rate * 100, 2) }}%</p></td></tr>
                   <tr><td><i data-lucide="check" class="icon-md text-primary me-2"></i></td><td><p class="mb-2">Equivalent units {{ $package->units_limit }}</p></td></tr>
                   <tr><td><i data-lucide="check" class="icon-md text-primary me-2"></i></td><td><p class="mb-2">Active miner: {{ $miner->name }}</p></td></tr>
-                  <tr><td><i data-lucide="check" class="icon-md text-primary me-2"></i></td><td><p class="mb-2">Level and team bonuses apply after purchase</p></td></tr>
+                  <tr><td><i data-lucide="check" class="icon-md text-primary me-2"></i></td><td><p class="mb-2">Level and team bonuses apply after approval</p></td></tr>
                 </table>
                 <div class="d-grid mt-4">
-                  <form method="POST" action="{{ route('general.sell-products.subscribe') }}">
+                  <form method="POST" action="{{ route('general.sell-products.subscribe') }}" class="d-grid gap-2">
                     @csrf
                     <input type="hidden" name="package" value="{{ $package->slug }}">
-                    <button class="btn btn-{{ $accent }}" type="submit">{{ $isCurrent ? 'Buy again' : 'Subscribe' }}</button>
+                    <select name="payment_method" class="form-select form-select-sm" required>
+                      <option value="">Select payment method</option>
+                      <option value="btc_transfer">BTC Transfer</option>
+                      <option value="usdt_transfer">USDT Transfer</option>
+                      <option value="bank_transfer">Bank Transfer</option>
+                    </select>
+                    <input type="text" name="payment_reference" class="form-control form-control-sm" placeholder="Transaction hash or payment reference" required>
+                    <textarea name="notes" rows="2" class="form-control form-control-sm" placeholder="Optional payment notes"></textarea>
+                    <button class="btn btn-{{ $accent }}" type="submit" {{ $isPending ? 'disabled' : '' }}>{{ $isPending ? 'Pending approval' : ($isCurrent ? 'Buy again' : 'Submit payment') }}</button>
                   </form>
                 </div>
               </div>
@@ -187,9 +256,3 @@
   </div>
 @endif
 @endsection
-
-
-
-
-
-

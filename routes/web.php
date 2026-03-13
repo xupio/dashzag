@@ -4,6 +4,7 @@ use App\Http\Controllers\ProfileController;
 use App\Mail\FriendInvitationMail;
 use App\Models\Earning;
 use App\Models\FriendInvitation;
+use App\Models\InvestmentOrder;
 use App\Models\InvestmentPackage;
 use App\Models\Miner;
 use App\Models\MinerPerformanceLog;
@@ -12,11 +13,16 @@ use App\Models\ReferralEvent;
 use App\Models\Shareholder;
 use App\Models\User;
 use App\Models\UserInvestment;
+use App\Notifications\ActivityFeedNotification;
+use App\Notifications\DigestSummaryNotification;
+use App\Notifications\PayoutStatusNotification;
 use App\Support\MiningPlatform;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Validation\Rule;
 
 Route::get('/', function () {
     return view('welcome');
@@ -74,6 +80,154 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'user' => request()->user(),
         ]);
     })->name('dashboard.profile');
+
+    Route::get('/dashboard/notifications', function (Request $request) {
+        $filter = $request->query('filter', 'all');
+        $allowedFilters = ['all', 'payout', 'reward', 'investment', 'network', 'milestone', 'digest'];
+
+        if (! in_array($filter, $allowedFilters, true)) {
+            $filter = 'all';
+        }
+
+        $notifications = $request->user()->notifications()->latest()->get();
+        $filteredNotifications = $filter === 'all'
+            ? $notifications
+            : $notifications->filter(
+                fn ($notification) => ($notification->data['category'] ?? 'payout') === $filter
+            )->values();
+
+        return view('pages.general.notifications', [
+            'notifications' => $filteredNotifications,
+            'allNotificationsCount' => $notifications->count(),
+            'unreadCount' => $request->user()->unreadNotifications()->count(),
+            'activeFilter' => $filter,
+            'notificationFilters' => [
+                'all' => 'All',
+                'payout' => 'Payouts',
+                'reward' => 'Rewards',
+                'investment' => 'Investments',
+                'network' => 'Network',
+                'milestone' => 'Milestones',
+                'digest' => 'Digests',
+            ],
+        ]);
+    })->name('dashboard.notifications');
+
+    Route::post('/dashboard/notifications/read-all', function (Request $request) {
+        $request->user()->unreadNotifications->markAsRead();
+
+        return redirect()->route('dashboard.notifications')->with('notifications_success', 'All notifications have been marked as read.');
+    })->name('dashboard.notifications.read-all');
+
+    Route::post('/dashboard/notifications/{notification}/read', function (Request $request, string $notification) {
+        $dashboardNotification = $request->user()->notifications()->whereKey($notification)->firstOrFail();
+        $dashboardNotification->markAsRead();
+
+        return redirect()->route('dashboard.notifications')->with('notifications_success', 'Notification marked as read.');
+    })->name('dashboard.notifications.read');
+
+    Route::post('/dashboard/notifications/clear-read', function (Request $request) {
+        $deleted = $request->user()->notifications()->whereNotNull('read_at')->delete();
+
+        return redirect()->route('dashboard.notifications')->with('notifications_success', $deleted.' read notifications removed.');
+    })->name('dashboard.notifications.clear-read');
+
+    Route::post('/dashboard/notifications/clear-previews', function (Request $request) {
+        $deleted = $request->user()->notifications()->get()
+            ->filter(fn ($notification) => (bool) ($notification->data['is_preview'] ?? false))
+            ->each(fn ($notification) => $notification->delete())
+            ->count();
+
+        return redirect()->route('dashboard.notifications')->with('notifications_success', $deleted.' preview notifications removed.');
+    })->name('dashboard.notifications.clear-previews');
+
+    Route::post('/dashboard/notifications/prune', function (Request $request) {
+        abort_unless($request->user()->isAdmin(), 403);
+
+        $validated = $request->validate([
+            'filter' => ['required', 'string', 'in:all,payout,reward,investment,network,milestone,digest'],
+            'older_than_days' => ['required', 'integer', 'min:1'],
+        ]);
+
+        $threshold = now()->subDays($validated['older_than_days']);
+        $notifications = $request->user()->notifications()->where('created_at', '<', $threshold)->get();
+
+        $deleted = $notifications
+            ->filter(function ($notification) use ($validated) {
+                if ($validated['filter'] === 'all') {
+                    return true;
+                }
+
+                return ($notification->data['category'] ?? 'payout') === $validated['filter'];
+            })
+            ->each(fn ($notification) => $notification->delete())
+            ->count();
+
+        return redirect()->route('dashboard.notifications')->with('notifications_success', $deleted.' notifications removed by admin cleanup.');
+    })->name('dashboard.notifications.prune');
+
+    Route::get('/dashboard/notification-preferences', function () {
+        $user = request()->user();
+
+        return view('pages.general.notification-preferences', [
+            'user' => $user,
+            'notificationPreferences' => $user->notificationPreferences(),
+            'digestSummary' => MiningPlatform::digestSummaryForUser($user),
+            'recentDigests' => $user->notifications()
+                ->where('data->category', 'digest')
+                ->latest()
+                ->limit(5)
+                ->get(),
+        ]);
+    })->name('dashboard.notification-preferences');
+
+    Route::post('/dashboard/notification-preferences', function (Request $request) {
+        $request->validate([
+            'payout_in_app' => ['nullable', 'boolean'],
+            'payout_email' => ['nullable', 'boolean'],
+            'reward_in_app' => ['nullable', 'boolean'],
+            'reward_email' => ['nullable', 'boolean'],
+            'investment_in_app' => ['nullable', 'boolean'],
+            'investment_email' => ['nullable', 'boolean'],
+            'network_in_app' => ['nullable', 'boolean'],
+            'network_email' => ['nullable', 'boolean'],
+            'milestone_in_app' => ['nullable', 'boolean'],
+            'milestone_email' => ['nullable', 'boolean'],
+            'digest_in_app' => ['nullable', 'boolean'],
+            'digest_email' => ['nullable', 'boolean'],
+            'digest_frequency' => ['required', 'string', 'in:daily,weekly'],
+        ]);
+
+        $categories = ['payout', 'reward', 'investment', 'network', 'milestone'];
+        $preferences = [];
+
+        foreach ($categories as $category) {
+            $preferences[$category] = [
+                'in_app' => $request->boolean($category.'_in_app'),
+                'email' => $request->boolean($category.'_email'),
+            ];
+        }
+
+        $preferences['digest'] = [
+            'in_app' => $request->boolean('digest_in_app'),
+            'email' => $request->boolean('digest_email'),
+            'frequency' => $request->string('digest_frequency')->toString(),
+        ];
+
+        $request->user()->forceFill([
+            'notification_preferences' => $preferences,
+        ])->save();
+
+        return redirect()->route('dashboard.notification-preferences')->with('preferences_success', 'Notification preferences updated successfully.');
+    })->name('dashboard.notification-preferences.update');
+
+    Route::post('/dashboard/notification-preferences/generate-digest', function (Request $request) {
+        $user = $request->user();
+        $summary = MiningPlatform::digestSummaryForUser($user, $user->digestFrequency());
+        $user->notify(new DigestSummaryNotification($summary['frequency'], $summary, $summary['period_label'], 'user_manual', $user->id, $user->name));
+
+        return redirect()->route('dashboard.notification-preferences')->with('preferences_success', ucfirst($summary['frequency']).' digest generated successfully.');
+    })->name('dashboard.notification-preferences.generate-digest');
 
     Route::get('/dashboard/investments', function () {
         MiningPlatform::ensureDefaults();
@@ -186,6 +340,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'payoutRequests' => $user->payoutRequests,
             'activeInvestments' => $user->investments->where('status', 'active')->values(),
             'expectedMonthlyEarnings' => MiningPlatform::expectedMonthlyEarnings($user),
+            'payoutMethods' => MiningPlatform::activePayoutMethods(),
+            'defaultPayoutMethod' => collect(MiningPlatform::activePayoutMethods())->first(),
         ]);
     })->name('dashboard.wallet');
 
@@ -197,7 +353,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:1'],
-            'method' => ['required', 'in:btc_wallet,usdt_wallet,bank_transfer'],
+            'method' => ['required', Rule::in(MiningPlatform::payoutMethodKeys())],
             'destination' => ['required', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
@@ -206,13 +362,25 @@ Route::middleware(['auth', 'verified'])->group(function () {
             return back()->withErrors(['amount' => 'Requested amount exceeds available wallet balance.'])->withInput();
         }
 
-        MiningPlatform::createPayoutRequest(
+        $quote = MiningPlatform::payoutQuote($validated['method'], (float) $validated['amount']);
+
+        if ((float) $validated['amount'] < (float) ($quote['minimum_amount'] ?? 0)) {
+            return back()->withErrors(['amount' => 'Requested amount is below the minimum for this payout method.'])->withInput();
+        }
+
+        if ((float) ($quote['net_amount'] ?? 0) <= 0) {
+            return back()->withErrors(['amount' => 'Requested amount is too low after fees for this payout method.'])->withInput();
+        }
+
+        $payoutRequest = MiningPlatform::createPayoutRequest(
             $user,
             (float) $validated['amount'],
             $validated['method'],
             $validated['destination'],
             $validated['notes'] ?? null,
         );
+
+        $user->notify(new PayoutStatusNotification($payoutRequest, 'submitted'));
 
         return redirect()->route('dashboard.wallet')->with('wallet_success', 'Your payout request has been submitted successfully.');
     })->name('dashboard.wallet.request');
@@ -344,6 +512,308 @@ Route::middleware(['auth', 'verified'])->group(function () {
             }, $filename, ['Content-Type' => 'text/csv']);
         })->name('dashboard.analytics.export');
 
+        Route::get('/dashboard/digests', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $segment = $request->query('segment', 'all');
+            $allowedSegments = ['all', 'email_enabled', 'no_recent_activity', 'daily_only', 'weekly_only'];
+
+            if (! in_array($segment, $allowedSegments, true)) {
+                $segment = 'all';
+            }
+
+            $digestRows = User::query()
+                ->whereNotNull('email_verified_at')
+                ->orderBy('name')
+                ->get()
+                ->map(function (User $user) {
+                    $preferences = $user->notificationPreferences();
+                    $frequency = $user->digestFrequency();
+                    $digestSummary = MiningPlatform::digestSummaryForUser($user, $frequency);
+                    $recentDigestCount = $user->notifications()
+                        ->where('data->category', 'digest')
+                        ->where('created_at', '>=', now()->subDays(7))
+                        ->count();
+
+                    return [
+                        'user' => $user,
+                        'preferences' => $preferences,
+                        'frequency' => $frequency,
+                        'digest_summary' => $digestSummary,
+                        'recent_digest_count' => $recentDigestCount,
+                        'is_inactive' => $digestSummary['total'] === 0 && $recentDigestCount === 0,
+                    ];
+                })
+                ->values();
+
+            $filteredDigestRows = $digestRows
+                ->filter(function (array $row) use ($segment) {
+                    return match ($segment) {
+                        'email_enabled' => (bool) ($row['preferences']['digest']['email'] ?? false),
+                        'no_recent_activity' => $row['is_inactive'],
+                        'daily_only' => $row['frequency'] === 'daily',
+                        'weekly_only' => $row['frequency'] === 'weekly',
+                        default => true,
+                    };
+                })
+                ->values();
+
+
+            return view('pages.general.digests', [
+                'digestRows' => $filteredDigestRows,
+                'totalDigestRowsCount' => $digestRows->count(),
+                'dailyUsersCount' => $digestRows->where('frequency', 'daily')->count(),
+                'weeklyUsersCount' => $digestRows->where('frequency', 'weekly')->count(),
+                'emailEnabledCount' => $digestRows->filter(fn (array $row) => (bool) ($row['preferences']['digest']['email'] ?? false))->count(),
+                'inactiveCount' => $digestRows->where('is_inactive', true)->count(),
+                'activeSegment' => $segment,
+                'segmentOptions' => [
+                    'all' => 'All segments',
+                    'email_enabled' => 'Email enabled',
+                    'no_recent_activity' => 'No recent activity',
+                    'daily_only' => 'Daily only',
+                    'weekly_only' => 'Weekly only',
+                ],
+            ]);
+        })->name('dashboard.digests');
+
+        Route::post('/dashboard/digests/{user}/send', function (Request $request, User $user) {
+            MiningPlatform::ensureDefaults();
+
+            $validated = $request->validate([
+                'frequency' => ['required', 'string', 'in:daily,weekly'],
+            ]);
+
+            abort_unless($user->hasVerifiedEmail(), 422, 'Digest can only be sent to verified users.');
+
+            $summary = MiningPlatform::digestSummaryForUser($user, $validated['frequency']);
+            $user->notify(new DigestSummaryNotification($summary['frequency'], $summary, $summary['period_label'], 'admin_manual', $request->user()->id, $request->user()->name));
+
+            if ($summary['frequency'] === 'daily') {
+                $user->forceFill(['last_daily_digest_sent_at' => now()])->save();
+            } else {
+                $user->forceFill(['last_weekly_digest_sent_at' => now()])->save();
+            }
+
+            return redirect()
+                ->route('dashboard.digests')
+                ->with('digests_success', ucfirst($summary['frequency']).' digest sent to '. $user->email . '.');
+        })->name('dashboard.digests.send');
+
+        Route::post('/dashboard/digests/send-bulk', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $validated = $request->validate([
+                'frequency' => ['required', 'string', 'in:daily,weekly'],
+                'scope' => ['required', 'string', 'in:matching,all_verified'],
+                'segment' => ['required', 'string', 'in:all,email_enabled,no_recent_activity,daily_only,weekly_only'],
+            ]);
+
+            $users = User::query()
+                ->whereNotNull('email_verified_at')
+                ->orderBy('name')
+                ->get()
+                ->filter(function (User $user) use ($validated) {
+                    if ($validated['scope'] !== 'all_verified' && $user->digestFrequency() !== $validated['frequency']) {
+                        return false;
+                    }
+
+                    $preferences = $user->notificationPreferences();
+                    $digestSummary = MiningPlatform::digestSummaryForUser($user, $validated['frequency']);
+                    $recentDigestCount = $user->notifications()
+                        ->where('data->category', 'digest')
+                        ->where('created_at', '>=', now()->subDays(7))
+                        ->count();
+                    $isInactive = $digestSummary['total'] === 0 && $recentDigestCount === 0;
+
+                    return match ($validated['segment']) {
+                        'email_enabled' => (bool) ($preferences['digest']['email'] ?? false),
+                        'no_recent_activity' => $isInactive,
+                        'daily_only' => $user->digestFrequency() === 'daily',
+                        'weekly_only' => $user->digestFrequency() === 'weekly',
+                        default => true,
+                    };
+                })
+                ->values();
+
+            foreach ($users as $user) {
+                $summary = MiningPlatform::digestSummaryForUser($user, $validated['frequency']);
+                $user->notify(new DigestSummaryNotification($summary['frequency'], $summary, $summary['period_label'], 'admin_bulk', $request->user()->id, $request->user()->name));
+
+                if ($summary['frequency'] === 'daily') {
+                    $user->forceFill(['last_daily_digest_sent_at' => now()])->save();
+                } else {
+                    $user->forceFill(['last_weekly_digest_sent_at' => now()])->save();
+                }
+            }
+
+            return redirect()
+                ->route('dashboard.digests')
+                ->with('digests_success', ucfirst($validated['frequency']).' digests sent to '. $users->count() . ' verified users.');
+        })->name('dashboard.digests.bulk-send');
+
+        Route::get('/dashboard/digests/history', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $source = $request->query('source', 'all');
+            $frequency = $request->query('frequency', 'all');
+            $allowedSources = ['all', 'admin_manual', 'admin_bulk', 'user_manual', 'scheduled'];
+            $allowedFrequencies = ['all', 'daily', 'weekly'];
+
+            if (! in_array($source, $allowedSources, true)) {
+                $source = 'all';
+            }
+
+            if (! in_array($frequency, $allowedFrequencies, true)) {
+                $frequency = 'all';
+            }
+
+            $history = User::query()
+                ->whereNotNull('email_verified_at')
+                ->with(['notifications' => fn ($query) => $query->where('data->category', 'digest')->latest()->limit(50)])
+                ->orderBy('name')
+                ->get()
+                ->flatMap(function (User $user) {
+                    return $user->notifications->map(function ($notification) use ($user) {
+                        return [
+                            'user' => $user,
+                            'notification' => $notification,
+                            'data' => $notification->data,
+                        ];
+                    });
+                })
+                ->filter(function (array $entry) use ($source, $frequency) {
+                    $entrySource = $entry['data']['digest_source'] ?? 'system';
+                    $entryFrequency = $entry['data']['digest_frequency'] ?? 'weekly';
+
+                    if ($source !== 'all' && $entrySource !== $source) {
+                        return false;
+                    }
+
+                    if ($frequency !== 'all' && $entryFrequency !== $frequency) {
+                        return false;
+                    }
+
+                    return true;
+                })
+                ->sortByDesc(fn (array $entry) => optional($entry['notification']->created_at)->timestamp ?? 0)
+                ->take(100)
+                ->values();
+
+            $sourceBreakdown = collect(['admin_manual', 'admin_bulk', 'user_manual', 'scheduled'])
+                ->mapWithKeys(fn (string $key) => [$key => $history->where('data.digest_source', $key)->count()]);
+            $frequencyBreakdown = collect(['daily', 'weekly'])
+                ->mapWithKeys(fn (string $key) => [$key => $history->where('data.digest_frequency', $key)->count()]);
+            $topRecipients = $history
+                ->groupBy(fn (array $entry) => $entry['user']->email)
+                ->map(function ($entries) {
+                    $first = $entries->first();
+
+                    return [
+                        'name' => $first['user']->name,
+                        'email' => $first['user']->email,
+                        'count' => $entries->count(),
+                    ];
+                })
+                ->sortByDesc('count')
+                ->take(5)
+                ->values();
+            $totalUpdatesDelivered = (int) $history->sum(fn (array $entry) => (int) ($entry['data']['amount'] ?? 0));
+
+            return view('pages.general.digest-history', [
+                'history' => $history,
+                'activeSource' => $source,
+                'activeFrequency' => $frequency,
+                'sourceOptions' => [
+                    'all' => 'All sources',
+                    'admin_manual' => 'Admin manual',
+                    'admin_bulk' => 'Admin bulk',
+                    'user_manual' => 'User manual',
+                    'scheduled' => 'Scheduled',
+                ],
+                'frequencyOptions' => [
+                    'all' => 'All frequencies',
+                    'daily' => 'Daily',
+                    'weekly' => 'Weekly',
+                ],
+                'sourceBreakdown' => $sourceBreakdown,
+                'frequencyBreakdown' => $frequencyBreakdown,
+                'topRecipients' => $topRecipients,
+                'totalUpdatesDelivered' => $totalUpdatesDelivered,
+            ]);
+        })->name('dashboard.digests.history');
+
+        Route::get('/dashboard/digests/history/export', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $source = $request->query('source', 'all');
+            $frequency = $request->query('frequency', 'all');
+            $allowedSources = ['all', 'admin_manual', 'admin_bulk', 'user_manual', 'scheduled'];
+            $allowedFrequencies = ['all', 'daily', 'weekly'];
+
+            if (! in_array($source, $allowedSources, true)) {
+                $source = 'all';
+            }
+
+            if (! in_array($frequency, $allowedFrequencies, true)) {
+                $frequency = 'all';
+            }
+
+            $history = User::query()
+                ->whereNotNull('email_verified_at')
+                ->with(['notifications' => fn ($query) => $query->where('data->category', 'digest')->latest()->limit(50)])
+                ->orderBy('name')
+                ->get()
+                ->flatMap(function (User $user) {
+                    return $user->notifications->map(function ($notification) use ($user) {
+                        return [
+                            'user' => $user,
+                            'notification' => $notification,
+                            'data' => $notification->data,
+                        ];
+                    });
+                })
+                ->filter(function (array $entry) use ($source, $frequency) {
+                    $entrySource = $entry['data']['digest_source'] ?? 'system';
+                    $entryFrequency = $entry['data']['digest_frequency'] ?? 'weekly';
+
+                    if ($source !== 'all' && $entrySource !== $source) {
+                        return false;
+                    }
+
+                    if ($frequency !== 'all' && $entryFrequency !== $frequency) {
+                        return false;
+                    }
+
+                    return true;
+                })
+                ->sortByDesc(fn (array $entry) => optional($entry['notification']->created_at)->timestamp ?? 0)
+                ->take(100)
+                ->values();
+
+            $filename = 'digest-history-'.now()->format('Ymd-His').'.csv';
+
+            return response()->streamDownload(function () use ($history) {
+                $handle = fopen('php://output', 'w');
+                fputcsv($handle, ['Recipient Name', 'Recipient Email', 'Frequency', 'Source', 'Triggered By', 'Period', 'Total Updates', 'Created At']);
+
+                foreach ($history as $entry) {
+                    fputcsv($handle, [
+                        $entry['user']->name,
+                        $entry['user']->email,
+                        $entry['data']['digest_frequency'] ?? 'weekly',
+                        $entry['data']['digest_source'] ?? 'system',
+                        $entry['data']['triggered_by_name'] ?? 'System',
+                        $entry['data']['period_label'] ?? 'Last activity window',
+                        $entry['data']['amount'] ?? 0,
+                        optional($entry['notification']->created_at)->format('Y-m-d H:i:s'),
+                    ]);
+                }
+
+                fclose($handle);
+            }, $filename, ['Content-Type' => 'text/csv']);
+        })->name('dashboard.digests.history.export');
+
         Route::get('/dashboard/network-admin', function () {
             MiningPlatform::ensureDefaults();
 
@@ -442,6 +912,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             return view('pages.general.operations', [
                 'payoutRequests' => PayoutRequest::with(['user', 'earnings'])->latest('requested_at')->get(),
+                'investmentOrders' => InvestmentOrder::with(['user', 'package', 'miner', 'approver'])->latest('submitted_at')->get(),
             ]);
         })->name('dashboard.operations');
 
@@ -480,7 +951,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'admin_notes' => ['nullable', 'string', 'max:1000'],
             ]);
 
-            MiningPlatform::approvePayoutRequest($payoutRequest, $validated['admin_notes'] ?? null);
+            $payoutRequest = MiningPlatform::approvePayoutRequest($payoutRequest, $validated['admin_notes'] ?? null);
+            $payoutRequest->user?->notify(new PayoutStatusNotification($payoutRequest, 'approved'));
 
             return redirect()->route('dashboard.operations')->with('operations_success', 'Payout request approved successfully.');
         })->name('dashboard.operations.payouts.approve');
@@ -491,14 +963,91 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'admin_notes' => ['nullable', 'string', 'max:1000'],
             ]);
 
-            MiningPlatform::markPayoutRequestPaid(
+            $payoutRequest = MiningPlatform::markPayoutRequestPaid(
                 $payoutRequest,
                 $validated['transaction_reference'] ?? null,
                 $validated['admin_notes'] ?? null,
             );
 
+            $payoutRequest->user?->notify(new PayoutStatusNotification($payoutRequest, 'paid'));
+
             return redirect()->route('dashboard.operations')->with('operations_success', 'Payout request marked as paid.');
         })->name('dashboard.operations.payouts.pay');
+
+        Route::post('/dashboard/operations/investment-orders/{investmentOrder}/approve', function (Request $request, InvestmentOrder $investmentOrder) {
+            $validated = $request->validate([
+                'allow_without_proof' => ['nullable', 'boolean'],
+                'admin_notes' => ['nullable', 'string', 'max:1000'],
+            ]);
+
+            $allowWithoutProof = (bool) ($validated['allow_without_proof'] ?? false);
+
+            if (! $investmentOrder->payment_proof_path && ! $allowWithoutProof) {
+                return redirect()->route('dashboard.operations')->withErrors([
+                    'approval' => 'Payment proof must be uploaded before standard approval.',
+                ]);
+            }
+
+            if (! $investmentOrder->payment_proof_path && blank($validated['admin_notes'] ?? null)) {
+                return redirect()->route('dashboard.operations')->withErrors([
+                    'admin_notes' => 'Admin notes are required when approving without proof.',
+                ]);
+            }
+
+            MiningPlatform::approveInvestmentOrder(
+                $investmentOrder,
+                $request->user(),
+                $allowWithoutProof,
+                $validated['admin_notes'] ?? null,
+            );
+
+            $investmentOrder = $investmentOrder->fresh(['user', 'package']);
+
+            if ($allowWithoutProof) {
+                $overrideTemplate = MiningPlatform::activityTemplate('investment_payment_override', [
+                    'package_name' => $investmentOrder->package?->name ?? 'investment',
+                ]);
+
+                $investmentOrder?->user?->notify(new ActivityFeedNotification([
+                    'category' => 'investment',
+                    'status' => 'warning',
+                    'subject' => $overrideTemplate['subject'],
+                    'message' => $overrideTemplate['message'],
+                    'context_label' => 'Admin reason',
+                    'context_value' => $validated['admin_notes'] ?? 'No reason provided.',
+                    'amount' => (float) $investmentOrder->amount,
+                    'amount_label' => 'Approved amount',
+                    'force_mail' => true,
+                ]));
+            } else {
+                $approvedTemplate = MiningPlatform::activityTemplate('investment_payment_approved', [
+                    'package_name' => $investmentOrder->package?->name ?? 'investment',
+                ]);
+
+                $investmentOrder?->user?->notify(new ActivityFeedNotification([
+                    'category' => 'investment',
+                    'status' => 'success',
+                    'subject' => $approvedTemplate['subject'],
+                    'message' => $approvedTemplate['message'],
+                    'context_label' => 'Approved package',
+                    'context_value' => $investmentOrder->package?->name ?? 'Investment package',
+                    'amount' => (float) $investmentOrder->amount,
+                    'amount_label' => 'Approved amount',
+                    'force_mail' => true,
+                ]));
+            }
+
+            return redirect()->route('dashboard.operations')->with('operations_success', $allowWithoutProof ? 'Investment order approved without proof override.' : 'Investment order approved successfully.');
+        })->name('dashboard.operations.investment-orders.approve');
+        Route::post('/dashboard/operations/investment-orders/{investmentOrder}/reject', function (Request $request, InvestmentOrder $investmentOrder) {
+            $validated = $request->validate([
+                'admin_notes' => ['required', 'string', 'max:1000'],
+            ]);
+
+            MiningPlatform::rejectInvestmentOrder($investmentOrder, $request->user(), $validated['admin_notes']);
+
+            return redirect()->route('dashboard.operations')->with('operations_success', 'Investment order rejected successfully.');
+        })->name('dashboard.operations.investment-orders.reject');
 
         Route::get('/dashboard/rewards', function () {
             MiningPlatform::ensureDefaults();
@@ -566,12 +1115,139 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'scale_package_units_limit' => ['required', 'integer', 'min:1'],
                 'scale_package_price_multiplier' => ['required', 'numeric', 'min:0.1'],
                 'scale_package_rate_bonus' => ['required', 'numeric', 'min:0', 'max:1'],
+                'payout_btc_wallet_enabled' => ['required', 'boolean'],
+                'payout_btc_wallet_label' => ['required', 'string', 'max:255'],
+                'payout_btc_wallet_placeholder' => ['required', 'string', 'max:255'],
+                'payout_btc_wallet_minimum_amount' => ['required', 'numeric', 'min:0'],
+                'payout_btc_wallet_fixed_fee' => ['required', 'numeric', 'min:0'],
+                'payout_btc_wallet_percentage_fee_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'payout_btc_wallet_instruction' => ['required', 'string', 'max:255'],
+                'payout_btc_wallet_processing_time' => ['required', 'string', 'max:255'],
+                'payout_usdt_wallet_enabled' => ['required', 'boolean'],
+                'payout_usdt_wallet_label' => ['required', 'string', 'max:255'],
+                'payout_usdt_wallet_placeholder' => ['required', 'string', 'max:255'],
+                'payout_usdt_wallet_minimum_amount' => ['required', 'numeric', 'min:0'],
+                'payout_usdt_wallet_fixed_fee' => ['required', 'numeric', 'min:0'],
+                'payout_usdt_wallet_percentage_fee_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'payout_usdt_wallet_instruction' => ['required', 'string', 'max:255'],
+                'payout_usdt_wallet_processing_time' => ['required', 'string', 'max:255'],
+                'payout_bank_transfer_enabled' => ['required', 'boolean'],
+                'payout_bank_transfer_label' => ['required', 'string', 'max:255'],
+                'payout_bank_transfer_placeholder' => ['required', 'string', 'max:255'],
+                'payout_bank_transfer_minimum_amount' => ['required', 'numeric', 'min:0'],
+                'payout_bank_transfer_fixed_fee' => ['required', 'numeric', 'min:0'],
+                'payout_bank_transfer_percentage_fee_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'payout_bank_transfer_instruction' => ['required', 'string', 'max:255'],
+                'payout_bank_transfer_processing_time' => ['required', 'string', 'max:255'],
             ]);
 
             MiningPlatform::updatePlatformSettings($validated);
 
             return redirect()->route('dashboard.settings')->with('settings_success', 'Platform defaults updated successfully.');
         })->name('dashboard.settings.update');
+
+        Route::get('/dashboard/notification-rules', function () {
+            MiningPlatform::ensureDefaults();
+
+            return view('pages.general.notification-rules', [
+                'settings' => MiningPlatform::platformSettings(),
+            ]);
+        })->name('dashboard.notification-rules');
+
+        Route::post('/dashboard/notification-rules', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $validated = $request->validate([
+                'notification_payout_in_app' => ['nullable', 'boolean'],
+                'notification_payout_email' => ['nullable', 'boolean'],
+                'notification_reward_in_app' => ['nullable', 'boolean'],
+                'notification_reward_email' => ['nullable', 'boolean'],
+                'notification_investment_in_app' => ['nullable', 'boolean'],
+                'notification_investment_email' => ['nullable', 'boolean'],
+                'notification_network_in_app' => ['nullable', 'boolean'],
+                'notification_network_email' => ['nullable', 'boolean'],
+                'notification_milestone_in_app' => ['nullable', 'boolean'],
+                'notification_milestone_email' => ['nullable', 'boolean'],
+            ]);
+
+            MiningPlatform::updatePlatformSettings($validated);
+
+            return redirect()->route('dashboard.notification-rules')->with('notification_rules_success', 'Notification rules updated successfully.');
+        })->name('dashboard.notification-rules.update');
+
+        Route::get('/dashboard/notification-templates', function () {
+            MiningPlatform::ensureDefaults();
+
+            return view('pages.general.notification-templates', [
+                'settings' => MiningPlatform::platformSettings(),
+            ]);
+        })->name('dashboard.notification-templates');
+
+        Route::post('/dashboard/notification-templates', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $templateKeys = [
+                'payout_submitted', 'payout_approved', 'payout_paid',
+                'free_starter', 'network_join', 'reward_registration',
+                'network_sponsor', 'basic_unlocked', 'investment_activated',
+                'team_level_1', 'team_level_2', 'team_level_generic',
+            ];
+
+            $rules = [];
+
+            foreach ($templateKeys as $templateKey) {
+                $rules['template_'.$templateKey.'_subject'] = ['required', 'string', 'max:255'];
+                $rules['template_'.$templateKey.'_message'] = ['required', 'string'];
+            }
+
+            $validated = $request->validate($rules);
+            MiningPlatform::updatePlatformSettings($validated);
+
+            return redirect()->route('dashboard.notification-templates')->with('notification_templates_success', 'Notification templates updated successfully.');
+        })->name('dashboard.notification-templates.update');
+
+        Route::post('/dashboard/notification-templates/preview', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $validated = $request->validate([
+                'template_key' => ['required', 'string', 'in:payout_submitted,payout_approved,payout_paid,free_starter,network_join,reward_registration,network_sponsor,basic_unlocked,investment_activated,team_level_1,team_level_2,team_level_generic'],
+            ]);
+
+            $templateKey = $validated['template_key'];
+            $category = match ($templateKey) {
+                'payout_submitted', 'payout_approved', 'payout_paid' => 'payout',
+                'investment_activated' => 'investment',
+                'network_join', 'network_sponsor' => 'network',
+                'free_starter', 'basic_unlocked' => 'milestone',
+                default => 'reward',
+            };
+
+            $template = MiningPlatform::activityTemplate($templateKey, [
+                'user_name' => 'Preview Investor',
+                'user_email' => 'preview@example.com',
+                'package_name' => 'Basic 100',
+                'level' => 3,
+                'sponsor_name' => 'Preview Sponsor',
+                'sponsor_email' => 'sponsor@example.com',
+                'gross_amount' => '$100.00',
+                'fee_amount' => '$5.00',
+                'net_amount' => '$95.00',
+                'method_label' => 'BTC Wallet',
+                'destination' => 'bc1-preview-wallet',
+            ]);
+
+            $request->user()->notify(new ActivityFeedNotification([
+                'category' => $category,
+                'status' => 'info',
+                'subject' => $template['subject'],
+                'message' => $template['message'],
+                'context_label' => 'Preview event',
+                'context_value' => str($templateKey)->replace('_', ' ')->title()->toString(),
+                'is_preview' => true,
+            ]));
+
+            return redirect()->route('dashboard.notification-templates')->with('notification_templates_success', 'Preview notification sent to your dashboard feed.');
+        })->name('dashboard.notification-templates.preview');
 
         Route::get('/dashboard/packages', function () {
             MiningPlatform::ensureDefaults();
@@ -894,6 +1570,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'packages' => $miner->packages,
             'shareholder' => $user->shareholder,
             'activeInvestment' => $user->investments->where('status', 'active')->firstWhere('miner_id', $miner->id),
+            'pendingInvestmentOrder' => InvestmentOrder::query()->where('user_id', $user->id)->where('miner_id', $miner->id)->where('status', 'pending')->latest('submitted_at')->first(),
+            'rejectedInvestmentOrder' => InvestmentOrder::query()->where('user_id', $user->id)->where('miner_id', $miner->id)->where('status', 'rejected')->latest('rejected_at')->first(),
             'sharesSold' => $sharesSold,
             'availableShares' => max($miner->total_shares - $sharesSold, 0),
         ]);
@@ -904,67 +1582,100 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         $validated = $request->validate([
             'package' => ['required', 'string', 'exists:investment_packages,slug'],
+            'payment_method' => ['required', 'string', 'in:btc_transfer,usdt_transfer,bank_transfer'],
+            'payment_reference' => ['required', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $user = $request->user()->load(['shareholder', 'userLevel', 'investments', 'sponsor']);
+        $user = $request->user();
         $package = InvestmentPackage::with('miner')
             ->where('slug', $validated['package'])
             ->where('is_active', true)
             ->firstOrFail();
 
-        $level = MiningPlatform::syncUserLevel($user);
-        $teamBonusRate = MiningPlatform::teamBonusRate($user);
+        $existingPendingOrder = InvestmentOrder::query()
+            ->where('user_id', $user->id)
+            ->where('package_id', $package->id)
+            ->where('status', 'pending')
+            ->first();
 
-        $shareholder = Shareholder::updateOrCreate(
-            ['user_id' => $user->id],
-            [
-                'package_name' => $package->name,
-                'price' => $package->price,
-                'billing_cycle' => 'monthly',
-                'units_limit' => $package->units_limit,
-                'status' => 'active',
-                'subscribed_at' => now(),
-            ],
-        );
+        if ($existingPendingOrder) {
+            return redirect()
+                ->route('general.sell-products', ['miner' => $package->miner?->slug])
+                ->with('subscription_success', 'You already have a pending payment review for the '.$package->name.' package.');
+        }
 
-        $investment = UserInvestment::create([
-            'user_id' => $user->id,
-            'miner_id' => $package->miner_id,
-            'package_id' => $package->id,
-            'shareholder_id' => $shareholder->id,
-            'amount' => $package->price,
-            'shares_owned' => $package->shares_count,
-            'monthly_return_rate' => $package->monthly_return_rate,
-            'level_bonus_rate' => $level->bonus_rate,
-            'team_bonus_rate' => $teamBonusRate,
-            'status' => 'active',
-            'subscribed_at' => now(),
+        $investmentOrder = MiningPlatform::submitInvestmentOrder($user, $package, $validated);
+        $submittedTemplate = MiningPlatform::activityTemplate('investment_payment_submitted', [
+            'package_name' => $package->name,
         ]);
 
-        $user->forceFill(['account_type' => 'shareholder'])->save();
-        $refreshedUser = MiningPlatform::refreshInvestmentBonusRates($user->fresh());
-        $investment->refresh();
-
-        Earning::firstOrCreate(
-            [
-                'user_id' => $refreshedUser->id,
-                'investment_id' => $investment->id,
-                'earned_on' => now()->toDateString(),
-                'source' => 'projected_return',
-            ],
-            [
-                'amount' => round((float) $investment->amount * ((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate + (float) $investment->team_bonus_rate), 2),
-                'status' => 'pending',
-                'notes' => 'Initial projected monthly return generated after package subscription.',
-            ],
-        );
-
-        MiningPlatform::awardReferralSubscription($refreshedUser, $investment);
+        $user->notify(new ActivityFeedNotification([
+            'category' => 'investment',
+            'status' => 'info',
+            'subject' => $submittedTemplate['subject'],
+            'message' => $submittedTemplate['message'],
+            'context_label' => 'Payment reference',
+            'context_value' => $investmentOrder->payment_reference,
+            'amount' => (float) $investmentOrder->amount,
+            'amount_label' => 'Submitted amount',
+            'force_mail' => true,
+        ]));
 
         return redirect()
             ->route('general.sell-products', ['miner' => $package->miner?->slug])
-            ->with('subscription_success', 'You are now subscribed to the '.$package->name.' package and your mining shares are active.');
+            ->with('subscription_success', 'Your payment for '.$package->name.' has been submitted. Upload the payment proof after you complete the transfer.');
     })->name('general.sell-products.subscribe');
+
+    Route::post('/general/sell-products/{investmentOrder}/proof', function (Request $request, InvestmentOrder $investmentOrder) {
+        MiningPlatform::ensureDefaults();
+
+        abort_unless($investmentOrder->user_id === $request->user()->id, 403);
+        abort_unless(in_array($investmentOrder->status, ['pending', 'rejected'], true), 403);
+
+        $validated = $request->validate([
+            'payment_proof' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+        ]);
+
+        if ($investmentOrder->payment_proof_path) {
+            Storage::disk('public')->delete($investmentOrder->payment_proof_path);
+        }
+
+        $storedPath = $validated['payment_proof']->store('investment-proofs', 'public');
+
+        $investmentOrder->forceFill([
+            'payment_proof_path' => $storedPath,
+            'payment_proof_original_name' => $validated['payment_proof']->getClientOriginalName(),
+            'proof_uploaded_at' => now(),
+        ])->save();
+
+        $proofTemplate = MiningPlatform::activityTemplate('investment_payment_proof', [
+            'package_name' => $investmentOrder->package?->name ?? 'your pending investment',
+        ]);
+
+        $investmentOrder->user?->notify(new ActivityFeedNotification([
+            'category' => 'investment',
+            'status' => 'info',
+            'subject' => $proofTemplate['subject'],
+            'message' => $proofTemplate['message'],
+            'context_label' => 'Uploaded file',
+            'context_value' => $investmentOrder->payment_proof_original_name ?? 'Payment proof',
+            'amount' => (float) $investmentOrder->amount,
+            'amount_label' => 'Submitted amount',
+            'force_mail' => true,
+        ]));
+
+        return redirect()
+            ->route('general.sell-products', ['miner' => $investmentOrder->miner?->slug])
+            ->with('subscription_success', 'Payment proof uploaded successfully. The admin team can review it now.');
+    })->name('general.sell-products.proof');
+
+    Route::get('/investment-orders/{investmentOrder}/proof-file', function (Request $request, InvestmentOrder $investmentOrder) {
+        abort_unless($investmentOrder->payment_proof_path, 404);
+        abort_unless($request->user()->id === $investmentOrder->user_id || $request->user()->isAdmin(), 403);
+
+        return Storage::disk('public')->response($investmentOrder->payment_proof_path, $investmentOrder->payment_proof_original_name ?? basename($investmentOrder->payment_proof_path));
+    })->name('investment-orders.proof-file');
 
     Route::group(['prefix' => 'general'], function () {
         Route::view('blank-page', 'pages.general.blank-page');
@@ -982,6 +1693,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
 
 
 

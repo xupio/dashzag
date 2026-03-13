@@ -12,19 +12,25 @@
   <div class="sidebar-body">
     <ul class="nav" id="sidebarNav">
       <li class="nav-item nav-category">Main</li>
-      <li class="nav-item {{ active_class(['dashboard', 'dashboard/profile', 'dashboard/investments', 'dashboard/network', 'dashboard/network-admin', 'dashboard/wallet', 'dashboard/analytics', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/rewards', 'dashboard/settings', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/friends']) }}">
-        <a class="nav-link" data-bs-toggle="collapse" href="#dashboardMenu" role="button" aria-expanded="{{ is_active_route(['dashboard', 'dashboard/profile', 'dashboard/investments', 'dashboard/network', 'dashboard/network-admin', 'dashboard/wallet', 'dashboard/analytics', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/rewards', 'dashboard/settings', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/friends']) }}" aria-controls="dashboardMenu">
+      <li class="nav-item {{ active_class(['dashboard', 'dashboard/profile', 'dashboard/notifications', 'dashboard/notification-preferences', 'dashboard/investments', 'dashboard/network', 'dashboard/network-admin', 'dashboard/digests', 'dashboard/wallet', 'dashboard/analytics', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/rewards', 'dashboard/settings', 'dashboard/notification-rules', 'dashboard/notification-templates', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/friends']) }}">
+        <a class="nav-link" data-bs-toggle="collapse" href="#dashboardMenu" role="button" aria-expanded="{{ is_active_route(['dashboard', 'dashboard/profile', 'dashboard/notifications', 'dashboard/notification-preferences', 'dashboard/investments', 'dashboard/network', 'dashboard/network-admin', 'dashboard/digests', 'dashboard/wallet', 'dashboard/analytics', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/rewards', 'dashboard/settings', 'dashboard/notification-rules', 'dashboard/notification-templates', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/friends']) }}" aria-controls="dashboardMenu">
           <i class="link-icon" data-lucide="home"></i>
           <span class="link-title">Dashboard</span>
           <i class="link-arrow" data-lucide="chevron-down"></i>
         </a>
-        <div class="collapse {{ show_class(['dashboard', 'dashboard/profile', 'dashboard/investments', 'dashboard/network', 'dashboard/network-admin', 'dashboard/wallet', 'dashboard/analytics', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/rewards', 'dashboard/settings', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/friends']) }}" data-bs-parent="#sidebarNav" id="dashboardMenu">
+        <div class="collapse {{ show_class(['dashboard', 'dashboard/profile', 'dashboard/notifications', 'dashboard/notification-preferences', 'dashboard/investments', 'dashboard/network', 'dashboard/network-admin', 'dashboard/digests', 'dashboard/wallet', 'dashboard/analytics', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/rewards', 'dashboard/settings', 'dashboard/notification-rules', 'dashboard/notification-templates', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/friends']) }}" data-bs-parent="#sidebarNav" id="dashboardMenu">
           <ul class="nav sub-menu">
             <li class="nav-item">
               <a href="{{ route('dashboard') }}" class="nav-link {{ active_class(['dashboard']) }}">Overview</a>
             </li>
             <li class="nav-item">
               <a href="{{ route('dashboard.profile') }}" class="nav-link {{ active_class(['dashboard/profile']) }}">Profile</a>
+            </li>
+            <li class="nav-item">
+              <a href="{{ route('dashboard.notifications') }}" class="nav-link {{ active_class(['dashboard/notifications']) }}">Notifications</a>
+            </li>
+            <li class="nav-item">
+              <a href="{{ route('dashboard.notification-preferences') }}" class="nav-link {{ active_class(['dashboard/notification-preferences']) }}">Notification Preferences</a>
             </li>
             <li class="nav-item">
               <a href="{{ route('dashboard.investments') }}" class="nav-link {{ active_class(['dashboard/investments']) }}">Investments</a>
@@ -38,6 +44,9 @@
             @if (auth()->user()?->isAdmin())
               <li class="nav-item">
                 <a href="{{ route('dashboard.analytics') }}" class="nav-link {{ active_class(['dashboard/analytics']) }}">Analytics</a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ route('dashboard.digests') }}" class="nav-link {{ active_class(['dashboard/digests']) }}">Digests</a>
               </li>
               <li class="nav-item">
                 <a href="{{ route('dashboard.network-admin') }}" class="nav-link {{ active_class(['dashboard/network-admin']) }}">Network Admin</a>
@@ -56,6 +65,12 @@
               </li>
               <li class="nav-item">
                 <a href="{{ route('dashboard.settings') }}" class="nav-link {{ active_class(['dashboard/settings']) }}">Settings</a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ route('dashboard.notification-rules') }}" class="nav-link {{ active_class(['dashboard/notification-rules']) }}">Notification Rules</a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ route('dashboard.notification-templates') }}" class="nav-link {{ active_class(['dashboard/notification-templates']) }}">Notification Templates</a>
               </li>
               <li class="nav-item">
                 <a href="{{ route('dashboard.packages') }}" class="nav-link {{ active_class(['dashboard/packages']) }}">Packages</a>

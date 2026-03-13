@@ -14,6 +14,9 @@ class PayoutRequest extends Model
     protected $fillable = [
         'user_id',
         'amount',
+        'fee_amount',
+        'net_amount',
+        'fee_rate',
         'method',
         'destination',
         'transaction_reference',
@@ -29,6 +32,9 @@ class PayoutRequest extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'fee_amount' => 'decimal:2',
+            'net_amount' => 'decimal:2',
+            'fee_rate' => 'decimal:4',
             'requested_at' => 'datetime',
             'approved_at' => 'datetime',
             'processed_at' => 'datetime',
@@ -45,3 +51,5 @@ class PayoutRequest extends Model
         return $this->hasMany(Earning::class);
     }
 }
+
+

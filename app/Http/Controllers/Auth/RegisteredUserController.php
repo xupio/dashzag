@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Notifications\ActivityFeedNotification;
 use App\Support\MiningPlatform;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
@@ -35,7 +36,18 @@ class RegisteredUserController extends Controller
             'account_type' => 'starter',
         ]);
 
-        MiningPlatform::ensureStarterPackage($user);
+        $starterInvestment = MiningPlatform::ensureStarterPackage($user);
+        $template = MiningPlatform::activityTemplate('free_starter');
+
+        $user->notify(new ActivityFeedNotification([
+            'category' => 'milestone',
+            'status' => 'success',
+            'subject' => $template['subject'],
+            'message' => $template['message'],
+            'context_label' => 'Package',
+            'context_value' => 'Starter Free',
+            'investment_id' => $starterInvestment->id,
+        ]));
 
         event(new Registered($user));
 

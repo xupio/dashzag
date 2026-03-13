@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Earning;
 use App\Models\FriendInvitation;
+use App\Models\InvestmentOrder;
 use App\Models\InvestmentPackage;
 use App\Models\Miner;
 use App\Models\PayoutRequest;
@@ -13,6 +14,7 @@ use App\Models\Shareholder;
 use App\Models\User;
 use App\Models\UserInvestment;
 use App\Models\UserLevel;
+use App\Notifications\ActivityFeedNotification;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -98,6 +100,186 @@ class MiningPlatform
             'scale_package_units_limit' => '10',
             'scale_package_price_multiplier' => '10',
             'scale_package_rate_bonus' => '0.0100',
+            'payout_btc_wallet_enabled' => '1',
+            'payout_btc_wallet_label' => 'BTC Wallet',
+            'payout_btc_wallet_placeholder' => 'Enter your BTC wallet address',
+            'payout_btc_wallet_minimum_amount' => '25',
+            'payout_btc_wallet_fixed_fee' => '0',
+            'payout_btc_wallet_percentage_fee_rate' => '0',
+            'payout_btc_wallet_instruction' => 'Make sure your BTC address is correct before submitting.',
+            'payout_btc_wallet_processing_time' => 'Within 24 hours',
+            'payout_usdt_wallet_enabled' => '1',
+            'payout_usdt_wallet_label' => 'USDT Wallet',
+            'payout_usdt_wallet_placeholder' => 'Enter your USDT wallet address',
+            'payout_usdt_wallet_minimum_amount' => '25',
+            'payout_usdt_wallet_fixed_fee' => '0',
+            'payout_usdt_wallet_percentage_fee_rate' => '0',
+            'payout_usdt_wallet_instruction' => 'Use the correct network for your USDT wallet destination.',
+            'payout_usdt_wallet_processing_time' => 'Within 12 hours',
+            'payout_bank_transfer_enabled' => '1',
+            'payout_bank_transfer_label' => 'Bank Transfer',
+            'payout_bank_transfer_placeholder' => 'Enter your bank account or IBAN details',
+            'payout_bank_transfer_minimum_amount' => '100',
+            'payout_bank_transfer_fixed_fee' => '15',
+            'payout_bank_transfer_percentage_fee_rate' => '0',
+            'payout_bank_transfer_instruction' => 'Include full beneficiary and banking details to avoid delays.',
+            'payout_bank_transfer_processing_time' => '2 to 5 business days',
+            'notification_payout_in_app' => '1',
+            'notification_payout_email' => '1',
+            'notification_reward_in_app' => '1',
+            'notification_reward_email' => '0',
+            'notification_investment_in_app' => '1',
+            'notification_investment_email' => '1',
+            'notification_network_in_app' => '1',
+            'notification_network_email' => '0',
+            'notification_milestone_in_app' => '1',
+            'notification_milestone_email' => '0',
+            'template_payout_submitted_subject' => 'Payout Request Submitted',
+            'template_payout_submitted_message' => 'Your payout request has been submitted and is now waiting for review.',
+            'template_payout_approved_subject' => 'Payout Request Approved',
+            'template_payout_approved_message' => 'Your payout request has been approved by the operations team.',
+            'template_payout_paid_subject' => 'Payout Request Paid',
+            'template_payout_paid_message' => 'Your payout request has been marked as paid.',
+            'template_free_starter_subject' => 'Free Starter activated',
+            'template_free_starter_message' => 'Your account now includes the Starter Free package and is ready for referral progress.',
+            'template_network_join_subject' => 'A referred user joined your network',
+            'template_network_join_message' => ':user_name completed email verification and is now attached to your team.',
+            'template_reward_registration_subject' => 'Referral registration reward added',
+            'template_reward_registration_message' => ':user_name completed registration and your referral reward is now available in the wallet.',
+            'template_network_sponsor_subject' => 'You are now linked to a sponsor team',
+            'template_network_sponsor_message' => 'Your account has been connected to :sponsor_name after confirming your email.',
+            'template_basic_unlocked_subject' => 'Basic 100 unlocked',
+            'template_basic_unlocked_message' => 'Your Starter Free mission is complete and the Basic 100 package is now active on your account.',
+            'template_investment_payment_submitted_subject' => 'Investment payment submitted',
+            'template_investment_payment_submitted_message' => 'Your payment for :package_name has been submitted and is now waiting for admin review.',
+            'template_investment_payment_proof_subject' => 'Payment proof uploaded',
+            'template_investment_payment_proof_message' => 'Your payment proof for :package_name has been uploaded successfully and is now waiting for admin review.',
+            'template_investment_payment_approved_subject' => 'Investment payment approved',
+            'template_investment_payment_approved_message' => 'Your payment for :package_name has been approved and your subscription is now being activated.',
+            'template_investment_payment_override_subject' => 'Investment approved without proof override',
+            'template_investment_payment_override_message' => 'Your :package_name order was approved using an admin override before a payment proof was uploaded.',
+            'template_investment_payment_rejected_subject' => 'Investment payment rejected',
+            'template_investment_payment_rejected_message' => 'Your payment for :package_name was rejected. Please review the admin notes and resubmit with the correct payment reference.',
+            'template_investment_activated_subject' => 'Investment subscription activated',
+            'template_investment_activated_message' => 'Your :package_name package is active and your mining shares are now running.',
+            'template_team_level_1_subject' => 'Direct referral investment reward added',
+            'template_team_level_1_message' => ':user_name subscribed to :package_name and your direct reward plus team bonus have been added.',
+            'template_team_level_2_subject' => 'A second-level investor subscribed',
+            'template_team_level_2_message' => ':user_name subscribed in your extended network.',
+            'template_team_level_generic_subject' => 'A level :level investor subscribed',
+            'template_team_level_generic_message' => ':user_name subscribed in level :level of your network.',
+        ];
+    }
+
+    public static function defaultNotificationTemplateSettings(): array
+    {
+        return [
+            'template_payout_submitted_subject' => 'Payout Request Submitted',
+            'template_payout_submitted_message' => 'Your payout request has been submitted and is now waiting for review.',
+            'template_payout_approved_subject' => 'Payout Request Approved',
+            'template_payout_approved_message' => 'Your payout request has been approved by the operations team.',
+            'template_payout_paid_subject' => 'Payout Request Paid',
+            'template_payout_paid_message' => 'Your payout request has been marked as paid.',
+            'template_free_starter_subject' => 'Free Starter activated',
+            'template_free_starter_message' => 'Your account now includes the Starter Free package and is ready for referral progress.',
+            'template_network_join_subject' => 'A referred user joined your network',
+            'template_network_join_message' => ':user_name completed email verification and is now attached to your team.',
+            'template_reward_registration_subject' => 'Referral registration reward added',
+            'template_reward_registration_message' => ':user_name completed registration and your referral reward is now available in the wallet.',
+            'template_network_sponsor_subject' => 'You are now linked to a sponsor team',
+            'template_network_sponsor_message' => 'Your account has been connected to :sponsor_name after confirming your email.',
+            'template_basic_unlocked_subject' => 'Basic 100 unlocked',
+            'template_basic_unlocked_message' => 'Your Starter Free mission is complete and the Basic 100 package is now active on your account.',
+            'template_investment_payment_submitted_subject' => 'Investment payment submitted',
+            'template_investment_payment_submitted_message' => 'Your payment for :package_name has been submitted and is now waiting for admin review.',
+            'template_investment_payment_proof_subject' => 'Payment proof uploaded',
+            'template_investment_payment_proof_message' => 'Your payment proof for :package_name has been uploaded successfully and is now waiting for admin review.',
+            'template_investment_payment_approved_subject' => 'Investment payment approved',
+            'template_investment_payment_approved_message' => 'Your payment for :package_name has been approved and your subscription is now being activated.',
+            'template_investment_payment_override_subject' => 'Investment approved without proof override',
+            'template_investment_payment_override_message' => 'Your :package_name order was approved using an admin override before a payment proof was uploaded.',
+            'template_investment_payment_rejected_subject' => 'Investment payment rejected',
+            'template_investment_payment_rejected_message' => 'Your payment for :package_name was rejected. Please review the admin notes and resubmit with the correct payment reference.',
+            'template_investment_activated_subject' => 'Investment subscription activated',
+            'template_investment_activated_message' => 'Your :package_name package is active and your mining shares are now running.',
+            'template_team_level_1_subject' => 'Direct referral investment reward added',
+            'template_team_level_1_message' => ':user_name subscribed to :package_name and your direct reward plus team bonus have been added.',
+            'template_team_level_2_subject' => 'A second-level investor subscribed',
+            'template_team_level_2_message' => ':user_name subscribed in your extended network.',
+            'template_team_level_generic_subject' => 'A level :level investor subscribed',
+            'template_team_level_generic_message' => ':user_name subscribed in level :level of your network.',
+        ];
+    }
+
+    public static function notificationTemplateSetting(string $key): string
+    {
+        return self::platformSettings()[$key] ?? self::defaultNotificationTemplateSettings()[$key] ?? '';
+    }
+
+    public static function renderNotificationTemplate(string $template, array $replacements = []): string
+    {
+        $rendered = $template;
+
+        foreach ($replacements as $key => $value) {
+            $rendered = str_replace(':'.$key, (string) $value, $rendered);
+        }
+
+        return $rendered;
+    }
+
+    public static function activityTemplate(string $key, array $replacements = []): array
+    {
+        return [
+            'subject' => self::renderNotificationTemplate(self::notificationTemplateSetting('template_'.$key.'_subject'), $replacements),
+            'message' => self::renderNotificationTemplate(self::notificationTemplateSetting('template_'.$key.'_message'), $replacements),
+        ];
+    }
+    public static function digestSummaryForUser(User $user, ?string $frequency = null): array
+    {
+        $resolvedFrequency = in_array($frequency, ['daily', 'weekly'], true) ? $frequency : $user->digestFrequency();
+        $start = $resolvedFrequency === 'daily' ? now()->subDay() : now()->subWeek();
+        $notifications = $user->notifications()->where('created_at', '>=', $start)->get();
+        $trackedCategories = ['payout', 'reward', 'investment', 'network', 'milestone'];
+
+        $summary = [
+            'frequency' => $resolvedFrequency,
+            'period_label' => $resolvedFrequency === 'daily' ? 'the last 24 hours' : 'the last 7 days',
+            'total' => 0,
+            'unread' => (int) $notifications->whereNull('read_at')->count(),
+        ];
+
+        foreach ($trackedCategories as $category) {
+            $summary[$category] = (int) $notifications->filter(
+                fn ($notification) => ($notification->data['category'] ?? 'payout') === $category
+            )->count();
+            $summary['total'] += $summary[$category];
+        }
+
+        return $summary;
+    }
+    public static function notificationDefaultPreferences(): array
+    {
+        return [
+            'payout' => [
+                'in_app' => self::platformSetting('notification_payout_in_app') === '1',
+                'email' => self::platformSetting('notification_payout_email') === '1',
+            ],
+            'reward' => [
+                'in_app' => self::platformSetting('notification_reward_in_app') === '1',
+                'email' => self::platformSetting('notification_reward_email') === '1',
+            ],
+            'investment' => [
+                'in_app' => self::platformSetting('notification_investment_in_app') === '1',
+                'email' => self::platformSetting('notification_investment_email') === '1',
+            ],
+            'network' => [
+                'in_app' => self::platformSetting('notification_network_in_app') === '1',
+                'email' => self::platformSetting('notification_network_email') === '1',
+            ],
+            'milestone' => [
+                'in_app' => self::platformSetting('notification_milestone_in_app') === '1',
+                'email' => self::platformSetting('notification_milestone_email') === '1',
+            ],
         ];
     }
 
@@ -124,6 +306,109 @@ class MiningPlatform
                 ['value' => (string) $value],
             );
         }
+    }
+
+
+    public static function payoutMethods(): array
+    {
+        return [
+            [
+                'key' => 'btc_wallet',
+                'label' => self::platformSetting('payout_btc_wallet_label'),
+                'placeholder' => self::platformSetting('payout_btc_wallet_placeholder'),
+                'enabled' => self::platformSetting('payout_btc_wallet_enabled') === '1',
+                'minimum_amount' => (float) self::platformSetting('payout_btc_wallet_minimum_amount'),
+                'fixed_fee' => (float) self::platformSetting('payout_btc_wallet_fixed_fee'),
+                'percentage_fee_rate' => (float) self::platformSetting('payout_btc_wallet_percentage_fee_rate'),
+                'instruction' => self::platformSetting('payout_btc_wallet_instruction'),
+                'processing_time' => self::platformSetting('payout_btc_wallet_processing_time'),
+            ],
+            [
+                'key' => 'usdt_wallet',
+                'label' => self::platformSetting('payout_usdt_wallet_label'),
+                'placeholder' => self::platformSetting('payout_usdt_wallet_placeholder'),
+                'enabled' => self::platformSetting('payout_usdt_wallet_enabled') === '1',
+                'minimum_amount' => (float) self::platformSetting('payout_usdt_wallet_minimum_amount'),
+                'fixed_fee' => (float) self::platformSetting('payout_usdt_wallet_fixed_fee'),
+                'percentage_fee_rate' => (float) self::platformSetting('payout_usdt_wallet_percentage_fee_rate'),
+                'instruction' => self::platformSetting('payout_usdt_wallet_instruction'),
+                'processing_time' => self::platformSetting('payout_usdt_wallet_processing_time'),
+            ],
+            [
+                'key' => 'bank_transfer',
+                'label' => self::platformSetting('payout_bank_transfer_label'),
+                'placeholder' => self::platformSetting('payout_bank_transfer_placeholder'),
+                'enabled' => self::platformSetting('payout_bank_transfer_enabled') === '1',
+                'minimum_amount' => (float) self::platformSetting('payout_bank_transfer_minimum_amount'),
+                'fixed_fee' => (float) self::platformSetting('payout_bank_transfer_fixed_fee'),
+                'percentage_fee_rate' => (float) self::platformSetting('payout_bank_transfer_percentage_fee_rate'),
+                'instruction' => self::platformSetting('payout_bank_transfer_instruction'),
+                'processing_time' => self::platformSetting('payout_bank_transfer_processing_time'),
+            ],
+        ];
+    }
+
+    public static function activePayoutMethods(): array
+    {
+        return array_values(array_filter(self::payoutMethods(), fn (array $method) => $method['enabled']));
+    }
+
+    public static function payoutMethodKeys(): array
+    {
+        return array_column(self::activePayoutMethods(), 'key');
+    }
+
+    public static function payoutMethodLabel(string $key): string
+    {
+        foreach (self::payoutMethods() as $method) {
+            if ($method['key'] === $key) {
+                return $method['label'];
+            }
+        }
+
+        return str($key)->replace('_', ' ')->title()->toString();
+    }
+
+    public static function payoutMethod(string $key): ?array
+    {
+        foreach (self::payoutMethods() as $method) {
+            if ($method['key'] === $key) {
+                return $method;
+            }
+        }
+
+        return null;
+    }
+
+    public static function payoutQuote(string $key, float $amount): array
+    {
+        $method = self::payoutMethod($key);
+
+        if (! $method) {
+            return [
+                'minimum_amount' => 0.0,
+                'fixed_fee' => 0.0,
+                'percentage_fee_rate' => 0.0,
+                'fee_amount' => 0.0,
+                'net_amount' => max(round($amount, 2), 0),
+            ];
+        }
+
+        $grossAmount = round(max($amount, 0), 2);
+        $feeAmount = round((float) $method['fixed_fee'] + ($grossAmount * (float) $method['percentage_fee_rate']), 2);
+        $netAmount = round(max($grossAmount - $feeAmount, 0), 2);
+
+        return [
+            'minimum_amount' => (float) $method['minimum_amount'],
+            'fixed_fee' => (float) $method['fixed_fee'],
+            'percentage_fee_rate' => (float) $method['percentage_fee_rate'],
+            'fee_amount' => $feeAmount,
+            'net_amount' => $netAmount,
+            'instruction' => $method['instruction'],
+            'processing_time' => $method['processing_time'],
+            'placeholder' => $method['placeholder'],
+            'label' => $method['label'],
+        ];
     }
 
     public static function networkLevelRewardRate(int $depth): float
@@ -484,6 +769,143 @@ class MiningPlatform
         return $investment;
     }
 
+    public static function submitInvestmentOrder(User $user, InvestmentPackage $package, array $paymentData): InvestmentOrder
+    {
+        return InvestmentOrder::create([
+            'user_id' => $user->id,
+            'miner_id' => $package->miner_id,
+            'package_id' => $package->id,
+            'amount' => $package->price,
+            'shares_owned' => $package->shares_count,
+            'payment_method' => $paymentData['payment_method'],
+            'payment_reference' => $paymentData['payment_reference'],
+            'payment_proof_path' => $paymentData['payment_proof_path'] ?? null,
+            'payment_proof_original_name' => $paymentData['payment_proof_original_name'] ?? null,
+            'notes' => $paymentData['notes'] ?? null,
+            'status' => 'pending',
+            'submitted_at' => now(),
+            'proof_uploaded_at' => isset($paymentData['payment_proof_path']) ? now() : null,
+        ]);
+    }
+
+
+    public static function rejectInvestmentOrder(InvestmentOrder $order, User $admin, ?string $adminNotes = null): InvestmentOrder
+    {
+        if ($order->status !== 'pending') {
+            throw new RuntimeException('Only pending investment orders can be rejected.');
+        }
+
+        $order->loadMissing(['user', 'package']);
+
+        $order->forceFill([
+            'status' => 'rejected',
+            'approved_by_id' => $admin->id,
+            'admin_notes' => $adminNotes,
+            'rejected_at' => now(),
+        ])->save();
+
+        if ($order->user) {
+            $rejectionTemplate = self::activityTemplate('investment_payment_rejected', [
+                'package_name' => $order->package?->name ?? 'the selected package',
+            ]);
+
+            $order->user->notify(new ActivityFeedNotification([
+                'category' => 'investment',
+                'status' => 'danger',
+                'subject' => $rejectionTemplate['subject'],
+                'message' => $rejectionTemplate['message'],
+                'context_label' => 'Admin notes',
+                'context_value' => $adminNotes ?: 'No extra notes provided.',
+                'amount' => (float) $order->amount,
+                'amount_label' => 'Submitted amount',
+                'force_mail' => true,
+            ]));
+        }
+
+        return $order->fresh(['user', 'package', 'miner', 'approver']);
+    }
+    public static function approveInvestmentOrder(InvestmentOrder $order, User $admin, bool $allowWithoutProof = false, ?string $adminNotes = null): UserInvestment
+    {
+        if ($order->status !== 'pending') {
+            throw new RuntimeException('Only pending investment orders can be approved.');
+        }
+
+        if (! $order->payment_proof_path && ! $allowWithoutProof) {
+            throw new RuntimeException('Payment proof is required before approval.');
+        }
+
+        if (! $order->payment_proof_path && blank($adminNotes)) {
+            throw new RuntimeException('Admin notes are required when approving without proof.');
+        }
+
+        return DB::transaction(function () use ($order, $admin, $adminNotes) {
+            $order->loadMissing(['user.sponsor', 'package.miner']);
+
+            if (! $order->user || ! $order->package) {
+                throw new RuntimeException('Investment order is missing its related user or package.');
+            }
+
+            $user = $order->user;
+            $package = $order->package;
+            $level = self::syncUserLevel($user);
+            $teamBonusRate = self::teamBonusRate($user);
+
+            $shareholder = Shareholder::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'package_name' => $package->name,
+                    'price' => $package->price,
+                    'billing_cycle' => 'monthly',
+                    'units_limit' => $package->units_limit,
+                    'status' => 'active',
+                    'subscribed_at' => now(),
+                ],
+            );
+
+            $investment = UserInvestment::create([
+                'user_id' => $user->id,
+                'miner_id' => $package->miner_id,
+                'package_id' => $package->id,
+                'shareholder_id' => $shareholder->id,
+                'amount' => $package->price,
+                'shares_owned' => $package->shares_count,
+                'monthly_return_rate' => $package->monthly_return_rate,
+                'level_bonus_rate' => $level->bonus_rate,
+                'team_bonus_rate' => $teamBonusRate,
+                'status' => 'active',
+                'subscribed_at' => now(),
+            ]);
+
+            $user->forceFill(['account_type' => 'shareholder'])->save();
+            $refreshedUser = self::refreshInvestmentBonusRates($user->fresh());
+            $investment->refresh();
+
+            Earning::firstOrCreate(
+                [
+                    'user_id' => $refreshedUser->id,
+                    'investment_id' => $investment->id,
+                    'earned_on' => now()->toDateString(),
+                    'source' => 'projected_return',
+                ],
+                [
+                    'amount' => round((float) $investment->amount * ((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate + (float) $investment->team_bonus_rate), 2),
+                    'status' => 'pending',
+                    'notes' => 'Initial projected monthly return generated after investment order approval.',
+                ],
+            );
+
+            self::awardReferralSubscription($refreshedUser, $investment);
+
+            $order->forceFill([
+                'status' => 'approved',
+                'approved_by_id' => $admin->id,
+                'approved_at' => now(),
+                'admin_notes' => $adminNotes ?: $order->admin_notes,
+            ])->save();
+
+            return $investment;
+        });
+    }
     public static function assignSponsorFromInvitations(User $user): ?User
     {
         if ($user->sponsor_user_id) {
@@ -663,9 +1085,13 @@ class MiningPlatform
                 throw new RuntimeException('Requested payout exceeds available balance.');
             }
 
+            $quote = self::payoutQuote($method, $amount);
             $payoutRequest = PayoutRequest::create([
                 'user_id' => $user->id,
                 'amount' => $amount,
+                'fee_amount' => $quote['fee_amount'],
+                'net_amount' => $quote['net_amount'],
+                'fee_rate' => $quote['percentage_fee_rate'],
                 'method' => $method,
                 'destination' => $destination,
                 'notes' => $notes,
@@ -853,6 +1279,27 @@ class MiningPlatform
         }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

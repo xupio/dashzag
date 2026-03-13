@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Notifications\InvitationAwareVerifyEmail;
+use App\Support\MiningPlatform;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,6 +24,9 @@ class User extends Authenticatable implements MustVerifyEmail
         'role',
         'user_level_id',
         'sponsor_user_id',
+        'notification_preferences',
+        'last_daily_digest_sent_at',
+        'last_weekly_digest_sent_at',
     ];
 
     protected $hidden = [
@@ -33,6 +37,54 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
+    }
+
+    public static function defaultNotificationPreferences(): array
+    {
+        return array_replace_recursive(MiningPlatform::notificationDefaultPreferences(), [
+            'digest' => [
+                'in_app' => true,
+                'email' => false,
+                'frequency' => 'weekly',
+            ],
+        ]);
+    }
+
+    public function notificationPreferences(): array
+    {
+        return array_replace_recursive(static::defaultNotificationPreferences(), $this->notification_preferences ?? []);
+    }
+
+    public function notificationChannelsFor(string $category): array
+    {
+        $normalizedCategory = $this->normalizeNotificationCategory($category);
+        $preferences = $this->notificationPreferences()[$normalizedCategory] ?? ['in_app' => true, 'email' => false];
+        $channels = [];
+
+        if ($preferences['in_app'] ?? false) {
+            $channels[] = 'database';
+        }
+
+        if ($preferences['email'] ?? false) {
+            $channels[] = 'mail';
+        }
+
+        return $channels;
+    }
+
+    public function digestFrequency(): string
+    {
+        $frequency = $this->notificationPreferences()['digest']['frequency'] ?? 'weekly';
+
+        return in_array($frequency, ['daily', 'weekly'], true) ? $frequency : 'weekly';
+    }
+
+    public function normalizeNotificationCategory(string $category): string
+    {
+        return match ($category) {
+            'referral' => 'network',
+            default => $category,
+        };
     }
 
     public function sponsor(): BelongsTo
@@ -65,6 +117,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(UserInvestment::class)->latest('subscribed_at');
     }
 
+    public function investmentOrders(): HasMany
+    {
+        return $this->hasMany(InvestmentOrder::class)->latest('submitted_at');
+    }
+
     public function earnings(): HasMany
     {
         return $this->hasMany(Earning::class)->latest('earned_on');
@@ -94,6 +151,9 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'notification_preferences' => 'array',
+            'last_daily_digest_sent_at' => 'datetime',
+            'last_weekly_digest_sent_at' => 'datetime',
         ];
     }
 }

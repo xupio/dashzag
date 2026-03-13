@@ -50,12 +50,40 @@ test('admin can update platform settings and miner creation uses them', function
             'scale_package_units_limit' => 12,
             'scale_package_price_multiplier' => 8,
             'scale_package_rate_bonus' => 0.0120,
+            'payout_btc_wallet_enabled' => 1,
+            'payout_btc_wallet_label' => 'Bitcoin Wallet',
+            'payout_btc_wallet_placeholder' => 'Paste your BTC address',
+            'payout_btc_wallet_minimum_amount' => 30,
+            'payout_btc_wallet_fixed_fee' => 2,
+            'payout_btc_wallet_percentage_fee_rate' => 0.015,
+            'payout_btc_wallet_instruction' => 'Double-check your BTC address before submitting.',
+            'payout_btc_wallet_processing_time' => 'Within 24 hours',
+            'payout_usdt_wallet_enabled' => 1,
+            'payout_usdt_wallet_label' => 'USDT TRC20',
+            'payout_usdt_wallet_placeholder' => 'Paste your TRC20 wallet address',
+            'payout_usdt_wallet_minimum_amount' => 20,
+            'payout_usdt_wallet_fixed_fee' => 1,
+            'payout_usdt_wallet_percentage_fee_rate' => 0.01,
+            'payout_usdt_wallet_instruction' => 'Use a TRC20-compatible address.',
+            'payout_usdt_wallet_processing_time' => 'Within 12 hours',
+            'payout_bank_transfer_enabled' => 0,
+            'payout_bank_transfer_label' => 'Bank Wire',
+            'payout_bank_transfer_placeholder' => 'Bank account or IBAN',
+            'payout_bank_transfer_minimum_amount' => 150,
+            'payout_bank_transfer_fixed_fee' => 25,
+            'payout_bank_transfer_percentage_fee_rate' => 0.02,
+            'payout_bank_transfer_instruction' => 'Include beneficiary and IBAN details.',
+            'payout_bank_transfer_processing_time' => '3 business days',
         ])
         ->assertRedirect(route('dashboard.settings'));
 
     expect(MiningPlatform::platformSetting('new_miner_total_shares'))->toBe('2222');
     expect(MiningPlatform::platformSetting('launch_package_name'))->toBe('Kickoff');
     expect(MiningPlatform::platformSetting('scale_package_price_multiplier'))->toBe('8');
+    expect(MiningPlatform::platformSetting('payout_usdt_wallet_label'))->toBe('USDT TRC20');
+    expect(MiningPlatform::platformSetting('payout_bank_transfer_enabled'))->toBe('0');
+    expect(MiningPlatform::platformSetting('payout_btc_wallet_fixed_fee'))->toBe('2');
+    expect(MiningPlatform::platformSetting('payout_bank_transfer_processing_time'))->toBe('3 business days');
 
     $this->actingAs($admin)
         ->post(route('dashboard.miners.store'), [
@@ -92,3 +120,6 @@ test('non admin cannot access platform settings page', function () {
         ->get(route('dashboard.settings'))
         ->assertForbidden();
 });
+
+
+

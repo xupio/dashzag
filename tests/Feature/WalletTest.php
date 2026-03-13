@@ -1,10 +1,33 @@
 <?php
 
+use App\Models\InvestmentOrder;
 use App\Models\PayoutRequest;
 use App\Models\User;
+use App\Notifications\PayoutStatusNotification;
 use App\Support\MiningPlatform;
+use Illuminate\Support\Facades\Notification;
+
+function activateGrowthInvestment($test, User $user, ?User $admin = null): void
+{
+    $admin ??= User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $test->actingAs($user)->post(route('general.sell-products.subscribe'), [
+        'package' => 'growth-500',
+        'payment_method' => 'btc_transfer',
+        'payment_reference' => 'TX-WALLET-'.str($user->id)->padLeft(4, '0'),
+    ])->assertRedirect(route('general.sell-products', ['miner' => 'alpha-one']));
+
+    $order = InvestmentOrder::query()->latest('id')->firstOrFail();
+
+    $test->actingAs($admin)
+        ->post(route('dashboard.operations.investment-orders.approve', $order))
+        ->assertRedirect(route('dashboard.operations'));
+}
 
 beforeEach(function () {
+    Notification::fake();
     MiningPlatform::ensureDefaults();
 });
 
@@ -14,9 +37,7 @@ test('verified user can generate monthly wallet earnings from active investments
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($user)->post(route('general.sell-products.subscribe'), [
-        'package' => 'growth-500',
-    ])->assertRedirect(route('general.sell-products', ['miner' => 'alpha-one']));
+    activateGrowthInvestment($this, $user);
 
     $response = $this->actingAs($user)->post(route('dashboard.wallet.generate'));
 
@@ -35,14 +56,11 @@ test('verified user can request a payout from available balance', function () {
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($user)->post(route('general.sell-products.subscribe'), [
-        'package' => 'growth-500',
-    ]);
-
+    activateGrowthInvestment($this, $user);
     $this->actingAs($user)->post(route('dashboard.wallet.generate'));
 
     $response = $this->actingAs($user)->post(route('dashboard.wallet.request'), [
-        'amount' => 20,
+        'amount' => 30,
         'method' => 'btc_wallet',
         'destination' => 'bc1-test-wallet-address',
         'notes' => 'First withdrawal request',
@@ -50,12 +68,340 @@ test('verified user can request a payout from available balance', function () {
 
     $response->assertRedirect(route('dashboard.wallet'));
 
+    $payoutRequest = PayoutRequest::firstOrFail();
+
     $user->refresh();
     $user->load(['earnings', 'payoutRequests']);
 
     expect($user->payoutRequests)->toHaveCount(1);
-    expect((float) $user->payoutRequests->first()->amount)->toBe(20.0);
-    expect($user->earnings->where('status', 'payout_pending')->sum('amount'))->toBe(20.0);
+    expect((float) $user->payoutRequests->first()->amount)->toBe(30.0);
+    expect((float) $payoutRequest->fee_amount)->toBe(0.0);
+    expect((float) $payoutRequest->net_amount)->toBe(30.0);
+    expect($user->earnings->where('status', 'payout_pending')->sum('amount'))->toBe(30.0);
+});
+
+
+test('wallet page reflects admin managed payout methods', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $this->actingAs($admin)->post(route('dashboard.settings.update'), [
+        'new_miner_total_shares' => 1000,
+        'new_miner_share_price' => 100,
+        'new_miner_daily_output_usd' => 1200,
+        'new_miner_monthly_output_usd' => 36000,
+        'new_miner_base_monthly_return_rate' => 0.0800,
+        'launch_package_name' => 'Launch',
+        'launch_package_shares_count' => 1,
+        'launch_package_units_limit' => 1,
+        'launch_package_price_multiplier' => 1,
+        'launch_package_rate_bonus' => 0.0000,
+        'growth_package_name' => 'Growth',
+        'growth_package_shares_count' => 5,
+        'growth_package_units_limit' => 5,
+        'growth_package_price_multiplier' => 5,
+        'growth_package_rate_bonus' => 0.0050,
+        'scale_package_name' => 'Scale',
+        'scale_package_shares_count' => 10,
+        'scale_package_units_limit' => 10,
+        'scale_package_price_multiplier' => 10,
+        'scale_package_rate_bonus' => 0.0100,
+        'payout_btc_wallet_enabled' => 1,
+        'payout_btc_wallet_label' => 'Bitcoin Wallet',
+        'payout_btc_wallet_placeholder' => 'Paste your BTC address',
+        'payout_btc_wallet_minimum_amount' => 10,
+        'payout_btc_wallet_fixed_fee' => 2,
+        'payout_btc_wallet_percentage_fee_rate' => 0.05,
+        'payout_btc_wallet_instruction' => 'Use your main BTC address.',
+        'payout_btc_wallet_processing_time' => 'Within 24 hours',
+        'payout_usdt_wallet_enabled' => 1,
+        'payout_usdt_wallet_label' => 'USDT TRC20',
+        'payout_usdt_wallet_placeholder' => 'Paste your TRC20 address',
+        'payout_usdt_wallet_minimum_amount' => 10,
+        'payout_usdt_wallet_fixed_fee' => 1,
+        'payout_usdt_wallet_percentage_fee_rate' => 0.02,
+        'payout_usdt_wallet_instruction' => 'Use the TRC20 network.',
+        'payout_usdt_wallet_processing_time' => 'Within 12 hours',
+        'payout_bank_transfer_enabled' => 0,
+        'payout_bank_transfer_label' => 'Bank Transfer',
+        'payout_bank_transfer_placeholder' => 'Bank account details',
+        'payout_bank_transfer_minimum_amount' => 100,
+        'payout_bank_transfer_fixed_fee' => 15,
+        'payout_bank_transfer_percentage_fee_rate' => 0.01,
+        'payout_bank_transfer_instruction' => 'Include beneficiary details.',
+        'payout_bank_transfer_processing_time' => '2 to 5 business days',
+    ])->assertRedirect(route('dashboard.settings'));
+
+    $response = $this->actingAs($user)->get(route('dashboard.wallet'));
+
+    $response->assertOk();
+    $response->assertSee('Bitcoin Wallet');
+    $response->assertSee('USDT TRC20');
+    $response->assertDontSee('Bank Transfer');
+});
+
+test('disabled payout methods cannot be requested', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+    ]);
+
+    $this->actingAs($admin)->post(route('dashboard.settings.update'), [
+        'new_miner_total_shares' => 1000,
+        'new_miner_share_price' => 100,
+        'new_miner_daily_output_usd' => 1200,
+        'new_miner_monthly_output_usd' => 36000,
+        'new_miner_base_monthly_return_rate' => 0.0800,
+        'launch_package_name' => 'Launch',
+        'launch_package_shares_count' => 1,
+        'launch_package_units_limit' => 1,
+        'launch_package_price_multiplier' => 1,
+        'launch_package_rate_bonus' => 0.0000,
+        'growth_package_name' => 'Growth',
+        'growth_package_shares_count' => 5,
+        'growth_package_units_limit' => 5,
+        'growth_package_price_multiplier' => 5,
+        'growth_package_rate_bonus' => 0.0050,
+        'scale_package_name' => 'Scale',
+        'scale_package_shares_count' => 10,
+        'scale_package_units_limit' => 10,
+        'scale_package_price_multiplier' => 10,
+        'scale_package_rate_bonus' => 0.0100,
+        'payout_btc_wallet_enabled' => 1,
+        'payout_btc_wallet_label' => 'BTC Wallet',
+        'payout_btc_wallet_placeholder' => 'BTC address',
+        'payout_btc_wallet_minimum_amount' => 10,
+        'payout_btc_wallet_fixed_fee' => 0,
+        'payout_btc_wallet_percentage_fee_rate' => 0,
+        'payout_btc_wallet_instruction' => 'Use your BTC address.',
+        'payout_btc_wallet_processing_time' => 'Within 24 hours',
+        'payout_usdt_wallet_enabled' => 1,
+        'payout_usdt_wallet_label' => 'USDT Wallet',
+        'payout_usdt_wallet_placeholder' => 'USDT address',
+        'payout_usdt_wallet_minimum_amount' => 10,
+        'payout_usdt_wallet_fixed_fee' => 0,
+        'payout_usdt_wallet_percentage_fee_rate' => 0,
+        'payout_usdt_wallet_instruction' => 'Use your USDT address.',
+        'payout_usdt_wallet_processing_time' => 'Within 12 hours',
+        'payout_bank_transfer_enabled' => 0,
+        'payout_bank_transfer_label' => 'Bank Transfer',
+        'payout_bank_transfer_placeholder' => 'Bank account details',
+        'payout_bank_transfer_minimum_amount' => 100,
+        'payout_bank_transfer_fixed_fee' => 15,
+        'payout_bank_transfer_percentage_fee_rate' => 0.01,
+        'payout_bank_transfer_instruction' => 'Include beneficiary details.',
+        'payout_bank_transfer_processing_time' => '2 to 5 business days',
+    ])->assertRedirect(route('dashboard.settings'));
+
+    activateGrowthInvestment($this, $user, $admin);
+    $this->actingAs($user)->post(route('dashboard.wallet.generate'));
+
+    $response = $this->actingAs($user)->from(route('dashboard.wallet'))->post(route('dashboard.wallet.request'), [
+        'amount' => 20,
+        'method' => 'bank_transfer',
+        'destination' => 'AE00123456789',
+    ]);
+
+    $response->assertRedirect(route('dashboard.wallet'));
+    $response->assertSessionHasErrors('method');
+    expect(PayoutRequest::count())->toBe(0);
+});
+
+test('payout request stores fee and net amount based on method rules', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+    ]);
+
+    $this->actingAs($admin)->post(route('dashboard.settings.update'), [
+        'new_miner_total_shares' => 1000,
+        'new_miner_share_price' => 100,
+        'new_miner_daily_output_usd' => 1200,
+        'new_miner_monthly_output_usd' => 36000,
+        'new_miner_base_monthly_return_rate' => 0.0800,
+        'launch_package_name' => 'Launch',
+        'launch_package_shares_count' => 1,
+        'launch_package_units_limit' => 1,
+        'launch_package_price_multiplier' => 1,
+        'launch_package_rate_bonus' => 0.0000,
+        'growth_package_name' => 'Growth',
+        'growth_package_shares_count' => 5,
+        'growth_package_units_limit' => 5,
+        'growth_package_price_multiplier' => 5,
+        'growth_package_rate_bonus' => 0.0050,
+        'scale_package_name' => 'Scale',
+        'scale_package_shares_count' => 10,
+        'scale_package_units_limit' => 10,
+        'scale_package_price_multiplier' => 10,
+        'scale_package_rate_bonus' => 0.0100,
+        'payout_btc_wallet_enabled' => 1,
+        'payout_btc_wallet_label' => 'BTC Wallet',
+        'payout_btc_wallet_placeholder' => 'BTC address',
+        'payout_btc_wallet_minimum_amount' => 10,
+        'payout_btc_wallet_fixed_fee' => 2,
+        'payout_btc_wallet_percentage_fee_rate' => 0.05,
+        'payout_btc_wallet_instruction' => 'Use your BTC address.',
+        'payout_btc_wallet_processing_time' => 'Within 24 hours',
+        'payout_usdt_wallet_enabled' => 1,
+        'payout_usdt_wallet_label' => 'USDT Wallet',
+        'payout_usdt_wallet_placeholder' => 'USDT address',
+        'payout_usdt_wallet_minimum_amount' => 10,
+        'payout_usdt_wallet_fixed_fee' => 0,
+        'payout_usdt_wallet_percentage_fee_rate' => 0,
+        'payout_usdt_wallet_instruction' => 'Use your USDT address.',
+        'payout_usdt_wallet_processing_time' => 'Within 12 hours',
+        'payout_bank_transfer_enabled' => 0,
+        'payout_bank_transfer_label' => 'Bank Transfer',
+        'payout_bank_transfer_placeholder' => 'Bank account details',
+        'payout_bank_transfer_minimum_amount' => 100,
+        'payout_bank_transfer_fixed_fee' => 15,
+        'payout_bank_transfer_percentage_fee_rate' => 0.01,
+        'payout_bank_transfer_instruction' => 'Include beneficiary details.',
+        'payout_bank_transfer_processing_time' => '2 to 5 business days',
+    ])->assertRedirect(route('dashboard.settings'));
+
+    activateGrowthInvestment($this, $user, $admin);
+    $this->actingAs($user)->post(route('dashboard.wallet.generate'));
+
+    $this->actingAs($user)->post(route('dashboard.wallet.request'), [
+        'amount' => 20,
+        'method' => 'btc_wallet',
+        'destination' => 'bc1-fee-test',
+    ])->assertRedirect(route('dashboard.wallet'));
+
+    $payoutRequest = PayoutRequest::latest('id')->firstOrFail();
+
+    expect((float) $payoutRequest->fee_amount)->toBe(3.0);
+    expect((float) $payoutRequest->net_amount)->toBe(17.0);
+    expect((float) $payoutRequest->fee_rate)->toBe(0.05);
+});
+
+test('payout request enforces method minimum amount', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+    ]);
+
+    $this->actingAs($admin)->post(route('dashboard.settings.update'), [
+        'new_miner_total_shares' => 1000,
+        'new_miner_share_price' => 100,
+        'new_miner_daily_output_usd' => 1200,
+        'new_miner_monthly_output_usd' => 36000,
+        'new_miner_base_monthly_return_rate' => 0.0800,
+        'launch_package_name' => 'Launch',
+        'launch_package_shares_count' => 1,
+        'launch_package_units_limit' => 1,
+        'launch_package_price_multiplier' => 1,
+        'launch_package_rate_bonus' => 0.0000,
+        'growth_package_name' => 'Growth',
+        'growth_package_shares_count' => 5,
+        'growth_package_units_limit' => 5,
+        'growth_package_price_multiplier' => 5,
+        'growth_package_rate_bonus' => 0.0050,
+        'scale_package_name' => 'Scale',
+        'scale_package_shares_count' => 10,
+        'scale_package_units_limit' => 10,
+        'scale_package_price_multiplier' => 10,
+        'scale_package_rate_bonus' => 0.0100,
+        'payout_btc_wallet_enabled' => 1,
+        'payout_btc_wallet_label' => 'BTC Wallet',
+        'payout_btc_wallet_placeholder' => 'BTC address',
+        'payout_btc_wallet_minimum_amount' => 30,
+        'payout_btc_wallet_fixed_fee' => 0,
+        'payout_btc_wallet_percentage_fee_rate' => 0,
+        'payout_btc_wallet_instruction' => 'Use your BTC address.',
+        'payout_btc_wallet_processing_time' => 'Within 24 hours',
+        'payout_usdt_wallet_enabled' => 1,
+        'payout_usdt_wallet_label' => 'USDT Wallet',
+        'payout_usdt_wallet_placeholder' => 'USDT address',
+        'payout_usdt_wallet_minimum_amount' => 10,
+        'payout_usdt_wallet_fixed_fee' => 0,
+        'payout_usdt_wallet_percentage_fee_rate' => 0,
+        'payout_usdt_wallet_instruction' => 'Use your USDT address.',
+        'payout_usdt_wallet_processing_time' => 'Within 12 hours',
+        'payout_bank_transfer_enabled' => 0,
+        'payout_bank_transfer_label' => 'Bank Transfer',
+        'payout_bank_transfer_placeholder' => 'Bank account details',
+        'payout_bank_transfer_minimum_amount' => 100,
+        'payout_bank_transfer_fixed_fee' => 15,
+        'payout_bank_transfer_percentage_fee_rate' => 0.01,
+        'payout_bank_transfer_instruction' => 'Include beneficiary details.',
+        'payout_bank_transfer_processing_time' => '2 to 5 business days',
+    ])->assertRedirect(route('dashboard.settings'));
+
+    activateGrowthInvestment($this, $user, $admin);
+    $this->actingAs($user)->post(route('dashboard.wallet.generate'));
+
+    $response = $this->actingAs($user)->from(route('dashboard.wallet'))->post(route('dashboard.wallet.request'), [
+        'amount' => 20,
+        'method' => 'btc_wallet',
+        'destination' => 'bc1-min-test',
+    ]);
+
+    $response->assertRedirect(route('dashboard.wallet'));
+    $response->assertSessionHasErrors('amount');
+});
+
+test('users receive payout notifications for submit approve and pay events', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+    ]);
+
+    activateGrowthInvestment($this, $user, $admin);
+    $this->actingAs($user)->post(route('dashboard.wallet.generate'));
+
+    $this->actingAs($user)->post(route('dashboard.wallet.request'), [
+        'amount' => 30,
+        'method' => 'btc_wallet',
+        'destination' => 'bc1-notify-test',
+    ])->assertRedirect(route('dashboard.wallet'));
+
+    $payoutRequest = PayoutRequest::firstOrFail();
+
+    Notification::assertSentTo($user, PayoutStatusNotification::class, function ($notification) {
+        return $notification->toMail(User::factory()->make(['name' => 'Temp']))->subject === 'Payout Request Submitted';
+    });
+
+    Notification::fake();
+    $this->actingAs($admin)->post(route('dashboard.operations.payouts.approve', $payoutRequest), [
+        'admin_notes' => 'Reviewed and approved.',
+    ])->assertRedirect(route('dashboard.operations'));
+
+    Notification::assertSentTo($user, PayoutStatusNotification::class, function ($notification) {
+        return $notification->toMail(User::factory()->make(['name' => 'Temp']))->subject === 'Payout Request Approved';
+    });
+
+    Notification::fake();
+    $this->actingAs($admin)->post(route('dashboard.operations.payouts.pay', $payoutRequest->fresh()), [
+        'transaction_reference' => 'TX-NOTIFY-001',
+        'admin_notes' => 'Treasury transfer completed.',
+    ])->assertRedirect(route('dashboard.operations'));
+
+    Notification::assertSentTo($user, PayoutStatusNotification::class, function ($notification) {
+        return $notification->toMail(User::factory()->make(['name' => 'Temp']))->subject === 'Payout Request Paid';
+    });
 });
 
 test('admin can approve and pay payout requests with audit details', function () {
@@ -68,16 +414,13 @@ test('admin can approve and pay payout requests with audit details', function ()
         'account_type' => 'user',
     ]);
 
-    $this->actingAs($user)->post(route('general.sell-products.subscribe'), [
-        'package' => 'growth-500',
-    ]);
-
+    activateGrowthInvestment($this, $user, $admin);
     $this->actingAs($user)->post(route('dashboard.wallet.generate'));
     $this->actingAs($user)->post(route('dashboard.wallet.request'), [
-        'amount' => 20,
+        'amount' => 30,
         'method' => 'btc_wallet',
         'destination' => 'bc1-test-wallet-address',
-    ]);
+    ])->assertRedirect(route('dashboard.wallet'));
 
     $payoutRequest = PayoutRequest::firstOrFail();
 
@@ -103,7 +446,7 @@ test('admin can approve and pay payout requests with audit details', function ()
     expect($payoutRequest->transaction_reference)->toBe('TX-20260311-0001');
     expect($payoutRequest->admin_notes)->toBe('Sent manually through treasury wallet.');
     expect($payoutRequest->processed_at)->not->toBeNull();
-    expect($user->earnings->where('status', 'paid')->sum('amount'))->toBe(20.0);
+    expect($user->earnings->where('status', 'paid')->sum('amount'))->toBe(30.0);
 });
 
 test('non admin user cannot access operations page', function () {
@@ -130,4 +473,3 @@ test('wallet page is available to verified users', function () {
     $response->assertOk();
     $response->assertSee('Wallet');
 });
-

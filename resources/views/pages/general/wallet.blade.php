@@ -1,3 +1,8 @@
+@php
+  $payoutMethods = $payoutMethods ?? [];
+  $defaultPayoutMethod = $defaultPayoutMethod ?? null;
+@endphp
+
 @extends('layout.master')
 
 @section('content')
@@ -9,7 +14,7 @@
         <p class="text-secondary mb-0">Monitor available balance, pending returns, and every mining-related earning entry.</p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <button type="button" class="btn btn-success btn-icon-text" data-bs-toggle="modal" data-bs-target="#payoutRequestModal">
+        <button type="button" class="btn btn-success btn-icon-text" data-bs-toggle="modal" data-bs-target="#payoutRequestModal" @disabled(count($payoutMethods) === 0)>
           <i data-lucide="landmark" class="btn-icon-prepend"></i> Request payout
         </button>
         <form method="POST" action="{{ route('dashboard.wallet.generate') }}">
@@ -52,7 +57,7 @@
         <div class="border rounded p-3 mb-3 bg-light"><div class="text-secondary small">Expected monthly earnings</div><div class="fw-semibold">${{ number_format($expectedMonthlyEarnings, 2) }}</div></div>
         <div class="border rounded p-3 mb-3 bg-light"><div class="text-secondary small">Payout requests</div><div class="fw-semibold">{{ $payoutRequests->count() }}</div></div>
         <div class="alert alert-light border mb-0">
-          Use the generate button once per month to create mining returns, then submit a payout request from your available balance.
+          Use the generate button once per month to create mining returns, then submit a payout request from your available balance.{{ count($payoutMethods) === 0 ? ' Payout requests are currently disabled by the admin team.' : '' }}
         </div>
       </div>
     </div>
@@ -90,14 +95,14 @@
                   <tr>
                     <td>{{ $earning->earned_on?->format('M d, Y') }}</td>
                     <td>{{ str($earning->source)->replace('_', ' ')->title() }}</td>
-                    <td>{{ $earning->investment?->package?->name ?? '—' }}</td>
+                    <td>{{ $earning->investment?->package?->name ?? 'â€”' }}</td>
                     <td>
                       <span class="badge {{ $earning->status === 'available' ? 'bg-success' : ($earning->status === 'paid' ? 'bg-primary' : 'bg-warning text-dark') }}">
                         {{ str($earning->status)->replace('_', ' ')->title() }}
                       </span>
                     </td>
                     <td>${{ number_format((float) $earning->amount, 2) }}</td>
-                    <td>{{ $earning->notes ?: '—' }}</td>
+                    <td>{{ $earning->notes ?: 'â€”' }}</td>
                   </tr>
                 @endforeach
               </tbody>
@@ -140,18 +145,21 @@
                 @foreach ($payoutRequests as $request)
                   <tr>
                     <td>{{ $request->requested_at?->format('M d, Y h:i A') }}</td>
-                    <td>${{ number_format((float) $request->amount, 2) }}</td>
-                    <td>{{ str($request->method)->replace('_', ' ')->title() }}</td>
+                    <td>
+                      <div class="fw-semibold">${{ number_format((float) $request->amount, 2) }}</div>
+                      <div class="text-secondary small">Fee: ${{ number_format((float) $request->fee_amount, 2) }} | Net: ${{ number_format((float) $request->net_amount, 2) }}</div>
+                    </td>
+                    <td>{{ \App\Support\MiningPlatform::payoutMethodLabel($request->method) }}</td>
                     <td>{{ $request->destination }}</td>
                     <td><span class="badge {{ $request->status === 'paid' ? 'bg-primary' : ($request->status === 'approved' ? 'bg-info' : 'bg-warning text-dark') }}">{{ str($request->status)->title() }}</span></td>
                     <td>
-                      <div class="text-secondary small">Approved: {{ $request->approved_at?->format('M d, Y h:i A') ?? '—' }}</div>
-                      <div class="text-secondary small">Paid: {{ $request->processed_at?->format('M d, Y h:i A') ?? '—' }}</div>
-                      <div class="text-secondary small">Reference: {{ $request->transaction_reference ?: '—' }}</div>
+                      <div class="text-secondary small">Approved: {{ $request->approved_at?->format('M d, Y h:i A') ?? 'â€”' }}</div>
+                      <div class="text-secondary small">Paid: {{ $request->processed_at?->format('M d, Y h:i A') ?? 'â€”' }}</div>
+                      <div class="text-secondary small">Reference: {{ $request->transaction_reference ?: 'â€”' }}</div>
                     </td>
                     <td>
-                      <div>{{ $request->notes ?: '—' }}</div>
-                      <div class="text-secondary small mt-1">Admin: {{ $request->admin_notes ?: '—' }}</div>
+                      <div>{{ $request->notes ?: 'â€”' }}</div>
+                      <div class="text-secondary small mt-1">Admin: {{ $request->admin_notes ?: 'â€”' }}</div>
                     </td>
                   </tr>
                 @endforeach
@@ -181,17 +189,28 @@
           </div>
           <div class="mb-3">
             <label class="form-label">Method</label>
-            <select name="method" class="form-select @error('method') is-invalid @enderror" required>
-              <option value="btc_wallet" @selected(old('method') === 'btc_wallet')>BTC Wallet</option>
-              <option value="usdt_wallet" @selected(old('method') === 'usdt_wallet')>USDT Wallet</option>
-              <option value="bank_transfer" @selected(old('method') === 'bank_transfer')>Bank Transfer</option>
+            <select name="method" id="payoutMethodSelect" class="form-select @error('method') is-invalid @enderror" required>
+              @forelse ($payoutMethods as $method)
+                <option value="{{ $method['key'] }}" data-placeholder="{{ $method['placeholder'] }}" data-instruction="{{ $method['instruction'] }}" data-processing="{{ $method['processing_time'] }}" data-minimum="{{ $method['minimum_amount'] }}" data-fixed-fee="{{ $method['fixed_fee'] }}" data-rate="{{ $method['percentage_fee_rate'] }}" @selected(old('method', $loop->first ? $method['key'] : null) === $method['key'])>{{ $method['label'] }}</option>
+              @empty
+                <option value="">No payout methods available</option>
+              @endforelse
             </select>
             @error('method')<div class="invalid-feedback">{{ $message }}</div>@enderror
           </div>
           <div class="mb-3">
             <label class="form-label">Destination</label>
-            <input type="text" name="destination" class="form-control @error('destination') is-invalid @enderror" value="{{ old('destination') }}" required>
+            <input type="text" id="payoutDestinationInput" name="destination" class="form-control @error('destination') is-invalid @enderror" value="{{ old('destination') }}" placeholder="{{ $defaultPayoutMethod['placeholder'] ?? 'Enter payout destination' }}" required>
+            <div class="form-text" id="payoutDestinationHelp">{{ $defaultPayoutMethod['placeholder'] ?? 'No payout method is currently available.' }}</div>
             @error('destination')<div class="invalid-feedback">{{ $message }}</div>@enderror
+          </div>
+          <div class="border rounded p-3 bg-light mb-3">
+            <div class="fw-semibold mb-2">Method rules</div>
+            <div class="text-secondary small" id="payoutInstructionText">{{ $defaultPayoutMethod['instruction'] ?? 'No payout method is currently available.' }}</div>
+            <div class="text-secondary small mt-2" id="payoutProcessingText">Processing time: {{ $defaultPayoutMethod['processing_time'] ?? 'â€”' }}</div>
+            <div class="text-secondary small mt-1" id="payoutMinimumText">Minimum: ${{ number_format((float) ($defaultPayoutMethod['minimum_amount'] ?? 0), 2) }}</div>
+            <div class="text-secondary small mt-1" id="payoutFeeText">Fees: ${{ number_format((float) ($defaultPayoutMethod['fixed_fee'] ?? 0), 2) }} fixed + {{ number_format((float) (($defaultPayoutMethod['percentage_fee_rate'] ?? 0) * 100), 2) }}%</div>
+            <div class="fw-semibold mt-3" id="payoutNetEstimateText">Estimated net: $0.00</div>
           </div>
           <div class="mb-0">
             <label class="form-label">Notes</label>
@@ -210,16 +229,55 @@
 @endsection
 
 @push('custom-scripts')
-  @if ($errors->has('amount') || $errors->has('method') || $errors->has('destination') || $errors->has('notes'))
-    <script>
-      document.addEventListener('DOMContentLoaded', function () {
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var methodSelect = document.getElementById('payoutMethodSelect');
+      var destinationInput = document.getElementById('payoutDestinationInput');
+      var destinationHelp = document.getElementById('payoutDestinationHelp');
+      var amountInput = document.querySelector('input[name="amount"]');
+      var instructionText = document.getElementById('payoutInstructionText');
+      var processingText = document.getElementById('payoutProcessingText');
+      var minimumText = document.getElementById('payoutMinimumText');
+      var feeText = document.getElementById('payoutFeeText');
+      var netEstimateText = document.getElementById('payoutNetEstimateText');
+
+      if (methodSelect && destinationInput && destinationHelp) {
+        var syncPayoutDestination = function () {
+          var selectedOption = methodSelect.options[methodSelect.selectedIndex];
+          var placeholder = selectedOption ? selectedOption.getAttribute('data-placeholder') : 'Enter payout destination';
+          var instruction = selectedOption ? selectedOption.getAttribute('data-instruction') : 'No payout method is currently available.';
+          var processing = selectedOption ? selectedOption.getAttribute('data-processing') : 'â€”';
+          var minimum = selectedOption ? parseFloat(selectedOption.getAttribute('data-minimum') || '0') : 0;
+          var fixedFee = selectedOption ? parseFloat(selectedOption.getAttribute('data-fixed-fee') || '0') : 0;
+          var rate = selectedOption ? parseFloat(selectedOption.getAttribute('data-rate') || '0') : 0;
+          var amount = amountInput ? parseFloat(amountInput.value || '0') : 0;
+          var feeAmount = fixedFee + (amount * rate);
+          var netAmount = Math.max(amount - feeAmount, 0);
+
+          destinationInput.placeholder = placeholder || 'Enter payout destination';
+          destinationHelp.textContent = placeholder || 'Enter payout destination';
+          if (instructionText) instructionText.textContent = instruction || 'No payout method is currently available.';
+          if (processingText) processingText.textContent = 'Processing time: ' + (processing || 'â€”');
+          if (minimumText) minimumText.textContent = 'Minimum: $' + minimum.toFixed(2);
+          if (feeText) feeText.textContent = 'Fees: $' + fixedFee.toFixed(2) + ' fixed + ' + (rate * 100).toFixed(2) + '%';
+          if (netEstimateText) netEstimateText.textContent = 'Estimated net: $' + netAmount.toFixed(2);
+        };
+
+        methodSelect.addEventListener('change', syncPayoutDestination);
+        if (amountInput) {
+          amountInput.addEventListener('input', syncPayoutDestination);
+        }
+        syncPayoutDestination();
+      }
+
+      @if ($errors->has('amount') || $errors->has('method') || $errors->has('destination') || $errors->has('notes'))
         var modalElement = document.getElementById('payoutRequestModal');
         if (!modalElement || !window.bootstrap) {
           return;
         }
 
         new bootstrap.Modal(modalElement).show();
-      });
-    </script>
-  @endif
+      @endif
+    });
+  </script>
 @endpush

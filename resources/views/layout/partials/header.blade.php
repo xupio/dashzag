@@ -89,7 +89,7 @@
                   <p class="fs-12px text-secondary">Project status</p>
                 </div>
                 <p class="fs-12px text-secondary">2 min ago</p>
-              </div>	
+              </div>
             </a>
             <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
               <div class="me-3">
@@ -101,7 +101,7 @@
                   <p class="fs-12px text-secondary">Client meeting</p>
                 </div>
                 <p class="fs-12px text-secondary">30 min ago</p>
-              </div>	
+              </div>
             </a>
             <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
               <div class="me-3">
@@ -113,7 +113,7 @@
                   <p class="fs-12px text-secondary">Project updates</p>
                 </div>
                 <p class="fs-12px text-secondary">1 hrs ago</p>
-              </div>	
+              </div>
             </a>
             <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
               <div class="me-3">
@@ -125,7 +125,7 @@
                   <p class="fs-12px text-secondary">Project deadline</p>
                 </div>
                 <p class="fs-12px text-secondary">2 hrs ago</p>
-              </div>	
+              </div>
             </a>
             <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
               <div class="me-3">
@@ -137,7 +137,7 @@
                   <p class="fs-12px text-secondary">New record</p>
                 </div>
                 <p class="fs-12px text-secondary">5 hrs ago</p>
-              </div>	
+              </div>
             </a>
           </div>
           <div class="px-3 py-2 d-flex align-items-center justify-content-center border-top">
@@ -145,67 +145,50 @@
           </div>
         </div>
       </li>
+      @php
+        $headerNotifications = auth()->check() ? auth()->user()->notifications()->latest()->take(5)->get() : collect();
+        $headerUnreadCount = auth()->check() ? auth()->user()->unreadNotifications()->count() : 0;
+      @endphp
       <li class="nav-item dropdown">
         <a class="nav-link dropdown-toggle" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
           <i data-lucide="bell"></i>
-          <div class="indicator">
-            <div class="circle"></div>
-          </div>
+          @if ($headerUnreadCount > 0)
+            <div class="indicator">
+              <div class="circle"></div>
+            </div>
+          @endif
         </a>
         <div class="dropdown-menu p-0" aria-labelledby="notificationDropdown">
           <div class="px-3 py-2 d-flex align-items-center justify-content-between border-bottom">
-            <p>6 New Notifications</p>
-            <a href="javascript:;" class="text-secondary">Clear all</a>
+            <p>{{ $headerUnreadCount }} New Notifications</p>
+            <a href="{{ route('dashboard.notifications') }}" class="text-secondary">Open feed</a>
           </div>
           <div class="p-1">
-            <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
-              <div class="w-30px h-30px d-flex align-items-center justify-content-center bg-primary rounded-circle me-3">
-                <i class="icon-sm text-white" data-lucide="gift"></i>
+            @forelse ($headerNotifications as $notification)
+              @php($data = $notification->data)
+              @php($status = $data['status'] ?? 'info')
+              @php($statusClass = in_array($status, ['paid', 'approved']) ? 'bg-primary' : (in_array($status, ['success', 'active']) ? 'bg-success' : ($status === 'reward' ? 'bg-info' : 'bg-warning')))
+              <a href="{{ route('dashboard.notifications') }}" class="dropdown-item d-flex align-items-center py-2">
+                <div class="w-30px h-30px d-flex align-items-center justify-content-center {{ $statusClass }} rounded-circle me-3">
+                  <i class="icon-sm text-white" data-lucide="bell-ring"></i>
+                </div>
+                <div class="flex-grow-1 me-2">
+                  <p>{{ $data['subject'] ?? 'Notification' }}</p>
+                  <p class="fs-12px text-secondary">{{ $notification->created_at?->diffForHumans() }}</p>
+                </div>
+                @if (! $notification->read_at)
+                  <span class="badge bg-danger">New</span>
+                @endif
+              </a>
+            @empty
+              <div class="px-3 py-4 text-center">
+                <p class="mb-1">No notifications yet</p>
+                <p class="fs-12px text-secondary mb-0">Payout and account updates will appear here.</p>
               </div>
-              <div class="flex-grow-1 me-2">
-                <p>New Order Recieved</p>
-                <p class="fs-12px text-secondary">30 min ago</p>
-              </div>	
-            </a>
-            <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
-              <div class="w-30px h-30px d-flex align-items-center justify-content-center bg-primary rounded-circle me-3">
-                <i class="icon-sm text-white" data-lucide="alert-circle"></i>
-              </div>
-              <div class="flex-grow-1 me-2">
-                <p>Server Limit Reached!</p>
-                <p class="fs-12px text-secondary">1 hrs ago</p>
-              </div>	
-            </a>
-            <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
-              <div class="w-30px h-30px d-flex align-items-center justify-content-center bg-primary rounded-circle me-3">
-                <img class="w-30px h-30px rounded-circle" src="{{ url('https://placehold.co/30x30') }}" alt="userr">
-              </div>
-              <div class="flex-grow-1 me-2">
-                <p>New customer registered</p>
-                <p class="fs-12px text-secondary">2 sec ago</p>
-              </div>	
-            </a>
-            <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
-              <div class="w-30px h-30px d-flex align-items-center justify-content-center bg-primary rounded-circle me-3">
-                <i class="icon-sm text-white" data-lucide="layers"></i>
-              </div>
-              <div class="flex-grow-1 me-2">
-                <p>Apps are ready for update</p>
-                <p class="fs-12px text-secondary">5 hrs ago</p>
-              </div>	
-            </a>
-            <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
-              <div class="w-30px h-30px d-flex align-items-center justify-content-center bg-primary rounded-circle me-3">
-                <i class="icon-sm text-white" data-lucide="download"></i>
-              </div>
-              <div class="flex-grow-1 me-2">
-                <p>Download completed</p>
-                <p class="fs-12px text-secondary">6 hrs ago</p>
-              </div>	
-            </a>
+            @endforelse
           </div>
           <div class="px-3 py-2 d-flex align-items-center justify-content-center border-top">
-            <a href="javascript:;">View all</a>
+            <a href="{{ route('dashboard.notifications') }}">View all</a>
           </div>
         </div>
       </li>
@@ -262,6 +245,3 @@
 
   </div>
 </nav>
-
-
-
