@@ -163,6 +163,47 @@
   </div>
 </div>
 
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card border-0 bg-light">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+          <div>
+            <h5 class="mb-1">How package returns are calculated</h5>
+            <p class="text-secondary mb-0">Package returns follow the current base rate on {{ $miner->name }} plus the package uplift shown below.</p>
+          </div>
+          <span class="badge bg-primary-subtle text-primary fs-6">
+            Current miner base: {{ number_format((float) $miner->base_monthly_return_rate * 100, 2) }}%
+          </span>
+        </div>
+        <div class="row g-3">
+          @foreach ($packages as $package)
+            @php
+              $packageIsStarter = (float) $package->price <= 0 || (int) $package->shares_count <= 0;
+              $rateBonus = $packageIsStarter ? 0 : round((float) $package->monthly_return_rate - (float) $miner->base_monthly_return_rate, 4);
+            @endphp
+            <div class="col-md-4">
+              <div class="border rounded p-3 h-100 bg-white">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <div>
+                    <div class="fw-semibold">{{ $package->name }}</div>
+                    <div class="text-secondary small">{{ $package->shares_count }} shares</div>
+                  </div>
+                  <span class="badge {{ $packageIsStarter ? 'bg-secondary-subtle text-secondary' : 'bg-success-subtle text-success' }}">
+                    {{ $packageIsStarter ? 'Fixed' : ($rateBonus >= 0 ? '+' : '').number_format($rateBonus * 100, 2).'%' }}
+                  </span>
+                </div>
+                <div class="text-secondary small">Projected return on this package</div>
+                <div class="fw-bold fs-5">{{ number_format((float) $package->monthly_return_rate * 100, 2) }}%</div>
+              </div>
+            </div>
+          @endforeach
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="row">
   @foreach ($packages as $index => $package)
     @php

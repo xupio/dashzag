@@ -57,6 +57,7 @@
         <p class="text-secondary mb-1">Share price</p>
         <h3 class="mb-2">${{ number_format((float) $miner->share_price, 2) }}</h3>
         <div class="text-secondary small">Base monthly return: {{ number_format((float) $miner->base_monthly_return_rate * 100, 2) }}%</div>
+        <div class="text-secondary small">Package returns follow the miner base rate plus package uplift. See Buy Shares for the full breakdown.</div>
       </div>
     </div>
   </div>
@@ -465,6 +466,7 @@
     });
   </script>
 @endpush
+
 
 
 

@@ -627,7 +627,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'share_price' => ['required', 'numeric', 'min:1'],
                 'daily_output_usd' => ['required', 'numeric', 'min:0'],
                 'monthly_output_usd' => ['required', 'numeric', 'min:0'],
-                'base_monthly_return_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'base_monthly_return_rate' => ['required', 'numeric', 'min:0', 'max:100'],
                 'status' => ['required', 'in:active,paused,maintenance'],
             ]);
 
@@ -1741,13 +1741,29 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'share_price' => ['required', 'numeric', 'min:1'],
                 'daily_output_usd' => ['required', 'numeric', 'min:0'],
                 'monthly_output_usd' => ['required', 'numeric', 'min:0'],
-                'base_monthly_return_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'base_monthly_return_rate' => ['required', 'numeric', 'min:0', 'max:100'],
                 'status' => ['required', 'in:active,paused,maintenance'],
             ]);
 
             $miner = Miner::where('slug', $validated['miner_slug'])->firstOrFail();
+            $previousBaseMonthlyReturnRate = (float) $miner->base_monthly_return_rate;
+            $validated['base_monthly_return_rate'] = round(((float) $validated['base_monthly_return_rate']) / 100, 4);
             unset($validated['miner_slug']);
             $miner->update($validated);
+
+            $miner->packages()->get()->each(function (InvestmentPackage $package) use ($miner, $previousBaseMonthlyReturnRate) {
+                if ((float) $package->price <= 0 || (int) $package->shares_count <= 0) {
+                    $package->update(['monthly_return_rate' => 0]);
+
+                    return;
+                }
+
+                $rateBonus = round((float) $package->monthly_return_rate - $previousBaseMonthlyReturnRate, 4);
+
+                $package->update([
+                    'monthly_return_rate' => max(0, round((float) $miner->base_monthly_return_rate + $rateBonus, 4)),
+                ]);
+            });
 
             return redirect()
                 ->to(route('dashboard.miner').'?miner='.$miner->slug)
@@ -2117,6 +2133,9 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
+
+
+
 
 
 

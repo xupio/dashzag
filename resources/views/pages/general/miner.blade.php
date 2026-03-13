@@ -28,6 +28,13 @@
   <div class="alert alert-success">{{ session('log_success') }}</div>
 @endif
 
+@if ($errors->any())
+  <div class="alert alert-danger">
+    <div class="fw-semibold mb-1">Miner settings were not saved.</div>
+    <div>Please review the highlighted fields below and try again.</div>
+  </div>
+@endif
+
 @if (($miners ?? collect())->count() > 1)
   <div class="row mb-4">
     <div class="col-12">
@@ -134,14 +141,52 @@
               @error('monthly_output_usd')<div class="invalid-feedback">{{ $message }}</div>@enderror
             </div>
             <div class="col-md-6">
-              <label class="form-label">Base monthly return rate</label>
-              <input type="number" step="0.0001" min="0" max="1" name="base_monthly_return_rate" class="form-control @error('base_monthly_return_rate') is-invalid @enderror" value="{{ old('base_monthly_return_rate', $miner->base_monthly_return_rate) }}" required>
+              <label class="form-label">Base monthly return rate (%)</label><div class="form-text mb-2">Enter a normal percent. Example: <code>8</code> means 8%.</div>
+              <input type="number" step="0.01" min="0" max="100" name="base_monthly_return_rate" id="minerBaseMonthlyReturnRateInput" class="form-control @error('base_monthly_return_rate') is-invalid @enderror" value="{{ old('base_monthly_return_rate', number_format((float) $miner->base_monthly_return_rate * 100, 2, '.', '')) }}" required>
               @error('base_monthly_return_rate')<div class="invalid-feedback">{{ $message }}</div>@enderror
             </div>
             <div class="col-md-6 d-flex align-items-end">
               <div class="w-100 rounded border p-3 bg-light">
                 <div class="text-secondary small">Available shares</div>
                 <div class="fw-semibold fs-5">{{ number_format($availableShares) }}</div>
+              </div>
+            </div>
+            <div class="col-12">
+              <div class="rounded border p-3 bg-light">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                  <div>
+                    <div class="fw-semibold">Package return preview</div>
+                    <div class="text-secondary small">These package rates will sync when you save this miner.</div>
+                  </div>
+                  <span class="badge bg-primary-subtle text-primary" id="minerBaseMonthlyReturnRatePreviewBadge">
+                    Base: {{ number_format((float) old('base_monthly_return_rate', (float) $miner->base_monthly_return_rate * 100), 2) }}%
+                  </span>
+                </div>
+                <div class="row g-3">
+                  @foreach ($miner->packages as $package)
+                    @php
+                      $packageIsStarter = (float) $package->price <= 0 || (int) $package->shares_count <= 0;
+                      $rateBonus = $packageIsStarter ? 0 : round((float) $package->monthly_return_rate - (float) $miner->base_monthly_return_rate, 4);
+                    @endphp
+                    <div class="col-md-4">
+                      <div class="border rounded p-3 h-100 bg-white">
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                          <div>
+                            <div class="fw-semibold">{{ $package->name }}</div>
+                            <div class="text-secondary small">{{ $package->shares_count }} shares</div>
+                          </div>
+                          <span class="badge {{ $packageIsStarter ? 'bg-secondary-subtle text-secondary' : 'bg-success-subtle text-success' }}">
+                            {{ $packageIsStarter ? 'Fixed' : ($rateBonus >= 0 ? '+' : '').number_format($rateBonus * 100, 2).'%' }}
+                          </span>
+                        </div>
+                        <div class="text-secondary small mb-1">Projected monthly return</div>
+                        <div class="fw-bold fs-5 miner-package-rate-preview" data-rate-bonus="{{ $rateBonus }}" data-is-starter="{{ $packageIsStarter ? '1' : '0' }}">
+                          {{ number_format((float) $package->monthly_return_rate * 100, 2) }}%
+                        </div>
+                      </div>
+                    </div>
+                  @endforeach
+                </div>
               </div>
             </div>
             <div class="col-12">
@@ -234,3 +279,39 @@
 @endsection
 
 
+
+
+
+@push('custom-scripts')
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const baseRateInput = document.getElementById('minerBaseMonthlyReturnRateInput');
+    const baseRateBadge = document.getElementById('minerBaseMonthlyReturnRatePreviewBadge');
+    const packageRateEls = document.querySelectorAll('.miner-package-rate-preview');
+
+    if (!baseRateInput || !packageRateEls.length) {
+      return;
+    }
+
+    const renderPreview = () => {
+      const baseRate = Number.parseFloat(baseRateInput.value || '0');
+      const safeBaseRate = Number.isFinite(baseRate) ? baseRate : 0;
+
+      if (baseRateBadge) {
+        baseRateBadge.textContent = `Base: ${safeBaseRate.toFixed(2)}%`;
+      }
+
+      packageRateEls.forEach((el) => {
+        const isStarter = el.dataset.isStarter === '1';
+        const rateBonus = Number.parseFloat(el.dataset.rateBonus || '0');
+        const projectedRate = isStarter ? 0 : safeBaseRate + (Number.isFinite(rateBonus) ? (rateBonus * 100) : 0);
+
+        el.textContent = `${Math.max(projectedRate, 0).toFixed(2)}%`;
+      });
+    };
+
+    baseRateInput.addEventListener('input', renderPreview);
+    renderPreview();
+  });
+</script>
+@endpush

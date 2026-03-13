@@ -1219,7 +1219,7 @@ class MiningPlatform
             $sharesCount = max($definition['shares_count'], 1);
             $unitsLimit = max($definition['units_limit'], 1);
 
-            InvestmentPackage::updateOrCreate(
+            InvestmentPackage::firstOrCreate(
                 ['slug' => $miner->slug.'-'.$definition['suffix']],
                 [
                     'miner_id' => $miner->id,
@@ -1237,13 +1237,13 @@ class MiningPlatform
 
     protected static function seedMiner(array $minerData, array $packages): Miner
     {
-        $miner = Miner::updateOrCreate(
+        $miner = Miner::firstOrCreate(
             ['slug' => $minerData['slug']],
             $minerData,
         );
 
         foreach ($packages as $package) {
-            InvestmentPackage::updateOrCreate(
+            InvestmentPackage::firstOrCreate(
                 ['slug' => $package['slug']],
                 array_merge($package, ['miner_id' => $miner->id, 'is_active' => true]),
             );
@@ -1279,6 +1279,8 @@ class MiningPlatform
         }
     }
 }
+
+
 
 
 

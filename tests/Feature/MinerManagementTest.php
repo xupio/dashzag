@@ -21,7 +21,7 @@ test('admin can update a selected miner details', function () {
         'share_price' => 125.50,
         'daily_output_usd' => 2100,
         'monthly_output_usd' => 63000,
-        'base_monthly_return_rate' => 0.0950,
+        'base_monthly_return_rate' => 9.50,
         'status' => 'maintenance',
     ]);
 
@@ -32,6 +32,9 @@ test('admin can update a selected miner details', function () {
     expect($miner->name)->toBe('Alpha One Prime');
     expect($miner->status)->toBe('maintenance');
     expect((float) $miner->share_price)->toBe(125.5);
+    expect((float) $miner->base_monthly_return_rate)->toBe(0.095);
+    expect((float) $miner->packages()->where('slug', 'starter-100')->firstOrFail()->monthly_return_rate)->toBe(0.095);
+    expect((float) $miner->packages()->where('slug', 'growth-500')->firstOrFail()->monthly_return_rate)->toBe(0.1);
 });
 
 test('admin can update a secondary miner performance log', function () {
@@ -76,4 +79,33 @@ test('non admin user cannot manage miner data', function () {
         ])
         ->assertForbidden();
 });
+
+test('default seeding does not overwrite admin miner changes', function () {
+    $user = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $this->actingAs($user)->post(route('dashboard.miner.update'), [
+        'miner_slug' => 'alpha-one',
+        'name' => 'Alpha One Prime',
+        'description' => 'Updated miner profile.',
+        'total_shares' => 1500,
+        'share_price' => 125.50,
+        'daily_output_usd' => 2100,
+        'monthly_output_usd' => 63000,
+        'base_monthly_return_rate' => 9.50,
+        'status' => 'maintenance',
+    ]);
+
+    MiningPlatform::ensureDefaults();
+
+    $miner = Miner::where('slug', 'alpha-one')->firstOrFail();
+
+    expect($miner->name)->toBe('Alpha One Prime');
+    expect($miner->status)->toBe('maintenance');
+    expect((float) $miner->base_monthly_return_rate)->toBe(0.095);
+});
+
+
+
 
