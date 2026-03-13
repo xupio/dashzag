@@ -1,10 +1,14 @@
 <?php
 
 use App\Models\FriendInvitation;
+use App\Models\InvestmentOrder;
 use App\Models\User;
 use App\Support\MiningPlatform;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
+    Storage::fake('public');
     MiningPlatform::ensureDefaults();
 });
 
@@ -20,6 +24,11 @@ test('verified user can view network page', function () {
 });
 
 test('network page shows direct team and team rewards', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'admin',
+    ]);
+
     $inviter = User::factory()->create([
         'email_verified_at' => now(),
     ]);
@@ -42,7 +51,19 @@ test('network page shows direct team and team rewards', function () {
 
     $this->actingAs($buyer)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
-    ]);
+        'payment_method' => 'btc_transfer',
+        'payment_reference' => 'TX-NETWORK-001',
+    ])->assertRedirect(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+
+    $order = InvestmentOrder::query()->firstOrFail();
+
+    $this->actingAs($buyer)->post(route('dashboard.buy-shares.proof', $order), [
+        'payment_proof' => UploadedFile::fake()->create('network-proof.pdf', 120, 'application/pdf'),
+    ])->assertRedirect(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+
+    $this->actingAs($admin)
+        ->post(route('dashboard.operations.investment-orders.approve', $order->fresh()))
+        ->assertRedirect(route('dashboard.operations'));
 
     $response = $this->actingAs($inviter)->get(route('dashboard.network'));
 
@@ -55,6 +76,11 @@ test('network page shows direct team and team rewards', function () {
 });
 
 test('invitation pipeline marks invited email as active investor even without sponsor link', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'admin',
+    ]);
+
     $inviter = User::factory()->create([
         'email_verified_at' => now(),
     ]);
@@ -77,7 +103,19 @@ test('invitation pipeline marks invited email as active investor even without sp
 
     $this->actingAs($legacyInvestor)->post(route('dashboard.buy-shares.subscribe'), [
         'package' => 'growth-500',
-    ]);
+        'payment_method' => 'btc_transfer',
+        'payment_reference' => 'TX-LEGACY-001',
+    ])->assertRedirect(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+
+    $order = InvestmentOrder::query()->latest('id')->firstOrFail();
+
+    $this->actingAs($legacyInvestor)->post(route('dashboard.buy-shares.proof', $order), [
+        'payment_proof' => UploadedFile::fake()->create('legacy-proof.pdf', 120, 'application/pdf'),
+    ])->assertRedirect(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+
+    $this->actingAs($admin)
+        ->post(route('dashboard.operations.investment-orders.approve', $order->fresh()))
+        ->assertRedirect(route('dashboard.operations'));
 
     $response = $this->actingAs($inviter)->get(route('dashboard.network'));
 
@@ -85,6 +123,3 @@ test('invitation pipeline marks invited email as active investor even without sp
     $response->assertSee('Legacy Investor');
     $response->assertSee('Yes');
 });
-
-
-

@@ -238,96 +238,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'investorAllocationSeries' => $investmentAllocation->values()->all(),
         ]);
     })->name('dashboard.investors.show');
-    Route::get('/dashboard/investors/{user}', function (Request $request, User $user) {
-        MiningPlatform::ensureDefaults();
-
-        $viewer = $request->user();
-        $user->load(['userLevel', 'investments.package', 'investments.miner']);
-        $level = MiningPlatform::syncUserLevel($user);
-        $user->load(['userLevel', 'investments.package', 'investments.miner']);
-        $activeInvestments = $user->investments->where('status', 'active')->values();
-        $totalInvested = (float) $activeInvestments->sum('amount');
-        $expectedMonthlyEarnings = MiningPlatform::expectedMonthlyEarnings($user);
-        $teamBonusRate = MiningPlatform::teamBonusRate($user);
-        $investmentAllocation = $activeInvestments
-            ->groupBy(fn ($investment) => $investment->miner?->name ?? 'Unknown miner')
-            ->map(fn ($investments) => round((float) $investments->sum('amount'), 2))
-            ->sortDesc();
-
-        $displayTierName = $user->account_type === 'starter'
-            ? ($user->investments->firstWhere('package.slug', MiningPlatform::FREE_STARTER_PACKAGE_SLUG)?->package?->name ?? 'Free Starter')
-            : $level->name;
-
-        return view('pages.general.investor-profile', [
-            'viewer' => $viewer,
-            'user' => $user,
-            'level' => $level,
-            'displayTierName' => $displayTierName,
-            'activeInvestments' => $activeInvestments,
-            'totalInvested' => $totalInvested,
-            'expectedMonthlyEarnings' => $expectedMonthlyEarnings,
-            'teamBonusRate' => $teamBonusRate,
-            'backTarget' => match (true) {
-                $request->query('from') === 'shareholders' && $viewer->isAdmin() => route('dashboard.shareholders'),
-                $request->query('from') === 'network-admin' && $viewer->isAdmin() => route('dashboard.network-admin'),
-                $request->query('from') === 'network' => route('dashboard.network'),
-                default => route('dashboard'),
-            },
-            'backLabel' => match (true) {
-                $request->query('from') === 'shareholders' && $viewer->isAdmin() => 'Back to shareholders',
-                $request->query('from') === 'network-admin' && $viewer->isAdmin() => 'Back to network admin',
-                $request->query('from') === 'network' => 'Back to my network',
-                default => 'Back to overview',
-            },
-            'investorAllocationLabels' => $investmentAllocation->keys()->values()->all(),
-            'investorAllocationSeries' => $investmentAllocation->values()->all(),
-        ]);
-    })->name('dashboard.investors.show');
-    Route::get('/dashboard/investors/{user}', function (Request $request, User $user) {
-        MiningPlatform::ensureDefaults();
-
-        $viewer = $request->user();
-        $user->load(['userLevel', 'investments.package', 'investments.miner']);
-        $level = MiningPlatform::syncUserLevel($user);
-        $user->load(['userLevel', 'investments.package', 'investments.miner']);
-        $activeInvestments = $user->investments->where('status', 'active')->values();
-        $totalInvested = (float) $activeInvestments->sum('amount');
-        $expectedMonthlyEarnings = MiningPlatform::expectedMonthlyEarnings($user);
-        $teamBonusRate = MiningPlatform::teamBonusRate($user);
-        $investmentAllocation = $activeInvestments
-            ->groupBy(fn ($investment) => $investment->miner?->name ?? 'Unknown miner')
-            ->map(fn ($investments) => round((float) $investments->sum('amount'), 2))
-            ->sortDesc();
-
-        $displayTierName = $user->account_type === 'starter'
-            ? ($user->investments->firstWhere('package.slug', MiningPlatform::FREE_STARTER_PACKAGE_SLUG)?->package?->name ?? 'Free Starter')
-            : $level->name;
-
-        return view('pages.general.investor-profile', [
-            'viewer' => $viewer,
-            'user' => $user,
-            'level' => $level,
-            'displayTierName' => $displayTierName,
-            'activeInvestments' => $activeInvestments,
-            'totalInvested' => $totalInvested,
-            'expectedMonthlyEarnings' => $expectedMonthlyEarnings,
-            'teamBonusRate' => $teamBonusRate,
-            'backTarget' => match (true) {
-                $request->query('from') === 'shareholders' && $viewer->isAdmin() => route('dashboard.shareholders'),
-                $request->query('from') === 'network-admin' && $viewer->isAdmin() => route('dashboard.network-admin'),
-                $request->query('from') === 'network' => route('dashboard.network'),
-                default => route('dashboard'),
-            },
-            'backLabel' => match (true) {
-                $request->query('from') === 'shareholders' && $viewer->isAdmin() => 'Back to shareholders',
-                $request->query('from') === 'network-admin' && $viewer->isAdmin() => 'Back to network admin',
-                $request->query('from') === 'network' => 'Back to my network',
-                default => 'Back to overview',
-            },
-            'investorAllocationLabels' => $investmentAllocation->keys()->values()->all(),
-            'investorAllocationSeries' => $investmentAllocation->values()->all(),
-        ]);
-    })->name('dashboard.investors.show');
     Route::get('/dashboard/notifications', function (Request $request) {
         $filter = $request->query('filter', 'all');
         $allowedFilters = ['all', 'payout', 'reward', 'investment', 'network', 'milestone', 'digest'];
@@ -481,6 +391,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         $user = request()->user()->load(['investments.miner', 'investments.package', 'earnings']);
         $activeInvestments = $user->investments->where('status', 'active')->values();
+        $totalInvested = (float) $activeInvestments->sum('amount');
+        $expectedMonthlyEarnings = MiningPlatform::expectedMonthlyEarnings($user);
+        $availableEarnings = (float) $user->earnings->where('status', 'available')->sum('amount');
 
         return view('pages.general.investments', [
             'user' => $user,
@@ -627,6 +540,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         $user = request()->user()->load(['userLevel', 'earnings.investment.package', 'investments.package', 'payoutRequests']);
         $wallet = MiningPlatform::walletSummary($user);
+        $activeInvestments = $user->investments->where('status', 'active')->values();
+        $expectedMonthlyEarnings = MiningPlatform::expectedMonthlyEarnings($user);
 
         return view('pages.general.wallet', [
             'user' => $user,
@@ -727,6 +642,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $packages = InvestmentPackage::with('investments')->orderBy('display_order')->get();
             $miner = MiningPlatform::resolveMiner(request()->query('miner'));
             $miners = Miner::with(['investments.user', 'packages'])->orderBy('name')->get();
+
+            $totalInvested = (float) UserInvestment::where('status', 'active')->sum('amount');
 
             $topInvestors = $users->sortByDesc(fn ($user) => $user->investments->where('status', 'active')->sum('amount'))->take(5)->values();
             $topReferrers = $users->sortByDesc(fn ($user) => $user->friendInvitations->whereNotNull('registered_at')->count())->take(5)->values();
@@ -2200,6 +2117,10 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
+
+
+
+
 
 
 
