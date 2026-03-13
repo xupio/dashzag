@@ -83,6 +83,7 @@
                 <th>Return rate</th>
                 <th>Status</th>
                 <th>Subscribed</th>
+                <th class="text-end">Profile</th>
               </tr>
             </thead>
             <tbody>
@@ -99,10 +100,17 @@
                   <td>{{ number_format(((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate) * 100, 2) }}%</td>
                   <td><span class="badge bg-light text-dark text-capitalize">{{ $investment->status }}</span></td>
                   <td>{{ $investment->subscribed_at?->format('M d, Y H:i') }}</td>
+                  <td class="text-end">
+                    @if ($investment->user)
+                      <a href="{{ route('dashboard.investors.show', [$investment->user, 'from' => 'shareholders']) }}" class="btn btn-outline-primary btn-sm">Open profile</a>
+                    @else
+                      <span class="text-secondary">—</span>
+                    @endif
+                  </td>
                 </tr>
               @empty
                 <tr>
-                  <td colspan="8" class="text-center text-secondary py-4">No shareholder records match the current filters.</td>
+                  <td colspan="9" class="text-center text-secondary py-4">No shareholder records match the current filters.</td>
                 </tr>
               @endforelse
             </tbody>
@@ -113,6 +121,8 @@
   </div>
 </div>
 @endsection
+
+
 
 
 

@@ -110,7 +110,7 @@
                 <div class="border rounded p-3">
                   <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
                     <div>
-                      <div class="fw-semibold fs-5">{{ $member->name }}</div>
+                      <div class="d-flex align-items-center gap-2 flex-wrap"><div class="fw-semibold fs-5">{{ $member->name }}</div><a href="{{ route('dashboard.investors.show', ['user' => $member, 'from' => 'network']) }}" class="btn btn-outline-primary btn-xs">Open profile</a></div>
                       <div class="text-secondary small">{{ $member->email }}</div>
                       <div class="mt-2">
                         <span class="badge {{ $branch['is_active_investor'] ? 'bg-success' : 'bg-secondary' }}">{{ $branch['is_active_investor'] ? 'Investor active' : 'Registered only' }}</span>
@@ -138,7 +138,7 @@
                           @php($downlineCapital = (float) $downline->investments->where('status', 'active')->where('amount', '>', 0)->sum('amount'))
                           <div class="col-md-6 col-xl-4">
                             <div class="border rounded p-2 h-100">
-                              <div class="fw-semibold">{{ $downline->name }}</div>
+                              <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap"><div class="fw-semibold">{{ $downline->name }}</div><a href="{{ route('dashboard.investors.show', ['user' => $downline, 'from' => 'network']) }}" class="btn btn-outline-primary btn-xs">Open profile</a></div>
                               <div class="text-secondary small">{{ $downline->email }}</div>
                               <div class="mt-2 d-flex justify-content-between align-items-center gap-2 flex-wrap">
                                 <span class="badge {{ $downlineActive ? 'bg-success' : 'bg-secondary' }}">{{ $downlineActive ? 'Investor active' : 'Registered only' }}</span>
@@ -297,4 +297,6 @@
   </div>
 </div>
 @endsection
+
+
 

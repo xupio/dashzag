@@ -101,26 +101,53 @@
   <div class="col-xl-4 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
-        <h6 class="card-title mb-3">Miner summary</h6>
-        <div class="mb-3">
-          <div class="text-secondary small">Miner name</div>
-          <div class="fs-5 fw-semibold">{{ $miner->name }}</div>
+        <div class="d-flex justify-content-between align-items-baseline mb-3 flex-wrap gap-2">
+          <div>
+            <h6 class="card-title mb-1">Share status</h6>
+            <p class="text-secondary mb-0">Interactive view of sold package shares and the miner's remaining open capacity.</p>
+          </div>
+          <span class="badge bg-light text-dark text-capitalize">{{ $miner->status }}</span>
         </div>
-        <div class="mb-3">
-          <div class="text-secondary small">Status</div>
-          <div class="fs-6 fw-semibold text-capitalize">{{ $miner->status }}</div>
+        <div class="position-relative"><div id="minerShareStatusChart"></div><div class="position-absolute top-50 start-50 translate-middle text-center px-2 pe-none" style="max-width: 132px;"><div class="fw-semibold lh-sm" style="font-size: 16px;" id="minerShareStatusCenterLabel">{{ $shareStatusLabels[0] ?? 'Share status' }}</div></div></div>
+        <div class="border rounded p-3 bg-light mt-3" id="minerShareStatusInfo">
+          <div class="text-secondary small mb-1">Selected segment</div>
+          <div class="fs-5 fw-semibold" id="minerShareStatusTitle">{{ $shareStatusLabels[0] ?? 'Share status' }}</div>
+          <div class="small text-secondary" id="minerShareStatusBody">Tap or hover a segment to review how many shares it represents and how much of the miner it covers.</div>
         </div>
-        <div class="mb-3">
-          <div class="text-secondary small">Total capacity</div>
-          <div class="fs-5 fw-semibold">{{ number_format($miner->total_shares) }} shares</div>
+        <div class="mt-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="text-secondary small">Quick legend</div>
+            <div class="text-secondary small">Share of miner</div>
+          </div>
+          <div class="d-flex flex-column gap-2">
+            @php($shareLegendColors = ['#6571ff', '#05a34a', '#00acc1', '#fbbc06', '#ff3366', '#7987a1'])
+            @foreach ($shareStatusDetails as $index => $segment)
+              <div class="d-flex justify-content-between align-items-center border rounded px-2 py-2 share-status-legend-row {{ $index === 0 ? 'border-primary bg-primary-subtle' : '' }}" data-share-status-index="{{ $index }}">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="rounded-circle d-inline-block" style="width: 12px; height: 12px; background-color: {{ $shareLegendColors[$index % count($shareLegendColors)] }};"></span>
+                  <div>
+                    <div class="fw-semibold small mb-0">{{ $segment['label'] }}</div>
+                    <div class="text-secondary" style="font-size: 12px;">{{ number_format((int) $segment['shares']) }} shares</div>
+                  </div>
+                </div>
+                <span class="badge {{ $index === 0 ? 'bg-primary text-white' : 'bg-light text-dark' }} share-status-legend-badge">{{ number_format((float) $segment['utilization'], 2) }}%</span>
+              </div>
+            @endforeach
+          </div>
         </div>
-        <div class="mb-3">
-          <div class="text-secondary small">Sold capacity</div>
-          <div class="fs-5 fw-semibold">{{ number_format($sharesSold) }} shares</div>
-        </div>
-        <div>
-          <div class="text-secondary small">Utilization</div>
-          <div class="fs-5 fw-semibold">{{ $miner->total_shares > 0 ? number_format(min(($sharesSold / $miner->total_shares) * 100, 100), 2) : '0.00' }}%</div>
+        <div class="row g-3 mt-1">
+          <div class="col-6">
+            <div class="border rounded p-2 h-100">
+              <div class="text-secondary small">Sold capacity</div>
+              <div class="fw-semibold">{{ number_format($sharesSold) }} shares</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="border rounded p-2 h-100">
+              <div class="text-secondary small">Utilization</div>
+              <div class="fw-semibold">{{ $miner->total_shares > 0 ? number_format(min(($sharesSold / $miner->total_shares) * 100, 100), 2) : '0.00' }}%</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -170,6 +197,61 @@
   </div>
 </div>
 
+<div class="row">
+  <div class="col-12 grid-margin stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
+            <h6 class="card-title mb-1">Investor pipeline</h6>
+            <p class="text-secondary mb-0">See who is actively invested in this miner and open their investor profile for more detail.</p>
+          </div>
+          <span class="badge bg-light text-dark">{{ $minerInvestorPipeline->count() }} investor{{ $minerInvestorPipeline->count() === 1 ? '' : 's' }}</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Investor</th>
+                <th>Current package</th>
+                <th>Shares</th>
+                <th>Capital</th>
+                <th>Return rate</th>
+                <th>Joined miner</th>
+                <th class="text-end">Profile</th>
+              </tr>
+            </thead>
+            <tbody>
+              @forelse ($minerInvestorPipeline as $pipelineInvestor)
+                <tr>
+                  <td>
+                    <div class="fw-semibold">{{ $pipelineInvestor['user']->name }}</div>
+                    <div class="text-secondary small">{{ $pipelineInvestor['user']->email }}</div>
+                  </td>
+                  <td>
+                    <div class="fw-semibold">{{ $pipelineInvestor['package_name'] }}</div>
+                    <div class="text-secondary small">{{ $pipelineInvestor['active_positions'] }} active position{{ $pipelineInvestor['active_positions'] === 1 ? '' : 's' }}</div>
+                  </td>
+                  <td>{{ number_format((int) $pipelineInvestor['shares_owned']) }}</td>
+                  <td>${{ number_format((float) $pipelineInvestor['capital_committed'], 2) }}</td>
+                  <td>{{ number_format((float) $pipelineInvestor['expected_return_rate'], 2) }}%</td>
+                  <td>{{ optional($pipelineInvestor['latest_subscribed_at'])->format('M d, Y') ?? '—' }}</td>
+                  <td class="text-end">
+                    <a href="{{ route('dashboard.investors.show', $pipelineInvestor['user']) }}" class="btn btn-outline-primary btn-sm">Open profile</a>
+                  </td>
+                </tr>
+              @empty
+                <tr>
+                  <td colspan="7" class="text-center text-secondary py-4">No active investors are assigned to this miner yet.</td>
+                </tr>
+              @endforelse
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="row">
   <div class="col-12 grid-margin stretch-card">
     <div class="card">
@@ -259,6 +341,98 @@
         }).render();
       }
 
+      const shareStatusDetails = @json($shareStatusDetails);
+      const shareStatusElement = document.querySelector('#minerShareStatusChart');
+      const shareStatusTitle = document.querySelector('#minerShareStatusTitle');
+      const shareStatusBody = document.querySelector('#minerShareStatusBody');
+      const shareStatusCenterLabel = document.querySelector('#minerShareStatusCenterLabel');
+      const shareStatusLegendRows = document.querySelectorAll('.share-status-legend-row');
+
+      const highlightShareStatusLegend = (index) => {
+        shareStatusLegendRows.forEach((row) => {
+          const isActive = Number(row.dataset.shareStatusIndex) === index;
+          row.classList.toggle('border-primary', isActive);
+          row.classList.toggle('bg-primary-subtle', isActive);
+
+          const badge = row.querySelector('.share-status-legend-badge');
+          if (badge) {
+            badge.classList.toggle('bg-primary', isActive);
+            badge.classList.toggle('text-white', isActive);
+            badge.classList.toggle('bg-light', !isActive);
+            badge.classList.toggle('text-dark', !isActive);
+          }
+        });
+      };
+
+      const updateShareStatusInfo = (index) => {
+        const detail = shareStatusDetails[index];
+        if (!detail || !shareStatusTitle || !shareStatusBody) {
+          return;
+        }
+
+        highlightShareStatusLegend(index);
+        if (shareStatusCenterLabel) {
+          shareStatusCenterLabel.textContent = detail.label;
+        }
+        shareStatusTitle.textContent = detail.label;
+
+        if (detail.type === 'available') {
+          shareStatusBody.textContent = `${Number(detail.shares).toLocaleString()} shares are still available to purchase, which is ${Number(detail.utilization).toFixed(2)}% of {{ $miner->name }}.`;
+          return;
+        }
+
+        shareStatusBody.textContent = `${Number(detail.shares).toLocaleString()} shares are active in this package across ${Number(detail.investors).toLocaleString()} investor(s), representing ${Number(detail.utilization).toFixed(2)}% of the miner and $${Number(detail.capital).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} in committed capital.`;
+      };
+
+      if (shareStatusElement) {
+        new ApexCharts(shareStatusElement, {
+          chart: {
+            type: 'donut',
+            height: 340,
+            toolbar: { show: false },
+            events: {
+              dataPointMouseEnter: function (_event, _chart, config) {
+                updateShareStatusInfo(config.dataPointIndex);
+              },
+              dataPointSelection: function (_event, _chart, config) {
+                updateShareStatusInfo(config.dataPointIndex);
+              }
+            }
+          },
+          labels: @json($shareStatusLabels),
+          series: @json($shareStatusSeries),
+          legend: {
+            position: 'bottom'
+          },
+          stroke: {
+            width: 0
+          },
+          dataLabels: {
+            enabled: false
+          },
+          colors: ['#6571ff', '#05a34a', '#00acc1', '#fbbc06', '#ff3366', '#7987a1'],
+          plotOptions: {
+            pie: {
+              donut: {
+                size: '62%',
+                labels: {
+                  show: false
+                }
+              }
+            }
+          },
+          tooltip: {
+            y: {
+              formatter: function (value) {
+                return `${Number(value).toLocaleString()} shares`;
+              }
+            }
+          }
+        }).render();
+
+        updateShareStatusInfo(0);
+      }
+
       const statsElement = document.querySelector('#minerStatsChart');
       if (statsElement) {
         new ApexCharts(statsElement, {
@@ -291,6 +465,17 @@
     });
   </script>
 @endpush
+
+
+
+
+
+
+
+
+
+
+
 
 
 

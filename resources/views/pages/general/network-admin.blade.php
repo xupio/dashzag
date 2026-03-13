@@ -58,6 +58,7 @@
                 <th>Direct team</th>
                 <th>Active team</th>
                 <th>Team capital</th>
+                <th class="text-end">Profile</th>
               </tr>
             </thead>
             <tbody>
@@ -72,6 +73,9 @@
                   <td>{{ $networkUser->sponsoredUsers->count() }}</td>
                   <td>{{ $networkUser->sponsoredUsers->filter(fn ($member) => $member->investments->where('status', 'active')->where('amount', '>', 0)->isNotEmpty())->count() }}</td>
                   <td>${{ number_format((float) $networkUser->sponsoredUsers->sum(fn ($member) => $member->investments->where('status', 'active')->where('amount', '>', 0)->sum('amount')), 2) }}</td>
+                  <td class="text-end">
+                    <a href="{{ route('dashboard.investors.show', ['user' => $networkUser, 'from' => 'network-admin']) }}" class="btn btn-outline-primary btn-sm">Open profile</a>
+                  </td>
                 </tr>
               @endforeach
             </tbody>
@@ -129,4 +133,6 @@
   </div>
 </div>
 @endsection
+
+
 
