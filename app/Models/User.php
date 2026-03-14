@@ -117,6 +117,15 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(UserInvestment::class)->latest('subscribed_at');
     }
 
+    public function sentMessages(): HasMany
+    {
+        return $this->hasMany(InternalMessage::class, 'sender_id')->latest();
+    }
+
+    public function receivedMessageRecords(): HasMany
+    {
+        return $this->hasMany(InternalMessageRecipient::class)->latest();
+    }
     public function investmentOrders(): HasMany
     {
         return $this->hasMany(InvestmentOrder::class)->latest('submitted_at');
@@ -157,3 +166,6 @@ class User extends Authenticatable implements MustVerifyEmail
         ];
     }
 }
+
+
+

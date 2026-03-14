@@ -1,5 +1,6 @@
-﻿<?php
+<?php
 
+use App\Http\Controllers\InternalMailController;
 use App\Http\Controllers\ProfileController;
 use App\Mail\FriendInvitationMail;
 use App\Models\Earning;
@@ -24,9 +25,97 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+$marketingPageData = function () {
+    MiningPlatform::ensureDefaults();
+
+    $featuredMiner = MiningPlatform::resolveMiner(null);
+    $featuredMiner->load([
+        'packages' => fn ($query) => $query->where('is_active', true)->orderBy('display_order'),
+        'performanceLogs' => fn ($query) => $query->latest('logged_on')->limit(6),
+    ]);
+
+    $packages = $featuredMiner->packages;
+    $sharesSold = MiningPlatform::totalSharesSold($featuredMiner);
+    $availableShares = max($featuredMiner->total_shares - $sharesSold, 0);
+
+    return [
+        'featuredMiner' => $featuredMiner,
+        'packages' => $packages,
+        'sharesSold' => $sharesSold,
+        'availableShares' => $availableShares,
+        'mediaGallery' => collect([
+            [
+                'title' => 'Alpha One infrastructure',
+                'type' => 'image',
+                'description' => 'A visual snapshot of the cloud-mining operation, built for investor confidence.',
+                'src' => asset('build/images/others/placeholder.jpg'),
+            ],
+            [
+                'title' => 'Product walkthrough',
+                'type' => 'video',
+                'description' => 'A dedicated explainer slot for your subscription walkthrough and onboarding video.',
+                'src' => null,
+            ],
+            [
+                'title' => 'Animated reward flow',
+                'type' => 'motion',
+                'description' => 'An animated overview of shares, monthly return, and referral growth inside the platform.',
+                'src' => null,
+            ],
+        ]),
+        'references' => collect([
+            [
+                'name' => 'Infrastructure operations team',
+                'role' => 'Mining supervision',
+                'quote' => 'The platform is structured to translate miner performance into a clear subscription and earnings story.',
+            ],
+            [
+                'name' => 'Early investor group',
+                'role' => 'Pilot shareholders',
+                'quote' => 'The package structure and dashboard visibility make the business understandable even for first-time investors.',
+            ],
+            [
+                'name' => 'Referral growth partners',
+                'role' => 'Network expansion',
+                'quote' => 'The referral engine gives the product long-term momentum beyond a simple subscription page.',
+            ],
+        ]),
+        'faqItems' => collect([
+            [
+                'question' => 'What does a package represent?',
+                'answer' => 'Each package represents a number of shares inside the featured miner, and the return follows the miner base rate plus package uplift.',
+            ],
+            [
+                'question' => 'How do referrals help the investor?',
+                'answer' => 'Users can unlock upgrades, earn referral rewards, and improve their own return rate as their verified network and active investor team grow.',
+            ],
+            [
+                'question' => 'How is payment handled?',
+                'answer' => 'Users submit a payment order, upload proof after transfer, and the operations team reviews it before activating the investment.',
+            ],
+        ]),
+    ];
+};
+
+Route::get('/', function () use ($marketingPageData) {
+    return view('marketing.home', $marketingPageData());
+})->name('landing');
+
+Route::get('/about', function () use ($marketingPageData) {
+    return view('marketing.about', $marketingPageData());
+})->name('marketing.about');
+
+Route::get('/packages', function () use ($marketingPageData) {
+    return view('marketing.packages', $marketingPageData());
+})->name('marketing.packages');
+
+Route::get('/media', function () use ($marketingPageData) {
+    return view('marketing.media', $marketingPageData());
+})->name('marketing.media');
+
+Route::get('/references', function () use ($marketingPageData) {
+    return view('marketing.references', $marketingPageData());
+})->name('marketing.references');
 
 Route::get('/friend-invitations/{friendInvitation}/verify', function (FriendInvitation $friendInvitation) {
     if (! $friendInvitation->verified_at) {
@@ -138,6 +227,19 @@ Route::get('/dashboard', function (Request $request) {
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/email/inbox', [InternalMailController::class, 'inbox'])->name('email.inbox');
+    Route::get('/email/starred', [InternalMailController::class, 'starred'])->name('email.starred');
+    Route::get('/email/archived', [InternalMailController::class, 'archived'])->name('email.archived');
+    Route::get('/email/sent', [InternalMailController::class, 'sent'])->name('email.sent');
+    Route::get('/email/compose', [InternalMailController::class, 'compose'])->name('email.compose');
+    Route::post('/email/send', [InternalMailController::class, 'store'])->name('email.store');
+    Route::post('/email/{message}/reply', [InternalMailController::class, 'reply'])->name('email.reply');
+    Route::get('/email/inbox/{recipient}/read', [InternalMailController::class, 'showInbox'])->name('email.read');
+    Route::post('/email/inbox/{recipient}/toggle-star', [InternalMailController::class, 'toggleStar'])->name('email.toggle-star');
+    Route::post('/email/inbox/{recipient}/toggle-read', [InternalMailController::class, 'toggleRead'])->name('email.toggle-read');
+    Route::post('/email/inbox/{recipient}/archive', [InternalMailController::class, 'archive'])->name('email.archive');
+    Route::get('/email/sent/{message}/read', [InternalMailController::class, 'showSent'])->name('email.sent.read');
+
     Route::get('/dashboard/profile', function () {
         MiningPlatform::ensureDefaults();
 
@@ -2051,11 +2153,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
-    Route::group(['prefix' => 'email'], function () {
-        Route::view('inbox', 'pages.email.inbox');
-        Route::view('read', 'pages.email.read');
-        Route::view('compose', 'pages.email.compose');
-    });
 
     Route::group(['prefix' => 'apps'], function () {
         Route::view('chat', 'pages.apps.chat');
@@ -2344,6 +2441,7 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
+
 
 
 
