@@ -7,6 +7,7 @@ use App\Models\FriendInvitation;
 use App\Models\InvestmentOrder;
 use App\Models\InvestmentPackage;
 use App\Models\Miner;
+use App\Models\MinerPerformanceLog;
 use App\Models\PayoutRequest;
 use App\Models\PlatformSetting;
 use App\Models\ReferralEvent;
@@ -958,6 +959,111 @@ class MiningPlatform
         return (int) $miner->investments()->where('status', 'active')->sum('shares_owned');
     }
 
+    public static function performanceSnapshotForDate(Miner $miner, Carbon|string|null $date = null): array
+    {
+        $day = $date instanceof Carbon ? $date->copy()->startOfDay() : Carbon::parse($date ?? now())->startOfDay();
+        $seed = abs(crc32($miner->slug.'|'.$day->toDateString()));
+        $uptime = round(min(99.95, max(90, 95 + (($seed % 420) / 100))), 2);
+        $hashrateBase = max(((float) $miner->total_shares * 0.48), 1);
+        $hashrateMultiplier = 0.92 + (((($seed >> 4)) % 18) / 100);
+        $marketMultiplier = 0.94 + (((($seed >> 9)) % 15) / 100);
+        $dailyOutput = max((float) $miner->daily_output_usd, 0);
+        $revenue = round($dailyOutput * ($uptime / 100) * $marketMultiplier, 2);
+        $electricityRate = 0.16 + (((($seed >> 13)) % 5) / 100);
+        $maintenanceRate = 0.05 + (((($seed >> 17)) % 4) / 100);
+        $electricityCost = round($revenue * $electricityRate, 2);
+        $maintenanceCost = round($revenue * $maintenanceRate, 2);
+        $netProfit = round(max($revenue - $electricityCost - $maintenanceCost, 0), 2);
+        $activeShares = max(self::totalSharesSold($miner), 0);
+        $revenuePerShare = $activeShares > 0 ? round($netProfit / $activeShares, 4) : 0;
+
+        return [
+            'logged_on' => $day->toDateString(),
+            'revenue_usd' => $revenue,
+            'electricity_cost_usd' => $electricityCost,
+            'maintenance_cost_usd' => $maintenanceCost,
+            'net_profit_usd' => $netProfit,
+            'hashrate_th' => round($hashrateBase * $hashrateMultiplier, 2),
+            'uptime_percentage' => $uptime,
+            'active_shares' => $activeShares,
+            'revenue_per_share_usd' => $revenuePerShare,
+            'source' => 'automatic',
+            'auto_generated_at' => now(),
+            'notes' => 'Automatic daily miner snapshot generated from baseline output, uptime, and operating cost formulas.',
+        ];
+    }
+
+    public static function savePerformanceLog(Miner $miner, array $attributes, string $source = 'manual'): MinerPerformanceLog
+    {
+        $loggedOn = Carbon::parse($attributes['logged_on'] ?? now())->toDateString();
+        $revenue = round((float) ($attributes['revenue_usd'] ?? 0), 2);
+        $electricityCost = round((float) ($attributes['electricity_cost_usd'] ?? ($revenue * 0.18)), 2);
+        $maintenanceCost = round((float) ($attributes['maintenance_cost_usd'] ?? ($revenue * 0.06)), 2);
+        $netProfit = round(max((float) ($attributes['net_profit_usd'] ?? ($revenue - $electricityCost - $maintenanceCost)), 0), 2);
+        $activeShares = max((int) ($attributes['active_shares'] ?? self::totalSharesSold($miner)), 0);
+        $revenuePerShare = $activeShares > 0
+            ? round((float) ($attributes['revenue_per_share_usd'] ?? ($netProfit / $activeShares)), 4)
+            : 0;
+
+        $log = MinerPerformanceLog::updateOrCreate(
+            [
+                'miner_id' => $miner->id,
+                'logged_on' => $loggedOn,
+            ],
+            [
+                'revenue_usd' => $revenue,
+                'electricity_cost_usd' => $electricityCost,
+                'maintenance_cost_usd' => $maintenanceCost,
+                'net_profit_usd' => $netProfit,
+                'hashrate_th' => round((float) ($attributes['hashrate_th'] ?? 0), 2),
+                'uptime_percentage' => round((float) ($attributes['uptime_percentage'] ?? 0), 2),
+                'active_shares' => $activeShares,
+                'revenue_per_share_usd' => $revenuePerShare,
+                'source' => $source,
+                'auto_generated_at' => $source === 'automatic' ? now() : null,
+                'notes' => $attributes['notes'] ?? null,
+            ],
+        );
+
+        self::distributeDailyPerformanceEarnings($log);
+
+        return $log;
+    }
+
+    public static function generateAutomaticPerformanceLog(Miner $miner, Carbon|string|null $date = null): MinerPerformanceLog
+    {
+        return self::savePerformanceLog($miner, self::performanceSnapshotForDate($miner, $date), 'automatic');
+    }
+
+    public static function distributeDailyPerformanceEarnings(MinerPerformanceLog $log): Collection
+    {
+        $log->loadMissing('miner');
+
+        return UserInvestment::query()
+            ->with(['user', 'package'])
+            ->where('miner_id', $log->miner_id)
+            ->where('status', 'active')
+            ->where('amount', '>', 0)
+            ->get()
+            ->map(function (UserInvestment $investment) use ($log) {
+                $amount = round((float) $investment->shares_owned * (float) $log->revenue_per_share_usd, 2);
+
+                return Earning::updateOrCreate(
+                    [
+                        'user_id' => $investment->user_id,
+                        'investment_id' => $investment->id,
+                        'earned_on' => $log->logged_on->toDateString(),
+                        'source' => 'mining_daily_share',
+                    ],
+                    [
+                        'amount' => $amount,
+                        'status' => 'available',
+                        'notes' => 'Daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share.',
+                    ],
+                );
+            });
+    }
+
     public static function expectedMonthlyEarnings(User $user): float
     {
         return (float) $user->investments()->where('status', 'active')->get()->sum(function (UserInvestment $investment) {
@@ -1282,13 +1388,26 @@ class MiningPlatform
         foreach (range(6, 0) as $daysAgo) {
             $date = Carbon::today()->subDays($daysAgo)->toDateString();
             $offset = 6 - $daysAgo;
+            $revenue = round($revenueBase + ($offset * $revenueStep), 2);
+            $electricityCost = round($revenue * 0.18, 2);
+            $maintenanceCost = round($revenue * 0.06, 2);
+            $netProfit = round(max($revenue - $electricityCost - $maintenanceCost, 0), 2);
+            $activeShares = max(self::totalSharesSold($miner), 0);
+            $revenuePerShare = $activeShares > 0 ? round($netProfit / $activeShares, 4) : 0;
 
             DB::table('miner_performance_logs')->updateOrInsert(
                 ['miner_id' => $miner->id, 'logged_on' => $date],
                 [
-                    'revenue_usd' => $revenueBase + ($offset * $revenueStep),
-                    'hashrate_th' => $hashrateBase + ($offset * $hashrateStep),
-                    'uptime_percentage' => $uptimeBase + ($offset * $uptimeStep),
+                    'revenue_usd' => $revenue,
+                    'electricity_cost_usd' => $electricityCost,
+                    'maintenance_cost_usd' => $maintenanceCost,
+                    'net_profit_usd' => $netProfit,
+                    'hashrate_th' => round($hashrateBase + ($offset * $hashrateStep), 2),
+                    'uptime_percentage' => round($uptimeBase + ($offset * $uptimeStep), 2),
+                    'active_shares' => $activeShares,
+                    'revenue_per_share_usd' => $revenuePerShare,
+                    'source' => 'seeded',
+                    'auto_generated_at' => now(),
                     'notes' => 'Auto-generated baseline log for dashboard visibility.',
                     'updated_at' => now(),
                     'created_at' => now(),
@@ -1297,6 +1416,7 @@ class MiningPlatform
         }
     }
 }
+
 
 
 

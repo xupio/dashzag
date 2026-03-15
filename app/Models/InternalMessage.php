@@ -15,9 +15,21 @@ class InternalMessage extends Model
         'sender_id',
         'thread_root_id',
         'reply_to_message_id',
+        'is_draft',
+        'draft_to',
+        'draft_cc',
         'subject',
         'body',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'is_draft' => 'boolean',
+            'draft_to' => 'array',
+            'draft_cc' => 'array',
+        ];
+    }
 
     public function sender(): BelongsTo
     {
@@ -57,6 +69,11 @@ class InternalMessage extends Model
     public function threadMessages(): HasMany
     {
         return $this->hasMany(self::class, 'thread_root_id')->oldest('created_at');
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(InternalMessageAttachment::class)->latest();
     }
 
     public function threadKey(): int

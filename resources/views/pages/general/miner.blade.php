@@ -1,6 +1,9 @@
 @extends('layout.master')
 
 @section('content')
+@php
+  $snapshotDate = \Illuminate\Support\Carbon::parse($automaticSnapshot['logged_on'] ?? now()->toDateString());
+@endphp
 <div class="row">
   <div class="col-12 grid-margin">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
@@ -77,16 +80,69 @@
   <div class="col-md-3 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
-        <p class="text-secondary mb-1">Available shares</p>
-        <h4 class="mb-0">{{ number_format($availableShares) }}</h4>
+        <p class="text-secondary mb-1">Latest net profit</p>
+        <h4 class="mb-0">${{ number_format((float) ($latestLog->net_profit_usd ?? 0), 2) }}</h4>
       </div>
     </div>
   </div>
   <div class="col-md-3 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
+        <p class="text-secondary mb-1">Per share today</p>
+        <h4 class="mb-0">${{ number_format((float) ($automaticSnapshot['revenue_per_share_usd'] ?? 0), 4) }}</h4>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-4">
+  <div class="col-md-4 grid-margin stretch-card">
+    <div class="card border-primary">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-3">
+          <div>
+            <p class="text-secondary mb-1">Automatic snapshot preview</p>
+            <h5 class="mb-1">{{ $snapshotDate->format('M d, Y') }}</h5>
+            <p class="text-secondary mb-0">This is the formula-based daily projection before any manual override.</p>
+          </div>
+          <span class="badge bg-primary-subtle text-primary">Auto</span>
+        </div>
+        <div class="row g-3 mt-2">
+          <div class="col-6">
+            <div class="small text-secondary">Projected revenue</div>
+            <div class="fw-semibold">${{ number_format((float) ($automaticSnapshot['revenue_usd'] ?? 0), 2) }}</div>
+          </div>
+          <div class="col-6">
+            <div class="small text-secondary">Hashrate</div>
+            <div class="fw-semibold">{{ number_format((float) ($automaticSnapshot['hashrate_th'] ?? 0), 2) }} TH/s</div>
+          </div>
+          <div class="col-6">
+            <div class="small text-secondary">Uptime</div>
+            <div class="fw-semibold">{{ number_format((float) ($automaticSnapshot['uptime_percentage'] ?? 0), 2) }}%</div>
+          </div>
+          <div class="col-6">
+            <div class="small text-secondary">Active shares</div>
+            <div class="fw-semibold">{{ number_format((int) ($automaticSnapshot['active_shares'] ?? 0)) }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4 grid-margin stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <p class="text-secondary mb-1">Available shares</p>
+        <h4 class="mb-1">{{ number_format($availableShares) }}</h4>
+        <p class="text-secondary mb-0">Open miner capacity still available for new investors.</p>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4 grid-margin stretch-card">
+    <div class="card">
+      <div class="card-body">
         <p class="text-secondary mb-1">Status</p>
-        <h4 class="mb-0 text-capitalize">{{ $miner->status }}</h4>
+        <h4 class="mb-1 text-capitalize">{{ $miner->status }}</h4>
+        <p class="text-secondary mb-0">Current operations state for this miner and its package flow.</p>
       </div>
     </div>
   </div>
@@ -147,8 +203,8 @@
             </div>
             <div class="col-md-6 d-flex align-items-end">
               <div class="w-100 rounded border p-3 bg-light">
-                <div class="text-secondary small">Available shares</div>
-                <div class="fw-semibold fs-5">{{ number_format($availableShares) }}</div>
+                <div class="text-secondary small">Current snapshot source</div>
+                <div class="fw-semibold fs-5 text-capitalize">{{ $latestLog?->source ?? 'none yet' }}</div>
               </div>
             </div>
             <div class="col-12">
@@ -199,39 +255,90 @@
   </div>
 
   <div class="col-xl-5 grid-margin stretch-card">
-    <div class="card">
-      <div class="card-body">
-        <h5 class="mb-3">Add daily performance log</h5>
-        <form method="POST" action="{{ route('dashboard.miner.logs.store') }}">
-          @csrf
-          <input type="hidden" name="miner_slug" value="{{ $miner->slug }}">
-          <div class="mb-3">
-            <label class="form-label">Log date</label>
-            <input type="date" name="logged_on" class="form-control @error('logged_on') is-invalid @enderror" value="{{ old('logged_on', now()->toDateString()) }}" required>
-            @error('logged_on')<div class="invalid-feedback">{{ $message }}</div>@enderror
+    <div class="d-flex flex-column gap-4 w-100">
+      <div class="card">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div>
+              <h5 class="mb-1">Generate automatic daily snapshot</h5>
+              <p class="text-secondary mb-0">Use the ZagChain formula engine to project today’s revenue, uptime, costs, and per-share income.</p>
+            </div>
+            <span class="badge bg-primary-subtle text-primary">Live formula</span>
           </div>
-          <div class="mb-3">
-            <label class="form-label">Revenue (USD)</label>
-            <input type="number" step="0.01" min="0" name="revenue_usd" class="form-control @error('revenue_usd') is-invalid @enderror" value="{{ old('revenue_usd', $miner->daily_output_usd) }}" required>
-            @error('revenue_usd')<div class="invalid-feedback">{{ $message }}</div>@enderror
+          <div class="row g-3 mb-3">
+            <div class="col-6">
+              <div class="rounded border p-3 bg-light h-100">
+                <div class="text-secondary small">Electricity cost</div>
+                <div class="fw-semibold">${{ number_format((float) ($automaticSnapshot['electricity_cost_usd'] ?? 0), 2) }}</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="rounded border p-3 bg-light h-100">
+                <div class="text-secondary small">Maintenance cost</div>
+                <div class="fw-semibold">${{ number_format((float) ($automaticSnapshot['maintenance_cost_usd'] ?? 0), 2) }}</div>
+              </div>
+            </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label">Hashrate (TH/s)</label>
-            <input type="number" step="0.01" min="0" name="hashrate_th" class="form-control @error('hashrate_th') is-invalid @enderror" value="{{ old('hashrate_th', 500) }}" required>
-            @error('hashrate_th')<div class="invalid-feedback">{{ $message }}</div>@enderror
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Uptime %</label>
-            <input type="number" step="0.01" min="0" max="100" name="uptime_percentage" class="form-control @error('uptime_percentage') is-invalid @enderror" value="{{ old('uptime_percentage', 99.50) }}" required>
-            @error('uptime_percentage')<div class="invalid-feedback">{{ $message }}</div>@enderror
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Notes</label>
-            <textarea name="notes" rows="3" class="form-control @error('notes') is-invalid @enderror">{{ old('notes') }}</textarea>
-            @error('notes')<div class="invalid-feedback">{{ $message }}</div>@enderror
-          </div>
-          <button type="submit" class="btn btn-success">Save performance log</button>
-        </form>
+          <form method="POST" action="{{ route('dashboard.miner.logs.generate') }}">
+            @csrf
+            <input type="hidden" name="miner_slug" value="{{ $miner->slug }}">
+            <div class="mb-3">
+              <label class="form-label">Snapshot date</label>
+              <input type="date" name="logged_on" class="form-control" value="{{ old('logged_on', $snapshotDate->toDateString()) }}">
+            </div>
+            <button type="submit" class="btn btn-outline-primary w-100">Generate automatic snapshot and sync earnings</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <h5 class="mb-3">Add daily performance log</h5>
+          <form method="POST" action="{{ route('dashboard.miner.logs.store') }}">
+            @csrf
+            <input type="hidden" name="miner_slug" value="{{ $miner->slug }}">
+            <div class="mb-3">
+              <label class="form-label">Log date</label>
+              <input type="date" name="logged_on" class="form-control @error('logged_on') is-invalid @enderror" value="{{ old('logged_on', now()->toDateString()) }}" required>
+              @error('logged_on')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Revenue (USD)</label>
+              <input type="number" step="0.01" min="0" name="revenue_usd" class="form-control @error('revenue_usd') is-invalid @enderror" value="{{ old('revenue_usd', $automaticSnapshot['revenue_usd'] ?? $miner->daily_output_usd) }}" required>
+              @error('revenue_usd')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Electricity cost (USD)</label>
+                <input type="number" step="0.01" min="0" name="electricity_cost_usd" class="form-control @error('electricity_cost_usd') is-invalid @enderror" value="{{ old('electricity_cost_usd', $automaticSnapshot['electricity_cost_usd'] ?? 0) }}">
+                @error('electricity_cost_usd')<div class="invalid-feedback">{{ $message }}</div>@enderror
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Maintenance cost (USD)</label>
+                <input type="number" step="0.01" min="0" name="maintenance_cost_usd" class="form-control @error('maintenance_cost_usd') is-invalid @enderror" value="{{ old('maintenance_cost_usd', $automaticSnapshot['maintenance_cost_usd'] ?? 0) }}">
+                @error('maintenance_cost_usd')<div class="invalid-feedback">{{ $message }}</div>@enderror
+              </div>
+            </div>
+            <div class="row g-3 mt-0">
+              <div class="col-md-6">
+                <label class="form-label">Hashrate (TH/s)</label>
+                <input type="number" step="0.01" min="0" name="hashrate_th" class="form-control @error('hashrate_th') is-invalid @enderror" value="{{ old('hashrate_th', $automaticSnapshot['hashrate_th'] ?? 500) }}" required>
+                @error('hashrate_th')<div class="invalid-feedback">{{ $message }}</div>@enderror
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Uptime %</label>
+                <input type="number" step="0.01" min="0" max="100" name="uptime_percentage" class="form-control @error('uptime_percentage') is-invalid @enderror" value="{{ old('uptime_percentage', $automaticSnapshot['uptime_percentage'] ?? 99.50) }}" required>
+                @error('uptime_percentage')<div class="invalid-feedback">{{ $message }}</div>@enderror
+              </div>
+            </div>
+            <div class="mb-3 mt-3">
+              <label class="form-label">Notes</label>
+              <textarea name="notes" rows="3" class="form-control @error('notes') is-invalid @enderror">{{ old('notes') }}</textarea>
+              @error('notes')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            </div>
+            <button type="submit" class="btn btn-success">Save performance log and sync earnings</button>
+          </form>
+        </div>
       </div>
     </div>
   </div>
@@ -244,7 +351,7 @@
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
           <div>
             <h5 class="mb-1">Recent performance logs</h5>
-            <p class="text-secondary mb-0">Latest recorded revenue, hashrate, uptime, and notes for the technical/admin history.</p>
+            <p class="text-secondary mb-0">Latest recorded revenue, costs, per-share income, and source for the technical/admin history.</p>
           </div>
           <span class="badge bg-primary">{{ $recentLogs->count() }} recent entries</span>
         </div>
@@ -253,7 +360,11 @@
             <thead>
               <tr>
                 <th>Date</th>
+                <th>Source</th>
                 <th>Revenue</th>
+                <th>Costs</th>
+                <th>Net profit</th>
+                <th>Per share</th>
                 <th>Hashrate</th>
                 <th>Uptime</th>
                 <th>Notes</th>
@@ -263,7 +374,14 @@
               @foreach ($recentLogs as $log)
                 <tr>
                   <td>{{ $log->logged_on?->format('M d, Y') }}</td>
+                  <td><span class="badge bg-light text-dark text-capitalize">{{ str_replace('_', ' ', $log->source ?? 'manual') }}</span></td>
                   <td>${{ number_format((float) $log->revenue_usd, 2) }}</td>
+                  <td>
+                    ${{ number_format((float) $log->electricity_cost_usd, 2) }} elec<br>
+                    ${{ number_format((float) $log->maintenance_cost_usd, 2) }} maint
+                  </td>
+                  <td>${{ number_format((float) $log->net_profit_usd, 2) }}</td>
+                  <td>${{ number_format((float) $log->revenue_per_share_usd, 4) }}</td>
                   <td>{{ number_format((float) $log->hashrate_th, 2) }} TH/s</td>
                   <td>{{ number_format((float) $log->uptime_percentage, 2) }}%</td>
                   <td>{{ $log->notes ?: '—' }}</td>
@@ -277,10 +395,6 @@
   </div>
 </div>
 @endsection
-
-
-
-
 
 @push('custom-scripts')
 <script>

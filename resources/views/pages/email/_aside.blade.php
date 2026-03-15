@@ -34,6 +34,20 @@
           <span class="badge bg-secondary fw-bolder ms-auto">{{ $messageCounts['archived'] }}</span>
         </a>
       </li>
+      <li class="nav-item {{ $folder === 'trash' ? 'active' : '' }}">
+        <a class="nav-link d-flex align-items-center" href="{{ route('email.trash') }}">
+          <i data-lucide="trash-2" class="icon-lg me-2"></i>
+          Trash
+          <span class="badge bg-danger fw-bolder ms-auto">{{ $messageCounts['trash'] ?? 0 }}</span>
+        </a>
+      </li>
+      <li class="nav-item {{ $folder === 'drafts' ? 'active' : '' }}">
+        <a class="nav-link d-flex align-items-center" href="{{ route('email.drafts') }}">
+          <i data-lucide="file-pen-line" class="icon-lg me-2"></i>
+          Drafts
+          <span class="badge bg-info text-dark fw-bolder ms-auto">{{ $messageCounts['drafts'] }}</span>
+        </a>
+      </li>
       <li class="nav-item {{ $folder === 'sent' ? 'active' : '' }}">
         <a class="nav-link d-flex align-items-center" href="{{ route('email.sent') }}">
           <i data-lucide="send" class="icon-lg me-2"></i>
@@ -76,6 +90,13 @@
           <i data-lucide="archive" class="text-secondary icon-lg me-2"></i>
           Archived
           <span class="ms-auto">{{ $messageCounts['archived'] }}</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link d-flex align-items-center" href="javascript:;">
+          <i data-lucide="file-pen-line" class="text-info icon-lg me-2"></i>
+          Drafts
+          <span class="ms-auto">{{ $messageCounts['drafts'] }}</span>
         </a>
       </li>
     </ul>

@@ -29,6 +29,10 @@
                     @csrf
                     <button class="btn btn-sm btn-outline-secondary" type="submit">Archive</button>
                   </form>
+                  <form method="POST" action="{{ route('email.delete', $recipientRecord) }}" onsubmit="return confirm('Delete this message from your mailbox?');">
+                    @csrf
+                    <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                  </form>
                 @endif
                 <a href="{{ route('email.compose', ['reply' => $message->id]) }}" class="btn btn-sm btn-outline-primary">Reply in compose</a>
                 <a href="{{ $readContext === 'sent' ? route('email.sent') : route('email.inbox') }}" class="btn btn-sm btn-outline-secondary">Back</a>
@@ -73,6 +77,19 @@
                     </div>
                   </div>
                   <div class="fs-14px lh-lg">{!! nl2br(e($threadMessage->body)) !!}</div>
+                  @if ($threadMessage->attachments->isNotEmpty())
+                    <div class="mt-3 border-top pt-3">
+                      <div class="fw-semibold mb-2">Attachments</div>
+                      <div class="d-flex flex-column gap-2">
+                        @foreach ($threadMessage->attachments as $attachment)
+                          <a class="text-decoration-none" href="{{ route('email.attachments.download', $attachment) }}">
+                            {{ $attachment->original_name }}
+                            <span class="text-secondary fs-12px">({{ number_format($attachment->size / 1024, 1) }} KB)</span>
+                          </a>
+                        @endforeach
+                      </div>
+                    </div>
+                  @endif
                 </div>
               @endforeach
             </div>
@@ -103,3 +120,4 @@
   </div>
 </div>
 @endsection
+

@@ -230,14 +230,23 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/email/inbox', [InternalMailController::class, 'inbox'])->name('email.inbox');
     Route::get('/email/starred', [InternalMailController::class, 'starred'])->name('email.starred');
     Route::get('/email/archived', [InternalMailController::class, 'archived'])->name('email.archived');
+    Route::get('/email/trash', [InternalMailController::class, 'trash'])->name('email.trash');
+    Route::get('/email/drafts', [InternalMailController::class, 'drafts'])->name('email.drafts');
     Route::get('/email/sent', [InternalMailController::class, 'sent'])->name('email.sent');
     Route::get('/email/compose', [InternalMailController::class, 'compose'])->name('email.compose');
     Route::post('/email/send', [InternalMailController::class, 'store'])->name('email.store');
     Route::post('/email/{message}/reply', [InternalMailController::class, 'reply'])->name('email.reply');
+    Route::get('/email/attachments/{attachment}/download', [InternalMailController::class, 'downloadAttachment'])->name('email.attachments.download');
+    Route::post('/email/drafts/{draft}/attachments/{attachment}/remove', [InternalMailController::class, 'removeDraftAttachment'])->name('email.draft-attachments.remove');
+    Route::post('/email/drafts/{draft}/delete', [InternalMailController::class, 'deleteDraft'])->name('email.drafts.delete');
     Route::get('/email/inbox/{recipient}/read', [InternalMailController::class, 'showInbox'])->name('email.read');
     Route::post('/email/inbox/{recipient}/toggle-star', [InternalMailController::class, 'toggleStar'])->name('email.toggle-star');
     Route::post('/email/inbox/{recipient}/toggle-read', [InternalMailController::class, 'toggleRead'])->name('email.toggle-read');
     Route::post('/email/inbox/{recipient}/archive', [InternalMailController::class, 'archive'])->name('email.archive');
+    Route::post('/email/inbox/{recipient}/delete', [InternalMailController::class, 'deleteRecipientMessage'])->name('email.delete');
+    Route::post('/email/inbox/{recipient}/restore', [InternalMailController::class, 'restoreRecipientMessage'])->name('email.restore');
+    Route::post('/email/inbox/{recipient}/purge', [InternalMailController::class, 'purgeRecipientMessage'])->name('email.purge');
+    Route::post('/email/inbox/bulk-action', [InternalMailController::class, 'bulkMailboxAction'])->name('email.bulk');
     Route::get('/email/sent/{message}/read', [InternalMailController::class, 'showSent'])->name('email.sent.read');
 
     Route::get('/dashboard/profile', function () {
@@ -2000,6 +2009,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ]);
 
             $sharesSold = MiningPlatform::totalSharesSold($miner);
+            $automaticSnapshot = MiningPlatform::performanceSnapshotForDate($miner);
+            $latestLog = $miner->performanceLogs->first();
 
             return view('pages.general.miner', [
                 'miners' => $miners,
@@ -2007,6 +2018,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'sharesSold' => $sharesSold,
                 'availableShares' => max($miner->total_shares - $sharesSold, 0),
                 'recentLogs' => $miner->performanceLogs,
+                'automaticSnapshot' => $automaticSnapshot,
+                'latestLog' => $latestLog,
             ]);
         })->name('dashboard.miner');
 
@@ -2057,30 +2070,36 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'miner_slug' => ['required', 'string', 'exists:miners,slug'],
                 'logged_on' => ['required', 'date'],
                 'revenue_usd' => ['required', 'numeric', 'min:0'],
+                'electricity_cost_usd' => ['nullable', 'numeric', 'min:0'],
+                'maintenance_cost_usd' => ['nullable', 'numeric', 'min:0'],
                 'hashrate_th' => ['required', 'numeric', 'min:0'],
                 'uptime_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
                 'notes' => ['nullable', 'string'],
             ]);
 
             $miner = Miner::where('slug', $validated['miner_slug'])->firstOrFail();
-
-            MinerPerformanceLog::updateOrCreate(
-                [
-                    'miner_id' => $miner->id,
-                    'logged_on' => $validated['logged_on'],
-                ],
-                [
-                    'revenue_usd' => $validated['revenue_usd'],
-                    'hashrate_th' => $validated['hashrate_th'],
-                    'uptime_percentage' => $validated['uptime_percentage'],
-                    'notes' => $validated['notes'] ?? null,
-                ],
-            );
+            MiningPlatform::savePerformanceLog($miner, $validated, 'manual');
 
             return redirect()
                 ->to(route('dashboard.miner').'?miner='.$miner->slug)
-                ->with('log_success', 'Performance log saved successfully for '.$miner->name.'.');
+                ->with('log_success', 'Performance log saved successfully for '.$miner->name.' and daily earnings were synced.');
         })->name('dashboard.miner.logs.store');
+
+        Route::post('/dashboard/miner/logs/generate', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $validated = $request->validate([
+                'miner_slug' => ['required', 'string', 'exists:miners,slug'],
+                'logged_on' => ['nullable', 'date'],
+            ]);
+
+            $miner = Miner::where('slug', $validated['miner_slug'])->firstOrFail();
+            $log = MiningPlatform::generateAutomaticPerformanceLog($miner, $validated['logged_on'] ?? now()->toDateString());
+
+            return redirect()
+                ->to(route('dashboard.miner').'?miner='.$miner->slug)
+                ->with('log_success', 'Automatic snapshot generated for '.$miner->name.' on '.$log->logged_on->format('M d, Y').'.');
+        })->name('dashboard.miner.logs.generate');
     });
 
     Route::get('/dashboard/friends', function () {
@@ -2441,6 +2460,15 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
+
+
+
+
+
+
+
+
+
 
 
 

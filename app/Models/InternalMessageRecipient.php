@@ -17,6 +17,7 @@ class InternalMessageRecipient extends Model
         'read_at',
         'starred_at',
         'deleted_at',
+        'trashed_at',
     ];
 
     protected function casts(): array
@@ -25,6 +26,7 @@ class InternalMessageRecipient extends Model
             'read_at' => 'datetime',
             'starred_at' => 'datetime',
             'deleted_at' => 'datetime',
+            'trashed_at' => 'datetime',
         ];
     }
 
@@ -70,4 +72,25 @@ class InternalMessageRecipient extends Model
             $this->forceFill(['deleted_at' => now()])->save();
         }
     }
+
+    public function moveToTrash(): void
+    {
+        if (! $this->trashed_at) {
+            $this->forceFill(['trashed_at' => now()])->save();
+        }
+    }
+
+    public function restoreFromTrash(): void
+    {
+        if ($this->trashed_at) {
+            $this->forceFill(['trashed_at' => null])->save();
+        }
+    }
+
+    public function purge(): void
+    {
+        $this->delete();
+    }
 }
+
+
