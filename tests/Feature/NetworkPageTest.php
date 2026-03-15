@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Earning;
 use App\Models\FriendInvitation;
 use App\Models\InvestmentOrder;
 use App\Models\User;
@@ -21,6 +22,9 @@ test('verified user can view network page', function () {
 
     $response->assertOk();
     $response->assertSee('My Network');
+    $response->assertSee('Team power leaderboard');
+    $response->assertSee('Monthly branch champion');
+    $response->assertSee('Open Hall of Fame');
 });
 
 test('network page shows direct team and team rewards', function () {
@@ -123,3 +127,56 @@ test('invitation pipeline marks invited email as active investor even without sp
     $response->assertSee('Legacy Investor');
     $response->assertSee('Yes');
 });
+
+test('network page can filter reward ledger and invitation pipeline', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    FriendInvitation::create([
+        'user_id' => $user->id,
+        'name' => 'Direct Investor',
+        'email' => 'direct-investor@example.com',
+        'verified_at' => now(),
+        'registered_at' => now(),
+    ]);
+
+    FriendInvitation::create([
+        'user_id' => $user->id,
+        'name' => 'Pending Friend',
+        'email' => 'pending-friend@example.com',
+    ]);
+
+    Earning::create([
+        'user_id' => $user->id,
+        'investment_id' => null,
+        'earned_on' => now()->toDateString(),
+        'amount' => 25,
+        'source' => 'referral_registration',
+        'status' => 'available',
+        'notes' => 'Direct reward row.',
+    ]);
+
+    Earning::create([
+        'user_id' => $user->id,
+        'investment_id' => null,
+        'earned_on' => now()->toDateString(),
+        'amount' => 7.5,
+        'source' => 'team_level_3_bonus',
+        'status' => 'available',
+        'notes' => 'MLM reward row.',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.network', [
+        'reward_filter' => 'direct',
+        'pipeline_filter' => 'pending',
+    ]));
+
+    $response->assertOk();
+    $response->assertSee('Direct reward row.');
+    $response->assertDontSee('MLM reward row.');
+    $response->assertSee('Pending Friend');
+    $response->assertDontSee('Direct Investor');
+});
+
+

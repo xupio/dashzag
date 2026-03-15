@@ -1,10 +1,26 @@
-@extends('layout.master')
+﻿@extends('layout.master')
 
 @push('plugin-styles')
   <link href="{{ asset('build/plugins/flatpickr/flatpickr.min.css') }}" rel="stylesheet" />
 @endpush
 
 @section('content')
+@php
+  $powerBadgeClasses = [
+      'secondary' => 'bg-secondary-subtle text-secondary',
+      'info' => 'bg-info-subtle text-info',
+      'primary' => 'bg-primary-subtle text-primary',
+      'warning' => 'bg-warning-subtle text-warning',
+      'success' => 'bg-success-subtle text-success',
+  ];
+  $powerFrameClasses = [
+      'secondary' => 'border-secondary-subtle',
+      'info' => 'border-info-subtle',
+      'primary' => 'border-primary-subtle',
+      'warning' => 'border-warning-subtle',
+      'success' => 'border-success-subtle',
+  ];
+@endphp
 <div class="d-flex justify-content-between align-items-center flex-wrap grid-margin gap-3">
   <div>
     <h4 class="mb-1">{{ $miner->name }} Overview</h4>
@@ -206,8 +222,16 @@
           <div>
             <h6 class="card-title mb-1">Investor pipeline</h6>
             <p class="text-secondary mb-0">See who is actively invested in this miner and open their investor profile for more detail.</p>
+            <div class="d-flex align-items-center gap-2 flex-wrap mt-2">
+              <span class="badge bg-success-subtle text-success">Weekly winner</span>
+              <span class="badge bg-warning-subtle text-warning">Monthly champion</span>
+              <span class="text-secondary small">These badges reflect the current Hall of Fame leaders.</span>
+            </div>
           </div>
-          <span class="badge bg-light text-dark">{{ $minerInvestorPipeline->count() }} investor{{ $minerInvestorPipeline->count() === 1 ? '' : 's' }}</span>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="badge bg-light text-dark">{{ $minerInvestorPipeline->count() }} investor{{ $minerInvestorPipeline->count() === 1 ? '' : 's' }}</span>
+            <a href="{{ route('dashboard.hall-of-fame') }}" class="btn btn-outline-primary btn-sm">Open Hall of Fame</a>
+          </div>
         </div>
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
@@ -222,12 +246,29 @@
                 <th class="text-end">Profile</th>
               </tr>
             </thead>
-            <tbody>
-              @forelse ($minerInvestorPipeline as $pipelineInvestor)
-                <tr>
-                  <td>
-                    <div class="fw-semibold">{{ $pipelineInvestor['user']->name }}</div>
-                    <div class="text-secondary small">{{ $pipelineInvestor['user']->email }}</div>
+              <tbody>
+                @forelse ($minerInvestorPipeline as $pipelineInvestor)
+                  @php($pipelinePower = $pipelineInvestor['profile_power'])
+                  @php($isWeeklyWinner = ($weeklyHallOfFameWinnerId ?? null) === $pipelineInvestor['user']->id)
+                  @php($isMonthlyChampion = ($monthlyHallOfFameChampionId ?? null) === $pipelineInvestor['user']->id)
+                  <tr>
+                    <td>
+                      <div class="border rounded p-2 {{ !empty($pipelinePower) ? ($powerFrameClasses[$pipelinePower['rank_accent']] ?? 'border-primary-subtle') : '' }}">
+                        <div class="fw-semibold">{{ $pipelineInvestor['user']->name }}</div>
+                        <div class="text-secondary small">{{ $pipelineInvestor['user']->email }}</div>
+                        @if (!empty($pipelinePower))
+                          <div class="mt-2 d-flex gap-2 flex-wrap">
+                            <span class="badge bg-light text-dark">Power {{ $pipelinePower['score'] }}/100</span>
+                            <span class="badge {{ $powerBadgeClasses[$pipelinePower['rank_accent']] ?? 'bg-primary-subtle text-primary' }}">{{ $pipelinePower['rank_label'] }}</span>
+                            @if ($isWeeklyWinner)
+                              <span class="badge bg-success">Weekly winner</span>
+                            @endif
+                            @if ($isMonthlyChampion)
+                              <span class="badge bg-warning text-dark">Monthly champion</span>
+                            @endif
+                          </div>
+                        @endif
+                      </div>
                   </td>
                   <td>
                     <div class="fw-semibold">{{ $pipelineInvestor['package_name'] }}</div>
@@ -236,7 +277,7 @@
                   <td>{{ number_format((int) $pipelineInvestor['shares_owned']) }}</td>
                   <td>${{ number_format((float) $pipelineInvestor['capital_committed'], 2) }}</td>
                   <td>{{ number_format((float) $pipelineInvestor['expected_return_rate'], 2) }}%</td>
-                  <td>{{ optional($pipelineInvestor['latest_subscribed_at'])->format('M d, Y') ?? '�' }}</td>
+                  <td>{{ optional($pipelineInvestor['latest_subscribed_at'])->format('M d, Y') ?? '—' }}</td>
                   <td class="text-end">
                     <a href="{{ route('dashboard.investors.show', $pipelineInvestor['user']) }}" class="btn btn-outline-primary btn-sm">Open profile</a>
                   </td>
@@ -466,6 +507,8 @@
     });
   </script>
 @endpush
+
+
 
 
 
