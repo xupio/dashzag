@@ -779,22 +779,32 @@ class MiningPlatform
             $node['active_direct_investors'] >= 3 && $node['active_capital'] >= 1000 => [
                 'label' => 'Strong branch',
                 'description' => 'This investor already drives capital and active referrals, so this branch is contributing meaningful momentum.',
+                'health' => 'Healthy branch',
+                'action_hint' => 'Keep this branch engaged and monitor expansion into the next visible level.',
             ],
             $node['direct_team'] >= 2 && $node['active_direct_investors'] === 0 => [
                 'label' => 'Conversion gap',
                 'description' => 'This branch is bringing people in, but they have not converted into active investors yet.',
+                'health' => 'Invite-heavy, low conversion',
+                'action_hint' => 'Focus on converting direct referrals into their first active investment.',
             ],
             $node['active_capital'] > 0 && $node['direct_team'] === 0 => [
                 'label' => 'Investor only',
                 'description' => 'This user has active capital in the miner, but has not started building a visible referral branch yet.',
+                'health' => 'Capital without depth',
+                'action_hint' => 'Encourage this investor to activate referrals and begin building a branch.',
             ],
             $node['direct_team'] > 0 => [
                 'label' => 'Growing branch',
                 'description' => 'This branch is building structure and has room to convert more direct members into active investors.',
+                'health' => 'Needs activation',
+                'action_hint' => 'Support this branch with follow-up and activation messaging before it stalls.',
             ],
             default => [
                 'label' => 'Early stage',
                 'description' => 'This node is still at an early stage, with limited branch activity and low current capital impact.',
+                'health' => 'Early development',
+                'action_hint' => 'This branch still needs invites, verified users, and its first active investor.',
             ],
         };
 
@@ -807,6 +817,8 @@ class MiningPlatform
         return [
             'label' => $situation['label'],
             'description' => $situation['description'],
+            'health' => $situation['health'],
+            'action_hint' => $situation['action_hint'],
             'priority' => $priority,
         ];
     }
@@ -2225,6 +2237,9 @@ class MiningPlatform
                     'active_direct_investors' => self::activeDirectInvestorCount($user),
                     'children' => $children->values(),
                     'children_count' => $children->count(),
+                    'visible_descendants' => (int) $children->sum(fn (array $child) => 1 + $child['visible_descendants']),
+                    'branch_active_capital' => (float) ((float) $activeInvestments->sum('amount') + $children->sum('branch_active_capital')),
+                    'branch_active_investors' => (int) ($activeInvestments->isNotEmpty() ? 1 : 0) + (int) $children->sum('branch_active_investors'),
                     'power_summary' => self::compactTreePowerSummary($user),
                 ];
             })

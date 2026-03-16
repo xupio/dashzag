@@ -162,6 +162,33 @@
       box-shadow: 0 20px 36px rgba(8, 8, 25, 0.34);
     }
 
+    .network-org-health-dot {
+      position: absolute;
+      top: 0.55rem;
+      right: 0.55rem;
+      width: 0.62rem;
+      height: 0.62rem;
+      border-radius: 999px;
+      border: 2px solid rgba(255, 255, 255, 0.7);
+      box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12);
+    }
+
+    .network-org-health-dot.severity-healthy {
+      background: #22c55e;
+    }
+
+    .network-org-health-dot.severity-watch {
+      background: #f59e0b;
+    }
+
+    .network-org-health-dot.severity-risk {
+      background: #ef4444;
+    }
+
+    .network-org-health-dot.severity-early {
+      background: #3b82f6;
+    }
+
     .network-org-node.depth-1 {
       background: linear-gradient(180deg, #ffb323, #f58b15);
     }
@@ -229,6 +256,46 @@
       text-align: center;
     }
 
+    .network-org-health-card {
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .network-org-health-card.severity-healthy {
+      background: #ecfdf3 !important;
+      border-color: #86efac !important;
+    }
+
+    .network-org-health-card.severity-watch {
+      background: #fff7ed !important;
+      border-color: #fdba74 !important;
+    }
+
+    .network-org-health-card.severity-risk {
+      background: #fef2f2 !important;
+      border-color: #fca5a5 !important;
+    }
+
+    .network-org-health-card.severity-early {
+      background: #eff6ff !important;
+      border-color: #93c5fd !important;
+    }
+
+    .network-org-health-card.severity-healthy [data-org-modal-health] {
+      color: #15803d;
+    }
+
+    .network-org-health-card.severity-watch [data-org-modal-health] {
+      color: #c2410c;
+    }
+
+    .network-org-health-card.severity-risk [data-org-modal-health] {
+      color: #b91c1c;
+    }
+
+    .network-org-health-card.severity-early [data-org-modal-health] {
+      color: #1d4ed8;
+    }
+
     @media (max-width: 991.98px) {
       .network-org-node {
         width: 128px;
@@ -252,6 +319,11 @@
             <span class="badge bg-light text-dark" data-org-modal-level>Level</span>
             <span class="badge bg-dark" data-org-modal-priority>Priority</span>
           </div>
+          <div class="border rounded p-3 mb-3 bg-light network-org-health-card" data-org-modal-health-card>
+            <div class="text-secondary small">Branch health</div>
+            <div class="fw-semibold mb-1" data-org-modal-health></div>
+            <div class="text-secondary small mb-0" data-org-modal-action-hint></div>
+          </div>
           <p class="mb-3 text-secondary" data-org-modal-description></p>
           <div class="row g-3">
             <div class="col-6"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">Sponsor</div><div class="fw-semibold" data-org-modal-sponsor></div></div></div>
@@ -260,10 +332,17 @@
             <div class="col-6"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">Active direct investors</div><div class="fw-semibold" data-org-modal-active-direct></div></div></div>
             <div class="col-6"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">Active capital</div><div class="fw-semibold" data-org-modal-capital></div></div></div>
             <div class="col-6"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">Verified invites</div><div class="fw-semibold" data-org-modal-invites></div></div></div>
+            <div class="col-6"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">Visible descendants</div><div class="fw-semibold" data-org-modal-descendants></div></div></div>
+            <div class="col-6"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">Branch investors</div><div class="fw-semibold" data-org-modal-branch-investors></div></div></div>
+            <div class="col-12"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">Branch capital</div><div class="fw-semibold" data-org-modal-branch-capital></div></div></div>
           </div>
         </div>
         <div class="modal-footer border-0 pt-0">
-          <a href="#" class="btn btn-primary" data-org-modal-profile-link>Open full profile</a>
+          <div class="d-flex flex-wrap gap-2 w-100 justify-content-end">
+            <a href="#" class="btn btn-outline-secondary" data-org-modal-users-link>Users record</a>
+            <a href="#" class="btn btn-outline-secondary" data-org-modal-shareholders-link>Shareholder records</a>
+            <a href="#" class="btn btn-primary" data-org-modal-profile-link>Open full profile</a>
+          </div>
         </div>
       </div>
     </div>
@@ -308,13 +387,21 @@
           rank: modalElement.querySelector('[data-org-modal-rank]'),
           level: modalElement.querySelector('[data-org-modal-level]'),
           priority: modalElement.querySelector('[data-org-modal-priority]'),
+          healthCard: modalElement.querySelector('[data-org-modal-health-card]'),
+          health: modalElement.querySelector('[data-org-modal-health]'),
+          actionHint: modalElement.querySelector('[data-org-modal-action-hint]'),
           description: modalElement.querySelector('[data-org-modal-description]'),
           sponsor: modalElement.querySelector('[data-org-modal-sponsor]'),
           power: modalElement.querySelector('[data-org-modal-power]'),
           team: modalElement.querySelector('[data-org-modal-team]'),
           activeDirect: modalElement.querySelector('[data-org-modal-active-direct]'),
           capital: modalElement.querySelector('[data-org-modal-capital]'),
+          descendants: modalElement.querySelector('[data-org-modal-descendants]'),
+          branchInvestors: modalElement.querySelector('[data-org-modal-branch-investors]'),
+          branchCapital: modalElement.querySelector('[data-org-modal-branch-capital]'),
           invites: modalElement.querySelector('[data-org-modal-invites]'),
+          users: modalElement.querySelector('[data-org-modal-users-link]'),
+          shareholders: modalElement.querySelector('[data-org-modal-shareholders-link]'),
           profile: modalElement.querySelector('[data-org-modal-profile-link]'),
         };
 
@@ -326,18 +413,37 @@
           node.dataset.bound = 'true';
 
           node.addEventListener('click', function () {
+            const health = node.dataset.health || 'Branch health';
+            const severityClass = (function () {
+              if (health === 'Healthy branch') return 'severity-healthy';
+              if (health === 'Needs activation') return 'severity-watch';
+              if (health === 'Invite-heavy, low conversion' || health === 'Capital without depth') return 'severity-risk';
+              return 'severity-early';
+            })();
+
             nodeModalFields.title.textContent = node.dataset.name || 'Investor';
             nodeModalFields.rank.textContent = node.dataset.rank || 'Rank';
             nodeModalFields.level.textContent = node.dataset.level || 'Level';
             nodeModalFields.priority.textContent = node.dataset.priority || 'Priority';
+            nodeModalFields.healthCard.classList.remove('severity-healthy', 'severity-watch', 'severity-risk', 'severity-early');
+            nodeModalFields.healthCard.classList.add(severityClass);
+            nodeModalFields.health.textContent = health;
+            nodeModalFields.actionHint.textContent = node.dataset.actionHint || '';
             nodeModalFields.description.textContent = node.dataset.description || '';
             nodeModalFields.sponsor.textContent = node.dataset.sponsor || 'Top-level';
             nodeModalFields.power.textContent = node.dataset.power || 'N/A';
             nodeModalFields.team.textContent = node.dataset.team || '0';
             nodeModalFields.activeDirect.textContent = node.dataset.activeDirect || '0';
             nodeModalFields.capital.textContent = node.dataset.capital || '$0.00';
+            nodeModalFields.descendants.textContent = node.dataset.descendants || '0';
+            nodeModalFields.branchInvestors.textContent = node.dataset.branchInvestors || '0';
+            nodeModalFields.branchCapital.textContent = node.dataset.branchCapital || '$0.00';
             nodeModalFields.invites.textContent = node.dataset.invites || '0';
+            nodeModalFields.users.href = node.dataset.usersLink || '#';
+            nodeModalFields.shareholders.href = node.dataset.shareholdersLink || '#';
             nodeModalFields.profile.href = node.dataset.profile || '#';
+            nodeModalFields.users.classList.toggle('d-none', !node.dataset.usersLink);
+            nodeModalFields.shareholders.classList.toggle('d-none', !node.dataset.shareholdersLink);
             nodeModalFields.profile.classList.toggle('d-none', !node.dataset.profile);
             modal.show();
           });

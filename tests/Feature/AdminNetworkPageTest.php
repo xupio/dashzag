@@ -38,6 +38,7 @@ test('admin can view the network admin page', function () {
     $response->assertSee('Visual sponsor tree');
     $response->assertSee('Branch Head');
     $response->assertSee('downline@example.com');
+    $response->assertSee('Click any node for branch details');
 });
 
 test('non admin cannot view the network admin page', function () {

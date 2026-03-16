@@ -119,6 +119,7 @@ test('analytics page shows investment referral miner and daily performance metri
     $response->assertSee('Top investors');
     $response->assertSee('Top referrers');
     $response->assertSee('Network tree snapshot');
+    $response->assertSee('Click any node for branch details');
     $response->assertSee('Network Lead');
     $response->assertSee('Package performance');
     $response->assertSee('Miner performance breakdown');
