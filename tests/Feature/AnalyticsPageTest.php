@@ -56,6 +56,19 @@ test('analytics page shows investment referral miner and daily performance metri
         'email_verified_at' => now(),
     ]);
 
+    $networkLead = User::factory()->create([
+        'email_verified_at' => now(),
+        'name' => 'Network Lead',
+        'email' => 'networklead@example.com',
+    ]);
+
+    User::factory()->create([
+        'email_verified_at' => now(),
+        'sponsor_user_id' => $networkLead->id,
+        'name' => 'Network Downline',
+        'email' => 'networkdownline@example.com',
+    ]);
+
     FriendInvitation::create([
         'user_id' => $referrer->id,
         'name' => 'Analytics Buyer',
@@ -105,6 +118,8 @@ test('analytics page shows investment referral miner and daily performance metri
     $response->assertOk();
     $response->assertSee('Top investors');
     $response->assertSee('Top referrers');
+    $response->assertSee('Network tree snapshot');
+    $response->assertSee('Network Lead');
     $response->assertSee('Package performance');
     $response->assertSee('Miner performance breakdown');
     $response->assertSee('Selected miner daily performance');

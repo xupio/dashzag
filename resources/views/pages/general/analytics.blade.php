@@ -1,4 +1,4 @@
-@extends('layout.master')
+﻿@extends('layout.master')
 
 @section('content')
 <div class="row">
@@ -27,6 +27,36 @@
   <div class="col-md-4 col-xl-2 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Available liability</p><h5 class="mb-0">${{ number_format($totalAvailableLiability, 2) }}</h5></div></div></div>
   <div class="col-md-4 col-xl-2 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Pending payouts</p><h5 class="mb-0">${{ number_format($totalPendingPayouts, 2) }}</h5></div></div></div>
   <div class="col-md-4 col-xl-2 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Paid out</p><h5 class="mb-0">${{ number_format($totalPaidOut, 2) }}</h5></div></div></div>
+</div>
+
+<div class="row mb-4">
+  <div class="col-12 grid-margin stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
+            <h5 class="mb-1">Network tree snapshot</h5>
+            <p class="text-secondary mb-0">A visual view of the current sponsor structure and the visible sub-levels across the platform.</p>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <span class="badge bg-primary">{{ $networkTreeSummary['root_count'] }} roots</span>
+            <span class="badge bg-light text-dark">{{ $networkTreeSummary['visible_nodes'] }} visible</span>
+            <span class="badge bg-dark">Depth {{ $networkTreeSummary['max_depth'] }}</span>
+          </div>
+        </div>
+        @if ($networkTree->isEmpty())
+          <p class="text-secondary mb-0">The sponsor tree snapshot will appear here once referrals begin to build across the platform.</p>
+        @else
+          @include('pages.general.partials.network-org-chart', [
+            'chartId' => 'analyticsNetworkOrgChart',
+            'chartTitle' => 'Analytics Sponsor Tree',
+            'chartDescription' => 'Click any investor node to understand branch strength, conversion gaps, and direct capital impact.',
+            'tree' => $networkTree,
+          ])
+        @endif
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="row mb-4">
@@ -265,6 +295,8 @@
   </div>
 </div>
 
+
+
 <div class="row mb-4">
   <div class="col-xl-6 grid-margin stretch-card">
     <div class="card">
@@ -352,3 +384,5 @@
   });
 </script>
 @endpush
+
+

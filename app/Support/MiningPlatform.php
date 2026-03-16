@@ -686,6 +686,131 @@ class MiningPlatform
             ->count();
     }
 
+    public static function referralTree(Collection $users, int $maxDepth = 5): Collection
+    {
+        $usersBySponsor = $users
+            ->sortBy(fn (User $user) => Str::lower($user->name))
+            ->groupBy(fn (User $user) => $user->sponsor_user_id ?? 'root');
+
+        return self::mapReferralTreeNodes($usersBySponsor, 'root', 1, $maxDepth)->values();
+    }
+
+    public static function referralTreeSummary(Collection $tree): array
+    {
+        $flattened = self::flattenReferralTree($tree);
+
+        return [
+            'root_count' => $tree->count(),
+            'visible_nodes' => $flattened->count(),
+            'max_depth' => (int) $flattened->max('depth'),
+            'leaf_nodes' => $flattened->where('children_count', 0)->count(),
+        ];
+    }
+
+    public static function compactTreePowerSummary(User $user): array
+    {
+        $verifiedInvites = $user->relationLoaded('friendInvitations')
+            ? $user->friendInvitations->whereNotNull('verified_at')->count()
+            : 0;
+
+        $activeInvestments = $user->relationLoaded('investments')
+            ? $user->investments->where('status', 'active')->where('amount', '>', 0)
+            : collect();
+
+        $activeCapital = (float) $activeInvestments->sum('amount');
+        $activeDirectInvestors = self::activeDirectInvestorCount($user);
+        $levelRank = (int) ($user->userLevel?->rank ?? 1);
+
+        $score = min(
+            ($levelRank * 18)
+            + min($verifiedInvites * 2, 18)
+            + min($activeDirectInvestors * 10, 30)
+            + min((int) floor($activeCapital / 200), 34),
+            100
+        );
+
+        $rank = match (true) {
+            $score >= 85 => 'Powerhouse',
+            $score >= 65 => 'Influencer',
+            $score >= 45 => 'Connector',
+            $score >= 25 => 'Builder',
+            default => 'Starter',
+        };
+
+        return [
+            'score' => (int) $score,
+            'rank' => $rank,
+        ];
+    }
+
+    public static function referralTreeChartPayload(Collection $tree, string $rootLabel = 'Network'): array
+    {
+        $links = [];
+        $nodes = [[
+            'id' => 'network-root',
+            'title' => $rootLabel,
+            'name' => 'Sponsor Tree',
+            'color' => '#f59e0b',
+            'situation' => 'Platform root',
+            'priority' => 'Overview',
+            'level_name' => 'Root',
+            'sponsor_name' => 'Top-level',
+            'power' => '—',
+            'direct_team' => (string) $tree->count(),
+            'active_direct' => (string) collect(self::flattenReferralTree($tree))->sum('active_direct_investors'),
+            'capital' => '$'.number_format((float) collect(self::flattenReferralTree($tree))->sum('active_capital'), 2),
+            'verified_invites' => (string) collect(self::flattenReferralTree($tree))->sum('verified_invites'),
+            'profile_url' => '',
+        ]];
+
+        foreach ($tree as $node) {
+            self::appendReferralTreeChartNode($node, 'network-root', $nodes, $links);
+        }
+
+        return [
+            'nodes' => $nodes,
+            'links' => $links,
+        ];
+    }
+
+    public static function treeNodeSituation(array $node): array
+    {
+        $situation = match (true) {
+            $node['active_direct_investors'] >= 3 && $node['active_capital'] >= 1000 => [
+                'label' => 'Strong branch',
+                'description' => 'This investor already drives capital and active referrals, so this branch is contributing meaningful momentum.',
+            ],
+            $node['direct_team'] >= 2 && $node['active_direct_investors'] === 0 => [
+                'label' => 'Conversion gap',
+                'description' => 'This branch is bringing people in, but they have not converted into active investors yet.',
+            ],
+            $node['active_capital'] > 0 && $node['direct_team'] === 0 => [
+                'label' => 'Investor only',
+                'description' => 'This user has active capital in the miner, but has not started building a visible referral branch yet.',
+            ],
+            $node['direct_team'] > 0 => [
+                'label' => 'Growing branch',
+                'description' => 'This branch is building structure and has room to convert more direct members into active investors.',
+            ],
+            default => [
+                'label' => 'Early stage',
+                'description' => 'This node is still at an early stage, with limited branch activity and low current capital impact.',
+            ],
+        };
+
+        $priority = match (true) {
+            $node['active_direct_investors'] >= 3 || $node['active_capital'] >= 1000 => 'High value',
+            $node['direct_team'] >= 2 => 'Watch closely',
+            default => 'Develop',
+        };
+
+        return [
+            'label' => $situation['label'],
+            'description' => $situation['description'],
+            'priority' => $priority,
+        ];
+    }
+
     public static function profilePowerSummary(User $user): array
     {
         $level = $user->relationLoaded('userLevel') && $user->userLevel
@@ -2071,6 +2196,86 @@ class MiningPlatform
                     'created_at' => now(),
                 ],
             );
+        }
+    }
+
+    protected static function mapReferralTreeNodes(Collection $usersBySponsor, string|int $parentKey, int $depth, int $maxDepth): Collection
+    {
+        return collect($usersBySponsor->get($parentKey, collect()))
+            ->map(function (User $user) use ($usersBySponsor, $depth, $maxDepth) {
+                $children = $depth < $maxDepth
+                    ? self::mapReferralTreeNodes($usersBySponsor, $user->id, $depth + 1, $maxDepth)
+                    : collect();
+
+                $activeInvestments = $user->relationLoaded('investments')
+                    ? $user->investments->where('status', 'active')->where('amount', '>', 0)
+                    : $user->investments()->where('status', 'active')->where('amount', '>', 0)->get();
+
+                return [
+                    'user' => $user,
+                    'depth' => $depth,
+                    'level_name' => $user->userLevel?->name ?? 'Starter',
+                    'sponsor_name' => $user->sponsor?->name ?? 'Top-level',
+                    'verified_invites' => $user->relationLoaded('friendInvitations')
+                        ? $user->friendInvitations->whereNotNull('verified_at')->count()
+                        : 0,
+                    'active_capital' => (float) $activeInvestments->sum('amount'),
+                    'active_shares' => (int) $activeInvestments->sum('shares_owned'),
+                    'direct_team' => (int) collect($usersBySponsor->get($user->id, collect()))->count(),
+                    'active_direct_investors' => self::activeDirectInvestorCount($user),
+                    'children' => $children->values(),
+                    'children_count' => $children->count(),
+                    'power_summary' => self::compactTreePowerSummary($user),
+                ];
+            })
+            ->map(function (array $node) {
+                $node['situation'] = self::treeNodeSituation($node);
+
+                return $node;
+            })
+            ->values();
+    }
+
+    protected static function flattenReferralTree(Collection $tree): Collection
+    {
+        return $tree->flatMap(function (array $node) {
+            return collect([$node])->merge(self::flattenReferralTree($node['children']));
+        })->values();
+    }
+
+    protected static function appendReferralTreeChartNode(array $node, string $parentId, array &$nodes, array &$links): void
+    {
+        $nodeId = 'user-'.$node['user']->id;
+
+        $nodes[] = [
+            'id' => $nodeId,
+            'title' => $node['user']->name,
+            'name' => $node['situation']['label'],
+            'color' => match (true) {
+                $node['depth'] === 1 => '#f59e0b',
+                $node['depth'] === 2 => '#ef4444',
+                $node['depth'] === 3 => '#4f46e5',
+                default => '#0891b2',
+            },
+            'situation' => $node['situation']['description'],
+            'priority' => $node['situation']['priority'],
+            'level_name' => $node['level_name'],
+            'sponsor_name' => $node['sponsor_name'],
+            'power' => $node['power_summary']['score'].'/100',
+            'direct_team' => (string) $node['direct_team'],
+            'active_direct' => (string) $node['active_direct_investors'],
+            'capital' => '$'.number_format($node['active_capital'], 2),
+            'verified_invites' => (string) $node['verified_invites'],
+            'profile_url' => route('dashboard.investors.show', [
+                'user' => $node['user'],
+                'from' => request()->routeIs('dashboard.network-admin') ? 'network-admin' : 'network',
+            ]),
+        ];
+
+        $links[] = [$parentId, $nodeId];
+
+        foreach ($node['children'] as $child) {
+            self::appendReferralTreeChartNode($child, $nodeId, $nodes, $links);
         }
     }
 }

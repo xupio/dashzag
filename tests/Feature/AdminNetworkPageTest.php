@@ -17,9 +17,16 @@ test('admin can view the network admin page', function () {
         'email_verified_at' => now(),
     ]);
 
-    User::factory()->create([
+    $branchHead = User::factory()->create([
         'email_verified_at' => now(),
         'sponsor_user_id' => $sponsor->id,
+        'name' => 'Branch Head',
+        'email' => 'branch@example.com',
+    ]);
+
+    User::factory()->create([
+        'email_verified_at' => now(),
+        'sponsor_user_id' => $branchHead->id,
         'name' => 'Downline User',
         'email' => 'downline@example.com',
     ]);
@@ -28,6 +35,8 @@ test('admin can view the network admin page', function () {
 
     $response->assertOk();
     $response->assertSee('Network Admin');
+    $response->assertSee('Visual sponsor tree');
+    $response->assertSee('Branch Head');
     $response->assertSee('downline@example.com');
 });
 

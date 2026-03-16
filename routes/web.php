@@ -1213,7 +1213,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/dashboard/analytics', function () {
             MiningPlatform::ensureDefaults();
 
-            $users = User::with(['friendInvitations', 'investments', 'earnings'])->get();
+            $users = User::with(['sponsor', 'userLevel', 'friendInvitations', 'sponsoredUsers.investments', 'investments', 'earnings'])->get();
             $packages = InvestmentPackage::with('investments')->orderBy('display_order')->get();
             $miner = MiningPlatform::resolveMiner(request()->query('miner'));
             $miner->load([
@@ -1222,6 +1222,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $miners = Miner::with(['investments.user', 'packages'])->orderBy('name')->get();
             $selectedMinerPerformanceLogs = $miner->performanceLogs;
             $selectedMinerSlug = $miner->slug;
+            $networkTree = MiningPlatform::referralTree($users, 3);
+            $networkTreeSummary = MiningPlatform::referralTreeSummary($networkTree);
+            $networkTreeChart = MiningPlatform::referralTreeChartPayload($networkTree, 'Analytics');
 
             $totalInvested = (float) UserInvestment::where('status', 'active')->sum('amount');
 
@@ -1269,6 +1272,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'selectedMinerSlug' => $selectedMinerSlug,
                 'selectedMinerPerformanceLogs' => $selectedMinerPerformanceLogs,
                 'selectedMinerPerformanceSummary' => $selectedMinerPerformanceSummary,
+                'networkTree' => $networkTree,
+                'networkTreeSummary' => $networkTreeSummary,
+                'networkTreeChart' => $networkTreeChart,
             ]);
         })->name('dashboard.analytics');
 
@@ -1644,13 +1650,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $users = User::with([
                 'sponsor',
                 'userLevel',
+                'friendInvitations',
                 'investments.package',
                 'investments.miner',
                 'sponsoredUsers.investments',
             ])->orderBy('name')->get();
+            $networkTree = MiningPlatform::referralTree($users, 5);
+            $networkTreeSummary = MiningPlatform::referralTreeSummary($networkTree);
+            $networkTreeChart = MiningPlatform::referralTreeChartPayload($networkTree, 'Network Admin');
 
             return view('pages.general.network-admin', [
                 'users' => $users,
+                'networkTree' => $networkTree,
+                'networkTreeSummary' => $networkTreeSummary,
+                'networkTreeChart' => $networkTreeChart,
                 'events' => ReferralEvent::with(['sponsor', 'relatedUser', 'investment.package'])
                     ->latest()
                     ->limit(25)

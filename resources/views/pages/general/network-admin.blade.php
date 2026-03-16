@@ -1,4 +1,4 @@
-@extends('layout.master')
+ï»¿@extends('layout.master')
 
 @section('content')
 @php
@@ -35,6 +35,37 @@
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Sponsored users</p><h4 class="mb-0">{{ $users->whereNotNull('sponsor_user_id')->count() }}</h4></div></div></div>
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Active team investors</p><h4 class="mb-0">{{ $users->filter(fn ($user) => $user->investments->where('status', 'active')->where('amount', '>', 0)->isNotEmpty())->count() }}</h4></div></div></div>
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Tracked events</p><h4 class="mb-0">{{ $events->count() }}</h4></div></div></div>
+</div>
+
+<div class="row mb-4">
+  <div class="col-12 stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
+            <h5 class="mb-1">Visual sponsor tree</h5>
+            <p class="text-secondary mb-0">Follow every root sponsor, their direct branches, and the visible sub-levels in one tree view.</p>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <span class="badge bg-primary">{{ $networkTreeSummary['root_count'] }} roots</span>
+            <span class="badge bg-light text-dark">Depth {{ $networkTreeSummary['max_depth'] }}</span>
+            <span class="badge bg-dark">{{ $networkTreeSummary['leaf_nodes'] }} leaves</span>
+          </div>
+        </div>
+
+        @if ($networkTree->isEmpty())
+          <p class="text-secondary mb-0">The sponsor tree will appear here once users start building referral branches.</p>
+        @else
+          @include('pages.general.partials.network-org-chart', [
+            'chartId' => 'adminNetworkOrgChart',
+            'chartTitle' => 'Network Admin Sponsor Tree',
+            'chartDescription' => 'Click any investor node to open a quick branch situation summary and jump into the full investor profile.',
+            'tree' => $networkTree,
+          ])
+        @endif
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="row mb-4">
@@ -115,13 +146,13 @@
                 @foreach ($events as $event)
                   <tr>
                     <td>{{ $event->created_at?->format('M d, Y h:i A') }}</td>
-                    <td>{{ $event->sponsor?->email ?? '—' }}</td>
+                    <td>{{ $event->sponsor?->email ?? 'â€”' }}</td>
                     <td><span class="badge bg-light text-dark">{{ $formatEventDepth($event->type, $event->title) }}</span></td>
                     <td>
                       <div class="fw-semibold">{{ $event->title }}</div>
                       <div class="text-secondary small">{{ $event->message }}</div>
                     </td>
-                    <td>{{ $event->relatedUser?->email ?? '—' }}</td>
+                    <td>{{ $event->relatedUser?->email ?? 'â€”' }}</td>
                   </tr>
                 @endforeach
               </tbody>
@@ -133,6 +164,9 @@
   </div>
 </div>
 @endsection
+
+
+
 
 
 
