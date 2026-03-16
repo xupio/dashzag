@@ -1,4 +1,4 @@
-@extends('layout.master')
+﻿@extends('layout.master')
 
 @section('content')
 <div class="row inbox-wrapper">
@@ -14,6 +14,7 @@
               <div class="d-flex align-items-center">
                 <i data-lucide="messages-square" class="text-primary icon-md me-2"></i>
                 <span>{{ $message->subject }}</span>
+                <span class="badge bg-light text-dark ms-2">{{ \App\Models\InternalMessage::labelOptions()[$message->label] ?? ucfirst($message->label ?? 'General') }}</span>
               </div>
               <div class="d-flex gap-2">
                 @if ($recipientRecord)
@@ -120,4 +121,3 @@
   </div>
 </div>
 @endsection
-

@@ -1,4 +1,4 @@
-@extends('layout.master')
+﻿@extends('layout.master')
 
 @push('plugin-styles')
   <link href="{{ asset('build/plugins/select2/select2.min.css') }}" rel="stylesheet" />
@@ -64,6 +64,17 @@
                 <div class="col-md-10">
                   <input class="form-control @error('subject') is-invalid @enderror" type="text" name="subject" value="{{ old('subject', $prefillSubject ?? '') }}">
                   @error('subject')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+              </div>
+              <div class="row mb-3">
+                <label class="col-md-2 col-form-label">Label</label>
+                <div class="col-md-4">
+                  <select class="form-select @error('label') is-invalid @enderror" name="label">
+                    @foreach ($labels as $value => $label)
+                      <option value="{{ $value }}" @selected(old('label', $prefillLabel ?? 'general') === $value)>{{ $label }}</option>
+                    @endforeach
+                  </select>
+                  @error('label')<div class="invalid-feedback">{{ $message }}</div>@enderror
                 </div>
               </div>
               <div class="row mb-3">
@@ -137,6 +148,3 @@
   });
 </script>
 @endpush
-
-
-

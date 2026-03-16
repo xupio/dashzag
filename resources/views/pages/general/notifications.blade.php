@@ -57,6 +57,20 @@
 </div>
 
 <div class="row mb-4">
+  @foreach ($notificationBreakdown as $breakdownKey => $breakdown)
+    <div class="col-md-6 col-xl-2 grid-margin stretch-card">
+      <a href="{{ route('dashboard.notifications', ['filter' => $breakdownKey]) }}" class="card text-decoration-none {{ $activeFilter === $breakdownKey ? 'border-primary shadow-sm' : '' }}">
+        <div class="card-body">
+          <div class="text-secondary small">{{ $breakdown['label'] }}</div>
+          <div class="fw-semibold fs-4 text-dark">{{ $breakdown['count'] }}</div>
+          <div class="small {{ $breakdown['unread'] > 0 ? 'text-danger' : 'text-secondary' }}">{{ $breakdown['unread'] }} unread</div>
+        </div>
+      </a>
+    </div>
+  @endforeach
+</div>
+
+<div class="row mb-4">
   <div class="col-12">
     <div class="card">
       <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-3">
@@ -65,6 +79,9 @@
             <a href="{{ route('dashboard.notifications', ['filter' => $filterKey]) }}"
                class="btn {{ $activeFilter === $filterKey ? 'btn-primary' : 'btn-outline-secondary' }} btn-sm">
               {{ $filterLabel }}
+              @if ($filterKey !== 'all')
+                <span class="ms-1 badge {{ $activeFilter === $filterKey ? 'bg-light text-primary' : 'bg-secondary' }}">{{ $notificationBreakdown[$filterKey]['count'] ?? 0 }}</span>
+              @endif
             </a>
           @endforeach
         </div>
@@ -154,11 +171,11 @@
                   @php($data = $notification->data)
                   @php($status = $data['status'] ?? 'info')
                   @php($category = $data['category'] ?? 'activity')
+                  @php($eventKey = $data['event_key'] ?? null)
                   @php($isInvestmentOrderEvent = $category === 'investment' && in_array($data['subject'] ?? '', ['Payment proof uploaded', 'Investment payment rejected', 'Investment approved without proof override'], true))
-                  @php($subjectLabel = $isInvestmentOrderEvent ? 'Investment Order Update' : ($data['subject'] ?? 'Notification'))
-                  @php($detailLabel = $isInvestmentOrderEvent ? 'Investment review' : ($data['context_label'] ?? ($data['method_label'] ?? 'System update')))
-                  @php($detailValue = $isInvestmentOrderEvent ? ($data['subject'] ?? 'Investment update') : ($data['context_value'] ?? ($data['destination'] ?? '-')))
-                  @php($statusDetail = $isInvestmentOrderEvent ? ($data['message'] ?? 'Investment review update.') : ($data['status_line'] ?? ($data['notes_line'] ?? '-')))
+                  @php($isHallOfFameWin = in_array($eventKey, ['hall_of_fame_weekly_winner', 'hall_of_fame_monthly_winner'], true))
+                  @php($subjectLabel = $isHallOfFameWin ? 'Champion Win' : ($isInvestmentOrderEvent ? 'Investment Order Update' : ($data['subject'] ?? 'Notification')))
+                  @php($detailLabel = $isHallOfFameWin ? 'Hall of Fame' : ($isInvestmentOrderEvent ? 'Investment review' : ($data['context_label'] ?? ($data['method_label'] ?? 'System update'))))
                   @php($statusClass = match ($status) {
                     'paid', 'approved' => 'bg-primary',
                     'success', 'active' => 'bg-success',
@@ -177,8 +194,8 @@
                     </td>
                     <td>
                       <div>{{ $detailLabel }}</div>
-                      <div class="text-secondary small">{{ $data['context_value'] ?? ($data['destination'] ?? '—') }}</div>
-                      <div class="text-secondary small mt-1">{{ $data['status_line'] ?? ($data['notes_line'] ?? '—') }}</div>
+                      <div class="text-secondary small">{{ $data['context_value'] ?? ($data['destination'] ?? 'â€”') }}</div>
+                      <div class="text-secondary small mt-1">{{ $data['status_line'] ?? ($data['notes_line'] ?? 'â€”') }}</div>
                     </td>
                     <td>
                       @if (array_key_exists('gross_amount', $data))
@@ -189,7 +206,7 @@
                         <div class="fw-semibold">${{ number_format((float) ($data['amount'] ?? 0), 2) }}</div>
                         <div class="text-secondary small">{{ $data['amount_label'] ?? 'Amount' }}</div>
                       @else
-                        <div class="fw-semibold">—</div>
+                        <div class="fw-semibold">â€”</div>
                         <div class="text-secondary small">No amount attached</div>
                       @endif
                     </td>

@@ -1,4 +1,4 @@
-@extends('layout.master')
+﻿@extends('layout.master')
 
 @section('content')
 <div class="row inbox-wrapper">
@@ -44,8 +44,14 @@
                   </div>
                 </div>
                 <div class="col-lg-6">
-                  <form method="GET" action="{{ $folder === 'starred' ? route('email.starred') : ($folder === 'archived' ? route('email.archived') : ($folder === 'trash' ? route('email.trash') : route('email.inbox'))) }}" class="input-group">
+                  <form method="GET" action="{{ $folder === 'starred' ? route('email.starred') : ($folder === 'archived' ? route('email.archived') : ($folder === 'trash' ? route('email.trash') : route('email.inbox'))) }}" class="d-flex gap-2">
                     <input class="form-control" type="text" name="search" value="{{ $search }}" placeholder="Search mail...">
+                    <select class="form-select" name="label" style="max-width: 180px;">
+                      <option value="">All labels</option>
+                      @foreach ($labels as $value => $label)
+                        <option value="{{ $value }}" @selected($selectedLabel === $value)>{{ $label }}</option>
+                      @endforeach
+                    </select>
                     <button class="btn btn-icon border bg-transparent" type="submit"><i data-lucide="search"></i></button>
                   </form>
                 </div>
@@ -127,6 +133,7 @@
                     <a href="{{ route('email.read', $record) }}" class="email-list-detail">
                       <div class="content">
                         <span class="from">{{ $record->message->sender->name }}</span>
+                        <span class="badge bg-light text-dark ms-2">{{ $labels[$record->message->label] ?? ucfirst($record->message->label ?? 'General') }}</span>
                         <strong class="d-block mb-1">{{ $record->message->subject }}</strong>
                         <p class="msg">{{ \Illuminate\Support\Str::limit(strip_tags($record->message->body), 150) }}</p>
                       </div>

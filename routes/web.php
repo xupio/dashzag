@@ -5,6 +5,7 @@ use App\Http\Controllers\ProfileController;
 use App\Mail\FriendInvitationMail;
 use App\Models\Earning;
 use App\Models\FriendInvitation;
+use App\Models\HallOfFameSnapshot;
 use App\Models\InvestmentOrder;
 use App\Models\InvestmentPackage;
 use App\Models\Miner;
@@ -22,6 +23,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Validation\Rule;
 
@@ -138,7 +140,8 @@ Route::get('/dashboard', function (Request $request) {
     $miner = MiningPlatform::resolveMiner($request->query('miner'));
     $miner->load(['performanceLogs', 'packages' => fn ($query) => $query->where('is_active', true)->orderBy('display_order')]);
 
-    $performanceLogs = $miner->performanceLogs()->orderBy('logged_on')->take(7)->get();
+    $minerPerformanceSummary = MiningPlatform::minerPerformanceSummary($miner, 7);
+    $performanceLogs = $minerPerformanceSummary['logs'];
     $recentPerformanceLogs = $miner->performanceLogs()->orderByDesc('logged_on')->limit(5)->get();
     $sharesSold = MiningPlatform::totalSharesSold($miner);
     $availableShares = max($miner->total_shares - $sharesSold, 0);
@@ -180,7 +183,7 @@ Route::get('/dashboard', function (Request $request) {
     }
 
     $minerInvestorPipeline = UserInvestment::query()
-        ->with(['user.userLevel', 'package'])
+        ->with(['user.userLevel', 'user.friendInvitations', 'user.sponsoredUsers.investments', 'user.investments', 'package'])
         ->where('miner_id', $miner->id)
         ->where('status', 'active')
         ->orderByDesc('subscribed_at')
@@ -198,11 +201,15 @@ Route::get('/dashboard', function (Request $request) {
                 'expected_return_rate' => round(((float) $latestInvestment?->monthly_return_rate + (float) $latestInvestment?->level_bonus_rate + (float) $latestInvestment?->team_bonus_rate) * 100, 2),
                 'active_positions' => $investments->count(),
                 'latest_subscribed_at' => $latestInvestment?->subscribed_at,
+                'profile_power' => $investor ? MiningPlatform::profilePowerSummary($investor) : null,
             ];
         })
         ->filter(fn ($row) => $row['user'])
         ->sortByDesc(fn ($row) => optional($row['latest_subscribed_at'])->timestamp ?? 0)
         ->values();
+
+    $weeklyHallOfFameWinner = MiningPlatform::competitionLeaderboard('weekly', 1)->first();
+    $monthlyHallOfFameChampion = MiningPlatform::competitionLeaderboard('monthly', 1)->first();
 
     return view('dashboard', [
         'user' => $user,
@@ -216,17 +223,162 @@ Route::get('/dashboard', function (Request $request) {
         'activeInvestment' => $user->investments->where('status', 'active')->firstWhere('miner_id', $miner->id),
         'performanceLabels' => $performanceLogs->map(fn ($log) => $log->logged_on->format('M d'))->values(),
         'performanceRevenueData' => $performanceLogs->map(fn ($log) => round((float) $log->revenue_usd, 2))->values(),
+        'performanceCostData' => $performanceLogs->map(fn ($log) => round((float) $log->electricity_cost_usd + (float) $log->maintenance_cost_usd, 2))->values(),
+        'performanceNetProfitData' => $performanceLogs->map(fn ($log) => round((float) $log->net_profit_usd, 2))->values(),
         'performanceHashrateData' => $performanceLogs->map(fn ($log) => round((float) $log->hashrate_th, 2))->values(),
         'performanceUptimeData' => $performanceLogs->map(fn ($log) => round((float) $log->uptime_percentage, 2))->values(),
         'recentPerformanceLogs' => $recentPerformanceLogs,
+        'livePerformanceSummary' => $minerPerformanceSummary,
         'shareStatusLabels' => $shareStatusBreakdown->pluck('label')->values()->all(),
         'shareStatusSeries' => $shareStatusBreakdown->pluck('shares')->values()->all(),
         'shareStatusDetails' => $shareStatusBreakdown->values()->all(),
         'minerInvestorPipeline' => $minerInvestorPipeline,
+        'weeklyHallOfFameWinnerId' => $weeklyHallOfFameWinner['user']->id ?? null,
+        'monthlyHallOfFameChampionId' => $monthlyHallOfFameChampion['user']->id ?? null,
     ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/dashboard/miner-report', function (Request $request) {
+        MiningPlatform::ensureDefaults();
+
+        $user = $request->user()->load(['investments.package', 'investments.miner', 'earnings.investment.miner']);
+        $miners = MiningPlatform::activeMiners();
+        $miner = MiningPlatform::resolveMiner($request->query('miner'));
+        $miner->load([
+            'performanceLogs' => fn ($query) => $query->orderByDesc('logged_on')->limit(14),
+            'packages' => fn ($query) => $query->where('is_active', true)->orderBy('display_order'),
+        ]);
+
+        $minerPerformanceSummary = MiningPlatform::minerPerformanceSummary($miner, 14);
+        $performanceLogs = $minerPerformanceSummary['logs'];
+        $activeInvestments = $user->investments->where('status', 'active')->where('miner_id', $miner->id)->values();
+        $userMinerEarnings = $user->earnings
+            ->filter(fn ($earning) => $earning->source === 'mining_daily_share' && $earning->investment?->miner_id === $miner->id)
+            ->sortByDesc(fn ($earning) => optional($earning->earned_on)?->timestamp ?? 0)
+            ->values();
+
+        $userMinerEarningsByDay = $userMinerEarnings
+            ->take(14)
+            ->groupBy(fn ($earning) => optional($earning->earned_on)?->toDateString() ?? 'unknown')
+            ->map(function ($earnings, $date) {
+                return [
+                    'label' => Carbon\Carbon::parse($date)->format('M d'),
+                    'total' => round((float) $earnings->sum('amount'), 2),
+                ];
+            })
+            ->sortBy('label')
+            ->values();
+
+        return view('pages.general.miner-report', [
+            'user' => $user,
+            'miners' => $miners,
+            'miner' => $miner,
+            'minerPerformanceSummary' => $minerPerformanceSummary,
+            'performanceLogs' => $performanceLogs,
+            'activeInvestmentCount' => $activeInvestments->count(),
+            'activeSharesOwned' => (int) $activeInvestments->sum('shares_owned'),
+            'activeCapital' => round((float) $activeInvestments->sum('amount'), 2),
+            'latestUserMinerPayout' => (float) optional($userMinerEarnings->first())->amount,
+            'userMinerPayoutTotal' => round((float) $userMinerEarnings->take(14)->sum('amount'), 2),
+            'userMinerEarningsByDay' => $userMinerEarningsByDay,
+            'userHasStake' => $activeInvestments->isNotEmpty(),
+        ]);
+    })->name('dashboard.miner-report');
+
+    Route::get('/dashboard/miner-report/export', function (Request $request) {
+        MiningPlatform::ensureDefaults();
+
+        $user = $request->user()->load(['investments.miner', 'earnings.investment.miner']);
+        $miner = MiningPlatform::resolveMiner($request->query('miner'));
+        $performanceLogs = $miner->performanceLogs()
+            ->orderByDesc('logged_on')
+            ->limit(14)
+            ->get()
+            ->sortBy(fn ($log) => optional($log->logged_on)?->timestamp ?? 0)
+            ->values();
+
+        $userMinerEarnings = $user->earnings
+            ->filter(fn ($earning) => $earning->source === 'mining_daily_share' && $earning->investment?->miner_id === $miner->id)
+            ->sortBy(fn ($earning) => optional($earning->earned_on)?->timestamp ?? 0)
+            ->values();
+
+        $filename = $miner->slug.'-daily-miner-report-'.now()->format('Ymd-His').'.csv';
+
+        return response()->streamDownload(function () use ($miner, $performanceLogs, $userMinerEarnings) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['Section', 'Label', 'Value']);
+            fputcsv($handle, ['Summary', 'Miner', $miner->name]);
+            fputcsv($handle, ['Summary', 'Slug', $miner->slug]);
+            fputcsv($handle, ['Summary', 'Tracked days', $performanceLogs->count()]);
+            fputcsv($handle, []);
+            fputcsv($handle, ['Daily log', 'Date', 'Revenue', 'Costs', 'Net profit', 'Per share', 'Hashrate', 'Uptime', 'Source']);
+
+            foreach ($performanceLogs as $log) {
+                fputcsv($handle, [
+                    'Daily log',
+                    optional($log->logged_on)->format('Y-m-d'),
+                    number_format((float) $log->revenue_usd, 2, '.', ''),
+                    number_format((float) $log->electricity_cost_usd + (float) $log->maintenance_cost_usd, 2, '.', ''),
+                    number_format((float) $log->net_profit_usd, 2, '.', ''),
+                    number_format((float) $log->revenue_per_share_usd, 4, '.', ''),
+                    number_format((float) $log->hashrate_th, 2, '.', ''),
+                    number_format((float) $log->uptime_percentage, 2, '.', ''),
+                    $log->source,
+                ]);
+            }
+
+            fputcsv($handle, []);
+            fputcsv($handle, ['Your payout', 'Date', 'Amount', 'Notes']);
+
+            foreach ($userMinerEarnings as $earning) {
+                fputcsv($handle, [
+                    'Your payout',
+                    optional($earning->earned_on)->format('Y-m-d'),
+                    number_format((float) $earning->amount, 2, '.', ''),
+                    $earning->notes,
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    })->name('dashboard.miner-report.export');
+
+    Route::get('/dashboard/miner-report/print', function (Request $request) {
+        MiningPlatform::ensureDefaults();
+
+        $user = $request->user()->load(['investments.package', 'investments.miner', 'earnings.investment.miner']);
+        $miners = MiningPlatform::activeMiners();
+        $miner = MiningPlatform::resolveMiner($request->query('miner'));
+        $miner->load([
+            'performanceLogs' => fn ($query) => $query->orderByDesc('logged_on')->limit(14),
+            'packages' => fn ($query) => $query->where('is_active', true)->orderBy('display_order'),
+        ]);
+
+        $minerPerformanceSummary = MiningPlatform::minerPerformanceSummary($miner, 14);
+        $performanceLogs = $minerPerformanceSummary['logs'];
+        $activeInvestments = $user->investments->where('status', 'active')->where('miner_id', $miner->id)->values();
+        $userMinerEarnings = $user->earnings
+            ->filter(fn ($earning) => $earning->source === 'mining_daily_share' && $earning->investment?->miner_id === $miner->id)
+            ->sortByDesc(fn ($earning) => optional($earning->earned_on)?->timestamp ?? 0)
+            ->values();
+
+        return view('pages.general.miner-report-print', [
+            'user' => $user,
+            'miners' => $miners,
+            'miner' => $miner,
+            'minerPerformanceSummary' => $minerPerformanceSummary,
+            'performanceLogs' => $performanceLogs,
+            'activeInvestmentCount' => $activeInvestments->count(),
+            'activeSharesOwned' => (int) $activeInvestments->sum('shares_owned'),
+            'activeCapital' => round((float) $activeInvestments->sum('amount'), 2),
+            'latestUserMinerPayout' => (float) optional($userMinerEarnings->first())->amount,
+            'userMinerPayoutTotal' => round((float) $userMinerEarnings->take(14)->sum('amount'), 2),
+            'userMinerEarnings' => $userMinerEarnings->take(14),
+            'userHasStake' => $activeInvestments->isNotEmpty(),
+        ]);
+    })->name('dashboard.miner-report.print');
+
     Route::get('/email/inbox', [InternalMailController::class, 'inbox'])->name('email.inbox');
     Route::get('/email/starred', [InternalMailController::class, 'starred'])->name('email.starred');
     Route::get('/email/archived', [InternalMailController::class, 'archived'])->name('email.archived');
@@ -264,6 +416,30 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $verifiedReferrals = $user->friendInvitations->whereNotNull('verified_at')->count();
         $registeredReferrals = $user->friendInvitations->whereNotNull('registered_at')->count();
         $teamBonusRate = MiningPlatform::teamBonusRate($user);
+        $profilePower = MiningPlatform::profilePowerSummary($user);
+        $weeklyMomentum = MiningPlatform::weeklyMomentumSummary($user);
+        $monthlyMomentum = MiningPlatform::monthlyMomentumSummary($user);
+        $weeklyMomentumHistory = MiningPlatform::weeklyMomentumHistory($user);
+        $leaderboard = MiningPlatform::profilePowerLeaderboard();
+        $leaderboardPosition = $leaderboard->search(fn ($row) => $row['user']->is($user));
+        $recentRankCelebrations = $user->notifications()
+            ->where('type', \App\Notifications\ActivityFeedNotification::class)
+            ->latest()
+            ->get()
+            ->filter(fn ($notification) => ($notification->data['event_key'] ?? null) === 'profile_power_rank')
+            ->take(3)
+            ->values();
+        $recentHallOfFameWins = $user->notifications()
+            ->where('type', \App\Notifications\ActivityFeedNotification::class)
+            ->latest()
+            ->get()
+            ->filter(fn ($notification) => in_array(($notification->data['event_key'] ?? null), ['hall_of_fame_weekly_winner', 'hall_of_fame_monthly_winner'], true))
+            ->take(4)
+            ->values();
+        $hallOfFameWinCounts = [
+            'weekly' => HallOfFameSnapshot::query()->where('user_id', $user->id)->where('category', 'weekly')->where('rank_position', 1)->count(),
+            'monthly' => HallOfFameSnapshot::query()->where('user_id', $user->id)->where('category', 'monthly')->where('rank_position', 1)->count(),
+        ];
         $investmentAllocation = $activeInvestments
             ->groupBy(fn ($investment) => $investment->miner?->name ?? 'Unknown miner')
             ->map(fn ($investments) => round((float) $investments->sum('amount'), 2))
@@ -287,6 +463,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'verifiedReferrals' => $verifiedReferrals,
             'registeredReferrals' => $registeredReferrals,
             'teamBonusRate' => $teamBonusRate,
+            'profilePower' => $profilePower,
+            'weeklyMomentum' => $weeklyMomentum,
+            'monthlyMomentum' => $monthlyMomentum,
+            'weeklyMomentumHistory' => $weeklyMomentumHistory,
+            'profilePowerLeaderboard' => $leaderboard,
+            'leaderboardPosition' => $leaderboardPosition === false ? null : $leaderboardPosition + 1,
+            'recentRankCelebrations' => $recentRankCelebrations,
+            'recentHallOfFameWins' => $recentHallOfFameWins,
+            'hallOfFameWinCounts' => $hallOfFameWinCounts,
             'profileInvestmentLabels' => $investmentAllocation->keys()->values()->all(),
             'profileInvestmentSeries' => $investmentAllocation->values()->all(),
             'profileFinanceLabels' => ['Invested', 'Monthly return', 'Wallet'],
@@ -304,6 +489,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('dashboard.profile');
 
+    Route::get('/dashboard/hall-of-fame', function () {
+        MiningPlatform::ensureDefaults();
+
+        $powerLeaders = MiningPlatform::competitionLeaderboard('power');
+        $weeklyMovers = MiningPlatform::captureCompetitionSnapshot('weekly');
+        $monthlyChampions = MiningPlatform::captureCompetitionSnapshot('monthly');
+        $weeklyWinnerHistory = MiningPlatform::hallOfFameWinnerHistory('weekly');
+        $monthlyChampionHistory = MiningPlatform::hallOfFameWinnerHistory('monthly');
+
+        return view('pages.general.hall-of-fame', [
+            'powerLeaders' => $powerLeaders,
+            'weeklyMovers' => $weeklyMovers,
+            'monthlyChampions' => $monthlyChampions,
+            'weeklyWinnerHistory' => $weeklyWinnerHistory,
+            'monthlyChampionHistory' => $monthlyChampionHistory,
+        ]);
+    })->name('dashboard.hall-of-fame');
+
     Route::get('/dashboard/investors/{user}', function (Request $request, User $user) {
         MiningPlatform::ensureDefaults();
 
@@ -315,6 +518,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $totalInvested = (float) $activeInvestments->sum('amount');
         $expectedMonthlyEarnings = MiningPlatform::expectedMonthlyEarnings($user);
         $teamBonusRate = MiningPlatform::teamBonusRate($user);
+        $profilePower = MiningPlatform::profilePowerSummary($user);
+        $recentHallOfFameWins = $user->notifications()
+            ->where('type', \App\Notifications\ActivityFeedNotification::class)
+            ->latest()
+            ->get()
+            ->filter(fn ($notification) => in_array(($notification->data['event_key'] ?? null), ['hall_of_fame_weekly_winner', 'hall_of_fame_monthly_winner'], true))
+            ->take(4)
+            ->values();
+        $hallOfFameWinCounts = [
+            'weekly' => HallOfFameSnapshot::query()->where('user_id', $user->id)->where('category', 'weekly')->where('rank_position', 1)->count(),
+            'monthly' => HallOfFameSnapshot::query()->where('user_id', $user->id)->where('category', 'monthly')->where('rank_position', 1)->count(),
+        ];
         $investmentAllocation = $activeInvestments
             ->groupBy(fn ($investment) => $investment->miner?->name ?? 'Unknown miner')
             ->map(fn ($investments) => round((float) $investments->sum('amount'), 2))
@@ -333,6 +548,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'totalInvested' => $totalInvested,
             'expectedMonthlyEarnings' => $expectedMonthlyEarnings,
             'teamBonusRate' => $teamBonusRate,
+            'profilePower' => $profilePower,
+            'recentHallOfFameWins' => $recentHallOfFameWins,
+            'hallOfFameWinCounts' => $hallOfFameWinCounts,
             'backTarget' => match (true) {
                 $request->query('from') === 'shareholders' && $viewer->isAdmin() => route('dashboard.shareholders'),
                 $request->query('from') === 'network-admin' && $viewer->isAdmin() => route('dashboard.network-admin'),
@@ -358,26 +576,39 @@ Route::middleware(['auth', 'verified'])->group(function () {
         }
 
         $notifications = $request->user()->notifications()->latest()->get();
+        $notificationFilters = [
+            'all' => 'All',
+            'payout' => 'Payouts',
+            'reward' => 'Rewards',
+            'investment' => 'Investments',
+            'network' => 'Network',
+            'milestone' => 'Milestones',
+            'digest' => 'Digests',
+        ];
         $filteredNotifications = $filter === 'all'
             ? $notifications
             : $notifications->filter(
                 fn ($notification) => ($notification->data['category'] ?? 'payout') === $filter
             )->values();
+        $notificationBreakdown = collect($notificationFilters)
+            ->reject(fn ($label, $key) => $key === 'all')
+            ->map(function ($label, $key) use ($notifications) {
+                $items = $notifications->filter(fn ($notification) => ($notification->data['category'] ?? 'payout') === $key);
+
+                return [
+                    'label' => $label,
+                    'count' => $items->count(),
+                    'unread' => $items->whereNull('read_at')->count(),
+                ];
+            });
 
         return view('pages.general.notifications', [
             'notifications' => $filteredNotifications,
             'allNotificationsCount' => $notifications->count(),
             'unreadCount' => $request->user()->unreadNotifications()->count(),
             'activeFilter' => $filter,
-            'notificationFilters' => [
-                'all' => 'All',
-                'payout' => 'Payouts',
-                'reward' => 'Rewards',
-                'investment' => 'Investments',
-                'network' => 'Network',
-                'milestone' => 'Milestones',
-                'digest' => 'Digests',
-            ],
+            'notificationFilters' => $notificationFilters,
+            'notificationBreakdown' => $notificationBreakdown,
         ]);
     })->name('dashboard.notifications');
 
@@ -500,11 +731,76 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard/investments', function () {
         MiningPlatform::ensureDefaults();
 
-        $user = request()->user()->load(['investments.miner', 'investments.package', 'earnings']);
+        $source = request()->query('source', 'all');
+        $sourceMap = [
+            'all' => [
+                'label' => 'All earnings',
+                'sources' => ['mining_daily_share', 'mining_return', 'referral_registration', 'referral_subscription', 'team_subscription_bonus', 'team_downline_bonus', 'team_level_3_bonus', 'team_level_4_bonus', 'team_level_5_bonus'],
+            ],
+            'miner_daily_share' => [
+                'label' => 'Miner daily share',
+                'sources' => ['mining_daily_share'],
+            ],
+            'monthly_return' => [
+                'label' => 'Monthly return',
+                'sources' => ['mining_return'],
+            ],
+            'direct_referral' => [
+                'label' => 'Direct referral rewards',
+                'sources' => ['referral_registration', 'referral_subscription'],
+            ],
+            'mlm_network' => [
+                'label' => 'MLM network rewards',
+                'sources' => ['team_subscription_bonus', 'team_downline_bonus', 'team_level_3_bonus', 'team_level_4_bonus', 'team_level_5_bonus'],
+            ],
+        ];
+
+        if (! array_key_exists($source, $sourceMap)) {
+            $source = 'all';
+        }
+
+        $user = request()->user()->load(['investments.miner', 'investments.package', 'earnings.investment.package', 'earnings.investment.miner']);
         $activeInvestments = $user->investments->where('status', 'active')->values();
         $totalInvested = (float) $activeInvestments->sum('amount');
         $expectedMonthlyEarnings = MiningPlatform::expectedMonthlyEarnings($user);
         $availableEarnings = (float) $user->earnings->where('status', 'available')->sum('amount');
+        $earningsHistory = $user->earnings
+            ->whereIn('source', $sourceMap['all']['sources'])
+            ->sortByDesc(fn ($earning) => optional($earning->earned_on)?->timestamp ?? 0)
+            ->values();
+        $filteredEarnings = $source === 'all'
+            ? $earningsHistory
+            : $earningsHistory->whereIn('source', $sourceMap[$source]['sources'])->values();
+        $earningsByDay = $filteredEarnings
+            ->groupBy(fn ($earning) => $earning->earned_on?->format('Y-m-d'))
+            ->map(fn ($earnings, $day) => [
+                'day' => $day,
+                'label' => optional(optional($earnings->first())->earned_on)->format('M d'),
+                'total' => round((float) $earnings->sum('amount'), 2),
+            ])
+            ->sortBy('day')
+            ->values();
+        $earningsBreakdown = [
+            'miner_daily_share' => [
+                'label' => 'Miner daily share',
+                'amount' => round((float) $earningsHistory->where('source', 'mining_daily_share')->sum('amount'), 2),
+            ],
+            'monthly_return' => [
+                'label' => 'Monthly return',
+                'amount' => round((float) $earningsHistory->where('source', 'mining_return')->sum('amount'), 2),
+            ],
+            'direct_referral' => [
+                'label' => 'Direct referral rewards',
+                'amount' => round((float) $earningsHistory->whereIn('source', ['referral_registration', 'referral_subscription'])->sum('amount'), 2),
+            ],
+            'mlm_network' => [
+                'label' => 'MLM network rewards',
+                'amount' => round((float) $earningsHistory->whereIn('source', ['team_subscription_bonus', 'team_downline_bonus', 'team_level_3_bonus', 'team_level_4_bonus', 'team_level_5_bonus'])->sum('amount'), 2),
+            ],
+        ];
+        $investmentLivePerformance = $activeInvestments
+            ->map(fn (UserInvestment $investment) => MiningPlatform::investmentLivePerformanceSummary($investment, 7))
+            ->values();
 
         return view('pages.general.investments', [
             'user' => $user,
@@ -514,6 +810,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'totalSharesOwned' => (int) $activeInvestments->sum('shares_owned'),
             'expectedMonthlyEarnings' => $expectedMonthlyEarnings,
             'availableEarnings' => $availableEarnings,
+            'earningsHistory' => $filteredEarnings,
+            'earningsByDay' => $earningsByDay,
+            'totalFilteredEarnings' => round((float) $filteredEarnings->sum('amount'), 2),
+            'earningsBreakdown' => $earningsBreakdown,
+            'earningsSourceOptions' => $sourceMap,
+            'activeSource' => $source,
+            'investmentLivePerformance' => $investmentLivePerformance,
         ]);
     })->name('dashboard.investments');
 
@@ -567,6 +870,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard/network', function () {
         MiningPlatform::ensureDefaults();
 
+        $rewardFilter = request()->query('reward_filter', 'all');
+        $rewardFilters = [
+            'all' => 'All rewards',
+            'direct' => 'Direct rewards',
+            'mlm' => 'MLM rewards',
+        ];
+        if (! array_key_exists($rewardFilter, $rewardFilters)) {
+            $rewardFilter = 'all';
+        }
+
+        $pipelineFilter = request()->query('pipeline_filter', 'all');
+        $pipelineFilters = [
+            'all' => 'All contacts',
+            'verified' => 'Verified',
+            'registered' => 'Registered',
+            'active_investor' => 'Active investors',
+            'pending' => 'Pending',
+        ];
+        if (! array_key_exists($pipelineFilter, $pipelineFilters)) {
+            $pipelineFilter = 'all';
+        }
+
         $user = request()->user()->load([
             'sponsor',
             'friendInvitations',
@@ -574,10 +899,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'referralEvents.relatedUser',
             'referralEvents.investment.package',
             'sponsoredUsers' => fn ($query) => $query->with([
+                'userLevel',
+                'friendInvitations',
                 'investments.package',
                 'investments.miner',
+                'sponsoredUsers.userLevel',
+                'sponsoredUsers.friendInvitations',
                 'sponsoredUsers.investments.package',
                 'sponsoredUsers.investments.miner',
+                'sponsoredUsers.sponsoredUsers.investments',
             ])->orderBy('name'),
         ]);
 
@@ -603,9 +933,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $activeInvestments = $member->investments->where('status', 'active')->where('amount', '>', 0);
             $branchSecondLevel = $member->sponsoredUsers->values();
             $branchSecondLevelActive = $branchSecondLevel->filter(fn ($downline) => $downline->investments->where('status', 'active')->where('amount', '>', 0)->isNotEmpty());
+            $weeklyMomentum = MiningPlatform::weeklyMomentumSummary($member);
 
             return [
                 'member' => $member,
+                'profile_power' => MiningPlatform::profilePowerSummary($member),
+                'weekly_momentum' => $weeklyMomentum,
                 'active_investments' => $activeInvestments,
                 'active_capital' => (float) $activeInvestments->sum('amount'),
                 'active_package' => $activeInvestments->sortByDesc('subscribed_at')->first()?->package?->name,
@@ -613,14 +946,50 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'downline_count' => $branchSecondLevel->count(),
                 'downline_active_count' => $branchSecondLevelActive->count(),
                 'downline_capital' => (float) $branchSecondLevel->sum(fn ($downline) => $downline->investments->where('status', 'active')->where('amount', '>', 0)->sum('amount')),
-                'downline_members' => $branchSecondLevel,
+                'downline_members' => $branchSecondLevel->map(fn ($downline) => [
+                    'member' => $downline,
+                    'profile_power' => MiningPlatform::profilePowerSummary($downline),
+                ])->values(),
             ];
         })->values();
+        $topTeamMember = $directTeamBranches
+            ->sortByDesc(fn ($branch) => $branch['profile_power']['score'])
+            ->first();
+        $teamLeaderboard = $directTeamBranches
+            ->sortByDesc(fn ($branch) => $branch['profile_power']['score'])
+            ->take(5)
+            ->values();
+        $topMover = $directTeamBranches
+            ->sortByDesc(fn ($branch) => $branch['weekly_momentum']['score'])
+            ->first();
+        $monthlyBranchChampion = $directTeamBranches
+            ->map(function ($branch) {
+                $branch['monthly_momentum'] = MiningPlatform::monthlyMomentumSummary($branch['member']);
 
-        $referralRewards = $user->earnings
-            ->whereIn('source', ['referral_registration', 'referral_subscription', 'team_subscription_bonus', 'team_downline_bonus'])
+                return $branch;
+            })
+            ->sortByDesc(fn ($branch) => $branch['monthly_momentum']['score'])
+            ->first();
+
+        $allReferralRewards = $user->earnings
+            ->whereIn('source', ['referral_registration', 'referral_subscription', 'team_subscription_bonus', 'team_downline_bonus', 'team_level_3_bonus', 'team_level_4_bonus', 'team_level_5_bonus'])
             ->sortByDesc(fn ($reward) => optional($reward->earned_on)->timestamp ?? 0)
             ->values();
+        $filteredReferralRewards = match ($rewardFilter) {
+            'direct' => $allReferralRewards->whereIn('source', ['referral_registration', 'referral_subscription'])->values(),
+            'mlm' => $allReferralRewards->whereIn('source', ['team_subscription_bonus', 'team_downline_bonus', 'team_level_3_bonus', 'team_level_4_bonus', 'team_level_5_bonus'])->values(),
+            default => $allReferralRewards,
+        };
+
+        $filteredInvitations = $friendInvitations->filter(function ($friendInvitation) use ($pipelineFilter, $activeInvestorEmails) {
+            return match ($pipelineFilter) {
+                'verified' => ! is_null($friendInvitation->verified_at),
+                'registered' => ! is_null($friendInvitation->registered_at),
+                'active_investor' => $activeInvestorEmails->contains($friendInvitation->email),
+                'pending' => is_null($friendInvitation->verified_at) && is_null($friendInvitation->registered_at) && ! $activeInvestorEmails->contains($friendInvitation->email),
+                default => true,
+            };
+        })->values();
 
         $activeTeamInvestors = $directTeam->filter(fn ($member) => $member->investments->where('status', 'active')->isNotEmpty())->count();
         $teamCapital = (float) $directTeam->sum(fn ($member) => $member->investments->where('status', 'active')->sum('amount'));
@@ -628,10 +997,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         return view('pages.general.network', [
             'user' => $user,
-            'friendInvitations' => $friendInvitations,
+            'friendInvitations' => $filteredInvitations,
+            'allFriendInvitationsCount' => $friendInvitations->count(),
             'directTeam' => $directTeam,
             'directTeamBranches' => $directTeamBranches,
             'secondLevelTeam' => $secondLevelTeam,
+            'topTeamMember' => $topTeamMember,
+            'teamLeaderboard' => $teamLeaderboard,
+            'topMover' => $topMover,
+            'monthlyBranchChampion' => $monthlyBranchChampion,
             'teamEvents' => $user->referralEvents->sortByDesc('created_at')->values(),
             'teamBonusRate' => $teamBonusRate,
             'activeTeamInvestors' => $activeTeamInvestors,
@@ -641,23 +1015,113 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'registeredCount' => $friendInvitations->whereNotNull('registered_at')->count(),
             'subscribedCount' => $activeInvestorEmails->count(),
             'activeInvestorEmails' => $activeInvestorEmails,
-            'referralRewards' => $referralRewards,
-            'referralRewardsTotal' => (float) $referralRewards->sum('amount'),
+            'referralRewards' => $filteredReferralRewards,
+            'allReferralRewardsCount' => $allReferralRewards->count(),
+            'referralRewardsTotal' => (float) $allReferralRewards->sum('amount'),
+            'rewardBreakdown' => [
+                'direct' => [
+                    'label' => 'Direct rewards',
+                    'count' => $allReferralRewards->whereIn('source', ['referral_registration', 'referral_subscription'])->count(),
+                    'amount' => (float) $allReferralRewards->whereIn('source', ['referral_registration', 'referral_subscription'])->sum('amount'),
+                ],
+                'mlm' => [
+                    'label' => 'MLM rewards',
+                    'count' => $allReferralRewards->whereIn('source', ['team_subscription_bonus', 'team_downline_bonus', 'team_level_3_bonus', 'team_level_4_bonus', 'team_level_5_bonus'])->count(),
+                    'amount' => (float) $allReferralRewards->whereIn('source', ['team_subscription_bonus', 'team_downline_bonus', 'team_level_3_bonus', 'team_level_4_bonus', 'team_level_5_bonus'])->sum('amount'),
+                ],
+            ],
+            'rewardFilter' => $rewardFilter,
+            'rewardFilters' => $rewardFilters,
+            'pipelineFilter' => $pipelineFilter,
+            'pipelineFilters' => $pipelineFilters,
+            'pipelineBreakdown' => [
+                'verified' => $friendInvitations->whereNotNull('verified_at')->count(),
+                'registered' => $friendInvitations->whereNotNull('registered_at')->count(),
+                'active_investor' => $activeInvestorEmails->count(),
+                'pending' => $friendInvitations->filter(fn ($friendInvitation) => is_null($friendInvitation->verified_at) && is_null($friendInvitation->registered_at) && ! $activeInvestorEmails->contains($friendInvitation->email))->count(),
+            ],
         ]);
     })->name('dashboard.network');
 
     Route::get('/dashboard/wallet', function () {
         MiningPlatform::ensureDefaults();
 
-        $user = request()->user()->load(['userLevel', 'earnings.investment.package', 'investments.package', 'payoutRequests']);
+        $source = request()->query('source', 'all');
+        $sourceMap = [
+            'all' => [
+                'label' => 'All earnings',
+                'sources' => null,
+            ],
+            'miner_daily_share' => [
+                'label' => 'Miner daily share',
+                'sources' => ['mining_daily_share'],
+            ],
+            'monthly_return' => [
+                'label' => 'Monthly return',
+                'sources' => ['mining_return'],
+            ],
+            'direct_referral' => [
+                'label' => 'Direct referral rewards',
+                'sources' => ['referral_registration', 'referral_subscription'],
+            ],
+            'mlm_network' => [
+                'label' => 'MLM network rewards',
+                'sources' => [
+                    'team_subscription_bonus',
+                    'team_downline_bonus',
+                    'team_level_3_bonus',
+                    'team_level_4_bonus',
+                    'team_level_5_bonus',
+                ],
+            ],
+        ];
+
+        if (! array_key_exists($source, $sourceMap)) {
+            $source = 'all';
+        }
+
+        $user = request()->user()->load(['userLevel', 'earnings.investment.package', 'earnings.investment.miner', 'investments.package', 'payoutRequests']);
         $wallet = MiningPlatform::walletSummary($user);
         $activeInvestments = $user->investments->where('status', 'active')->values();
         $expectedMonthlyEarnings = MiningPlatform::expectedMonthlyEarnings($user);
+        $earnings = $user->earnings;
+
+        $walletSourceBreakdown = [
+            'miner_daily_share' => [
+                'label' => 'Miner daily share',
+                'amount' => round((float) $earnings->where('source', 'mining_daily_share')->sum('amount'), 2),
+            ],
+            'monthly_return' => [
+                'label' => 'Monthly return',
+                'amount' => round((float) $earnings->where('source', 'mining_return')->sum('amount'), 2),
+            ],
+            'direct_referral' => [
+                'label' => 'Direct referral rewards',
+                'amount' => round((float) $earnings->whereIn('source', ['referral_registration', 'referral_subscription'])->sum('amount'), 2),
+            ],
+            'mlm_network' => [
+                'label' => 'MLM network rewards',
+                'amount' => round((float) $earnings->whereIn('source', [
+                    'team_subscription_bonus',
+                    'team_downline_bonus',
+                    'team_level_3_bonus',
+                    'team_level_4_bonus',
+                    'team_level_5_bonus',
+                ])->sum('amount'), 2),
+            ],
+        ];
+
+        $filteredEarnings = $source === 'all'
+            ? $earnings
+            : $earnings->whereIn('source', $sourceMap[$source]['sources'])->values();
 
         return view('pages.general.wallet', [
             'user' => $user,
             'wallet' => $wallet,
-            'earnings' => $user->earnings,
+            'earnings' => $filteredEarnings,
+            'walletSourceBreakdown' => $walletSourceBreakdown,
+            'walletSourceOptions' => $sourceMap,
+            'activeSource' => $source,
             'payoutRequests' => $user->payoutRequests,
             'activeInvestments' => $activeInvestments,
             'expectedMonthlyEarnings' => $expectedMonthlyEarnings,
@@ -752,7 +1216,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $users = User::with(['friendInvitations', 'investments', 'earnings'])->get();
             $packages = InvestmentPackage::with('investments')->orderBy('display_order')->get();
             $miner = MiningPlatform::resolveMiner(request()->query('miner'));
+            $miner->load([
+                'performanceLogs' => fn ($query) => $query->orderBy('logged_on')->limit(7),
+            ]);
             $miners = Miner::with(['investments.user', 'packages'])->orderBy('name')->get();
+            $selectedMinerPerformanceLogs = $miner->performanceLogs;
+            $selectedMinerSlug = $miner->slug;
 
             $totalInvested = (float) UserInvestment::where('status', 'active')->sum('amount');
 
@@ -775,8 +1244,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ];
             })->values();
 
+            $selectedMinerPerformanceSummary = [
+                'total_revenue' => round((float) $selectedMinerPerformanceLogs->sum('revenue_usd'), 2),
+                'total_net_profit' => round((float) $selectedMinerPerformanceLogs->sum('net_profit_usd'), 2),
+                'average_uptime' => round((float) $selectedMinerPerformanceLogs->avg('uptime_percentage'), 2),
+                'average_hashrate' => round((float) $selectedMinerPerformanceLogs->avg('hashrate_th'), 2),
+                'average_per_share' => round((float) $selectedMinerPerformanceLogs->avg('revenue_per_share_usd'), 4),
+                'automatic_runs' => (int) $selectedMinerPerformanceLogs->where('source', 'automatic')->count(),
+            ];
+
             return view('pages.general.analytics', [
-            'totalInvested' => $totalInvested,
+                'totalInvested' => $totalInvested,
                 'totalSharesSold' => (int) UserInvestment::where('status', 'active')->sum('shares_owned'),
                 'totalAvailableLiability' => (float) Earning::where('status', 'available')->sum('amount'),
                 'totalPendingPayouts' => (float) PayoutRequest::whereIn('status', ['pending', 'approved'])->sum('amount'),
@@ -788,12 +1266,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'mlmRewardBreakdown' => $mlmRewardBreakdown,
                 'miner' => $miner,
                 'miners' => $miners,
+                'selectedMinerSlug' => $selectedMinerSlug,
+                'selectedMinerPerformanceLogs' => $selectedMinerPerformanceLogs,
+                'selectedMinerPerformanceSummary' => $selectedMinerPerformanceSummary,
             ]);
         })->name('dashboard.analytics');
 
         Route::get('/dashboard/analytics/export', function () {
             MiningPlatform::ensureDefaults();
 
+            $miner = MiningPlatform::resolveMiner(request()->query('miner'));
+            $selectedMinerSlug = $miner->slug;
+            $selectedMinerPerformanceLogs = $miner->performanceLogs()->orderBy('logged_on')->limit(7)->get();
             $mlmRewardBreakdown = collect([
                 1 => 'team_subscription_bonus',
                 2 => 'team_downline_bonus',
@@ -813,9 +1297,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             $filename = 'analytics-report-'.now()->format('Ymd-His').'.csv';
 
-            return response()->streamDownload(function () use ($mlmRewardBreakdown) {
+            return response()->streamDownload(function () use ($mlmRewardBreakdown, $miner, $selectedMinerSlug, $selectedMinerPerformanceLogs) {
                 $handle = fopen('php://output', 'w');
                 fputcsv($handle, ['Section', 'Label', 'Value']);
+                fputcsv($handle, ['Summary', 'Selected miner slug', $selectedMinerSlug]);
+                fputcsv($handle, ['Summary', 'Selected miner name', $miner->name]);
                 fputcsv($handle, ['Summary', 'Total invested', number_format((float) UserInvestment::where('status', 'active')->sum('amount'), 2, '.', '')]);
                 fputcsv($handle, ['Summary', 'Shares sold', (int) UserInvestment::where('status', 'active')->sum('shares_owned')]);
                 fputcsv($handle, ['Summary', 'Available liability', number_format((float) Earning::where('status', 'available')->sum('amount'), 2, '.', '')]);
@@ -829,6 +1315,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     fputcsv($handle, ['MLM payout breakdown', 'Level '.$rewardLevel['level'].' available', number_format($rewardLevel['available_total'], 2, '.', '')]);
                     fputcsv($handle, ['MLM payout breakdown', 'Level '.$rewardLevel['level'].' paid', number_format($rewardLevel['paid_total'], 2, '.', '')]);
                     fputcsv($handle, ['MLM payout breakdown', 'Level '.$rewardLevel['level'].' total', number_format($rewardLevel['overall_total'], 2, '.', '')]);
+                }
+
+                fputcsv($handle, ['Selected miner daily performance', 'Miner', $miner->name]);
+                foreach ($selectedMinerPerformanceLogs as $log) {
+                    fputcsv($handle, ['Selected miner daily performance', $log->logged_on?->format('Y-m-d').' revenue', number_format((float) $log->revenue_usd, 2, '.', '')]);
+                    fputcsv($handle, ['Selected miner daily performance', $log->logged_on?->format('Y-m-d').' costs', number_format((float) $log->electricity_cost_usd + (float) $log->maintenance_cost_usd, 2, '.', '')]);
+                    fputcsv($handle, ['Selected miner daily performance', $log->logged_on?->format('Y-m-d').' net profit', number_format((float) $log->net_profit_usd, 2, '.', '')]);
+                    fputcsv($handle, ['Selected miner daily performance', $log->logged_on?->format('Y-m-d').' per share', number_format((float) $log->revenue_per_share_usd, 4, '.', '')]);
+                    fputcsv($handle, ['Selected miner daily performance', $log->logged_on?->format('Y-m-d').' uptime', number_format((float) $log->uptime_percentage, 2, '.', '').'%']);
                 }
 
                 fclose($handle);
@@ -1168,18 +1663,68 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             $minerSlug = $request->query('miner');
             $status = $request->query('status');
+            $packageSlug = $request->query('package');
+            $search = trim((string) $request->query('search', ''));
 
-            $investments = UserInvestment::with(['user', 'miner', 'package'])
+            $investmentsQuery = UserInvestment::with(['user', 'miner', 'package'])
                 ->when($minerSlug, fn ($query) => $query->whereHas('miner', fn ($minerQuery) => $minerQuery->where('slug', $minerSlug)))
                 ->when($status, fn ($query) => $query->where('status', $status))
-                ->latest('subscribed_at')
-                ->get();
+                ->when($packageSlug, fn ($query) => $query->whereHas('package', fn ($packageQuery) => $packageQuery->where('slug', $packageSlug)))
+                ->when($search !== '', function ($query) use ($search) {
+                    $query->where(function ($nested) use ($search) {
+                        $nested->whereHas('user', fn ($userQuery) => $userQuery
+                            ->where('name', 'like', "%$search%")
+                            ->orWhere('email', 'like', "%$search%"))
+                            ->orWhereHas('miner', fn ($minerQuery) => $minerQuery->where('name', 'like', "%$search%"))
+                            ->orWhereHas('package', fn ($packageQuery) => $packageQuery->where('name', 'like', "%$search%"));
+                    });
+                });
+
+            $investments = $investmentsQuery->latest('subscribed_at')->get();
+            $allInvestments = UserInvestment::with(['user', 'miner', 'package'])->get();
+            $statusBreakdown = collect(['active', 'pending', 'closed'])->mapWithKeys(function ($statusKey) use ($allInvestments, $minerSlug, $packageSlug, $search) {
+                $items = $allInvestments
+                    ->when($minerSlug, fn ($collection) => $collection->filter(fn ($investment) => $investment->miner?->slug === $minerSlug))
+                    ->when($packageSlug, fn ($collection) => $collection->filter(fn ($investment) => $investment->package?->slug === $packageSlug))
+                    ->when($search !== '', function ($collection) use ($search) {
+                        return $collection->filter(function ($investment) use ($search) {
+                            return str_contains(strtolower((string) $investment->user?->name), strtolower($search))
+                                || str_contains(strtolower((string) $investment->user?->email), strtolower($search))
+                                || str_contains(strtolower((string) $investment->miner?->name), strtolower($search))
+                                || str_contains(strtolower((string) $investment->package?->name), strtolower($search));
+                        });
+                    })
+                    ->where('status', $statusKey);
+
+                return [$statusKey => $items->count()];
+            });
+            $minerBreakdown = $allInvestments
+                ->when($packageSlug, fn ($collection) => $collection->filter(fn ($investment) => $investment->package?->slug === $packageSlug))
+                ->when($status, fn ($collection) => $collection->where('status', $status))
+                ->when($search !== '', function ($collection) use ($search) {
+                    return $collection->filter(function ($investment) use ($search) {
+                        return str_contains(strtolower((string) $investment->user?->name), strtolower($search))
+                            || str_contains(strtolower((string) $investment->user?->email), strtolower($search))
+                            || str_contains(strtolower((string) $investment->miner?->name), strtolower($search))
+                            || str_contains(strtolower((string) $investment->package?->name), strtolower($search));
+                    });
+                })
+                ->groupBy(fn ($investment) => $investment->miner?->slug ?? 'unknown')
+                ->map(fn ($items) => [
+                    'name' => $items->first()?->miner?->name ?? 'Unknown miner',
+                    'count' => $items->count(),
+                ]);
 
             return view('pages.general.shareholders', [
                 'miners' => Miner::orderBy('name')->get(),
+                'packages' => \App\Models\InvestmentPackage::orderBy('price')->get(),
                 'investments' => $investments,
                 'selectedMiner' => $minerSlug,
                 'selectedStatus' => $status,
+                'selectedPackage' => $packageSlug,
+                'search' => $search,
+                'statusBreakdown' => $statusBreakdown,
+                'minerBreakdown' => $minerBreakdown,
             ]);
         })->name('dashboard.shareholders');
 
@@ -1188,17 +1733,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             $minerSlug = $request->query('miner');
             $status = $request->query('status');
+            $packageSlug = $request->query('package');
+            $search = trim((string) $request->query('search', ''));
 
             $investments = UserInvestment::with(['user', 'miner', 'package'])
                 ->when($minerSlug, fn ($query) => $query->whereHas('miner', fn ($minerQuery) => $minerQuery->where('slug', $minerSlug)))
                 ->when($status, fn ($query) => $query->where('status', $status))
+                ->when($packageSlug, fn ($query) => $query->whereHas('package', fn ($packageQuery) => $packageQuery->where('slug', $packageSlug)))
+                ->when($search !== '', function ($query) use ($search) {
+                    $query->where(function ($nested) use ($search) {
+                        $nested->whereHas('user', fn ($userQuery) => $userQuery
+                            ->where('name', 'like', "%$search%")
+                            ->orWhere('email', 'like', "%$search%"))
+                            ->orWhereHas('miner', fn ($minerQuery) => $minerQuery->where('name', 'like', "%$search%"))
+                            ->orWhereHas('package', fn ($packageQuery) => $packageQuery->where('name', 'like', "%$search%"));
+                    });
+                })
                 ->latest('subscribed_at')
                 ->get();
 
             $filename = 'shareholders-report-'.now()->format('Ymd-His').'.csv';
 
-            return response()->streamDownload(function () use ($investments) {
+            return response()->streamDownload(function () use ($investments, $minerSlug, $status, $packageSlug, $search) {
                 $handle = fopen('php://output', 'w');
+                fputcsv($handle, ['Filter', 'Value']);
+                fputcsv($handle, ['Miner', $minerSlug ?: 'all']);
+                fputcsv($handle, ['Status', $status ?: 'all']);
+                fputcsv($handle, ['Package', $packageSlug ?: 'all']);
+                fputcsv($handle, ['Search', $search !== '' ? $search : 'all']);
+                fputcsv($handle, []);
                 fputcsv($handle, ['Investor Name', 'Investor Email', 'Miner', 'Package', 'Amount', 'Shares', 'Return Rate', 'Status', 'Subscribed At']);
 
                 foreach ($investments as $investment) {
@@ -1218,13 +1781,95 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 fclose($handle);
             }, $filename, ['Content-Type' => 'text/csv']);
         })->name('dashboard.shareholders.export');
-        Route::get('/dashboard/users', function () {
+        Route::get('/dashboard/users', function (Request $request) {
             MiningPlatform::ensureDefaults();
 
+            $search = trim((string) $request->query('search', ''));
+            $role = $request->query('role');
+            $accountType = $request->query('account_type');
+            $verification = $request->query('verification');
+
+            $usersQuery = User::with(['userLevel', 'investments', 'earnings'])
+                ->when($search !== '', function ($query) use ($search) {
+                    $query->where(function ($nested) use ($search) {
+                        $nested->where('name', 'like', "%$search%")
+                            ->orWhere('email', 'like', "%$search%");
+                    });
+                })
+                ->when($role, fn ($query) => $query->where('role', $role))
+                ->when($accountType, fn ($query) => $query->where('account_type', $accountType))
+                ->when($verification === 'verified', fn ($query) => $query->whereNotNull('email_verified_at'))
+                ->when($verification === 'unverified', fn ($query) => $query->whereNull('email_verified_at'));
+
+            $users = $usersQuery->orderBy('created_at')->get();
+            $allUsers = User::query()->get();
+
             return view('pages.general.users', [
-                'users' => User::with(['userLevel', 'investments', 'earnings'])->orderBy('created_at')->get(),
+                'users' => $users,
+                'search' => $search,
+                'selectedRole' => $role,
+                'selectedAccountType' => $accountType,
+                'selectedVerification' => $verification,
+                'userBreakdown' => [
+                    'admins' => $allUsers->where('role', 'admin')->count(),
+                    'users' => $allUsers->where('role', 'user')->count(),
+                    'verified' => $allUsers->whereNotNull('email_verified_at')->count(),
+                    'shareholders' => $allUsers->where('account_type', 'shareholder')->count(),
+                ],
             ]);
         })->name('dashboard.users');
+
+        Route::get('/dashboard/users/export', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $search = trim((string) $request->query('search', ''));
+            $role = $request->query('role');
+            $accountType = $request->query('account_type');
+            $verification = $request->query('verification');
+
+            $users = User::with(['userLevel', 'investments', 'earnings'])
+                ->when($search !== '', function ($query) use ($search) {
+                    $query->where(function ($nested) use ($search) {
+                        $nested->where('name', 'like', "%$search%")
+                            ->orWhere('email', 'like', "%$search%");
+                    });
+                })
+                ->when($role, fn ($query) => $query->where('role', $role))
+                ->when($accountType, fn ($query) => $query->where('account_type', $accountType))
+                ->when($verification === 'verified', fn ($query) => $query->whereNotNull('email_verified_at'))
+                ->when($verification === 'unverified', fn ($query) => $query->whereNull('email_verified_at'))
+                ->orderBy('created_at')
+                ->get();
+
+            $filename = 'users-report-'.now()->format('Ymd-His').'.csv';
+
+            return response()->streamDownload(function () use ($users, $search, $role, $accountType, $verification) {
+                $handle = fopen('php://output', 'w');
+                fputcsv($handle, ['Filter', 'Value']);
+                fputcsv($handle, ['Search', $search !== '' ? $search : 'all']);
+                fputcsv($handle, ['Role', $role ?: 'all']);
+                fputcsv($handle, ['Account type', $accountType ?: 'all']);
+                fputcsv($handle, ['Verification', $verification ?: 'all']);
+                fputcsv($handle, []);
+                fputcsv($handle, ['Name', 'Email', 'Role', 'Verification', 'Level', 'Account Type', 'Total Invested', 'Available Earnings', 'Joined']);
+
+                foreach ($users as $listedUser) {
+                    fputcsv($handle, [
+                        $listedUser->name,
+                        $listedUser->email,
+                        $listedUser->role,
+                        $listedUser->email_verified_at ? 'verified' : 'pending',
+                        $listedUser->userLevel?->name ?? 'Starter',
+                        $listedUser->account_type,
+                        number_format((float) $listedUser->investments->where('status', 'active')->sum('amount'), 2, '.', ''),
+                        number_format((float) $listedUser->earnings->where('status', 'available')->sum('amount'), 2, '.', ''),
+                        optional($listedUser->created_at)->format('Y-m-d H:i:s'),
+                    ]);
+                }
+
+                fclose($handle);
+            }, $filename, ['Content-Type' => 'text/csv']);
+        })->name('dashboard.users.export');
 
         Route::post('/dashboard/users/{user}/role', function (Request $request, User $user) {
             $validated = $request->validate([
@@ -1500,8 +2145,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $investmentOrders = $investmentOrdersQuery->get();
             $filename = 'investment-orders-'.now()->format('Ymd-His').'.csv';
 
-            return response()->streamDownload(function () use ($investmentOrders) {
+            return response()->streamDownload(function () use ($investmentOrders, $status, $search, $paymentMethod) {
                 $handle = fopen('php://output', 'w');
+                fputcsv($handle, ['Filter', 'Value']);
+                fputcsv($handle, ['Status', $status]);
+                fputcsv($handle, ['Search', $search !== '' ? $search : 'all']);
+                fputcsv($handle, ['Payment method', $paymentMethod]);
+                fputcsv($handle, []);
                 fputcsv($handle, ['User Name', 'User Email', 'Package', 'Miner', 'Submitted At', 'Amount', 'Shares', 'Payment Method', 'Payment Reference', 'Proof Status', 'Status', 'Reviewed By', 'Approved At', 'Rejected At', 'Cancelled At', 'Admin Notes']);
 
                 foreach ($investmentOrders as $order) {
@@ -2085,6 +2735,149 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->with('log_success', 'Performance log saved successfully for '.$miner->name.' and daily earnings were synced.');
         })->name('dashboard.miner.logs.store');
 
+        Route::get('/dashboard/miner/logs/template', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $miner = MiningPlatform::resolveMiner($request->query('miner'));
+            $filename = $miner->slug.'-performance-template.csv';
+
+            return response()->streamDownload(function () use ($miner) {
+                $handle = fopen('php://output', 'w');
+                fputcsv($handle, ['logged_on', 'revenue_usd', 'electricity_cost_usd', 'maintenance_cost_usd', 'hashrate_th', 'uptime_percentage', 'notes']);
+                fputcsv($handle, [
+                    now()->toDateString(),
+                    number_format((float) $miner->daily_output_usd, 2, '.', ''),
+                    number_format((float) ((float) $miner->daily_output_usd * 0.18), 2, '.', ''),
+                    number_format((float) ((float) $miner->daily_output_usd * 0.06), 2, '.', ''),
+                    '500.00',
+                    '99.50',
+                    'Example imported performance row',
+                ]);
+                fclose($handle);
+            }, $filename, ['Content-Type' => 'text/csv']);
+        })->name('dashboard.miner.logs.template');
+
+        Route::post('/dashboard/miner/logs/import', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $validated = $request->validate([
+                'miner_slug' => ['required', 'string', 'exists:miners,slug'],
+                'csv_file' => ['required', 'file', 'mimes:csv,txt'],
+            ]);
+
+            $miner = Miner::where('slug', $validated['miner_slug'])->firstOrFail();
+            $handle = fopen($request->file('csv_file')->getRealPath(), 'r');
+
+            if ($handle === false) {
+                return redirect()
+                    ->to(route('dashboard.miner').'?miner='.$miner->slug)
+                    ->withErrors(['csv_file' => 'The CSV file could not be opened.']);
+            }
+
+            $header = fgetcsv($handle);
+            if (! is_array($header) || $header === []) {
+                fclose($handle);
+
+                return redirect()
+                    ->to(route('dashboard.miner').'?miner='.$miner->slug)
+                    ->withErrors(['csv_file' => 'The CSV file must include a header row.']);
+            }
+
+            $normalizedHeader = collect($header)
+                ->map(fn ($column) => Str::of((string) $column)->trim()->lower()->replace([' ', '-'], '_')->toString())
+                ->values()
+                ->all();
+
+            $requiredColumns = ['logged_on', 'revenue_usd', 'hashrate_th', 'uptime_percentage'];
+            $missingColumns = array_values(array_diff($requiredColumns, $normalizedHeader));
+
+            if ($missingColumns !== []) {
+                fclose($handle);
+
+                return redirect()
+                    ->to(route('dashboard.miner').'?miner='.$miner->slug)
+                    ->withErrors(['csv_file' => 'Missing required CSV columns: '.implode(', ', $missingColumns)]);
+            }
+
+            $importedRows = 0;
+
+            while (($row = fgetcsv($handle)) !== false) {
+                if (count(array_filter($row, fn ($value) => $value !== null && trim((string) $value) !== '')) === 0) {
+                    continue;
+                }
+
+                $mappedRow = collect($normalizedHeader)
+                    ->combine(array_pad($row, count($normalizedHeader), null))
+                    ->map(fn ($value) => is_string($value) ? trim($value) : $value)
+                    ->all();
+
+                MiningPlatform::savePerformanceLog($miner, [
+                    'logged_on' => $mappedRow['logged_on'] ?? now()->toDateString(),
+                    'revenue_usd' => (float) ($mappedRow['revenue_usd'] ?? 0),
+                    'electricity_cost_usd' => isset($mappedRow['electricity_cost_usd']) && $mappedRow['electricity_cost_usd'] !== '' ? (float) $mappedRow['electricity_cost_usd'] : null,
+                    'maintenance_cost_usd' => isset($mappedRow['maintenance_cost_usd']) && $mappedRow['maintenance_cost_usd'] !== '' ? (float) $mappedRow['maintenance_cost_usd'] : null,
+                    'hashrate_th' => (float) ($mappedRow['hashrate_th'] ?? 0),
+                    'uptime_percentage' => (float) ($mappedRow['uptime_percentage'] ?? 0),
+                    'notes' => $mappedRow['notes'] ?? 'Imported from CSV upload.',
+                ], 'manual');
+
+                $importedRows++;
+            }
+
+            fclose($handle);
+
+            return redirect()
+                ->to(route('dashboard.miner').'?miner='.$miner->slug)
+                ->with('log_success', $importedRows.' CSV performance log row'.($importedRows === 1 ? ' was' : 's were').' imported for '.$miner->name.'.');
+        })->name('dashboard.miner.logs.import');
+
+        Route::post('/dashboard/miner/logs/copy-yesterday', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $validated = $request->validate([
+                'miner_slug' => ['required', 'string', 'exists:miners,slug'],
+                'logged_on' => ['nullable', 'date'],
+            ]);
+
+            $miner = Miner::where('slug', $validated['miner_slug'])->firstOrFail();
+            $targetDate = Carbon\Carbon::parse($validated['logged_on'] ?? now()->toDateString())->startOfDay();
+            $yesterday = $targetDate->copy()->subDay()->toDateString();
+            $sourceLog = $miner->performanceLogs()
+                ->whereDate('logged_on', $yesterday)
+                ->orderByRaw("CASE WHEN source = 'manual' THEN 0 ELSE 1 END")
+                ->orderByDesc('updated_at')
+                ->first();
+
+            if (! $sourceLog) {
+                $sourceLog = $miner->performanceLogs()
+                    ->whereDate('logged_on', '<', $targetDate->toDateString())
+                    ->orderByRaw("CASE WHEN source = 'manual' THEN 0 ELSE 1 END")
+                    ->orderByDesc('logged_on')
+                    ->orderByDesc('updated_at')
+                    ->first();
+            }
+
+            if (! $sourceLog) {
+                return redirect()
+                    ->to(route('dashboard.miner').'?miner='.$miner->slug)
+                    ->withErrors(['logged_on' => 'No previous performance log is available to copy yet.']);
+            }
+
+            MiningPlatform::savePerformanceLog($miner, [
+                'logged_on' => $targetDate->toDateString(),
+                'revenue_usd' => (float) $sourceLog->revenue_usd,
+                'electricity_cost_usd' => (float) $sourceLog->electricity_cost_usd,
+                'maintenance_cost_usd' => (float) $sourceLog->maintenance_cost_usd,
+                'hashrate_th' => (float) $sourceLog->hashrate_th,
+                'uptime_percentage' => (float) $sourceLog->uptime_percentage,
+                'notes' => trim(($sourceLog->notes ? $sourceLog->notes.' ' : '').'Copied forward from '.$sourceLog->logged_on?->format('Y-m-d').'.'),
+            ], 'manual');
+
+            return redirect()
+                ->to(route('dashboard.miner').'?miner='.$miner->slug)
+                ->with('log_success', 'Yesterday\'s performance was copied into '.$targetDate->format('M d, Y').' for '.$miner->name.'.');
+        })->name('dashboard.miner.logs.copy-yesterday');
+
         Route::post('/dashboard/miner/logs/generate', function (Request $request) {
             MiningPlatform::ensureDefaults();
 
@@ -2460,6 +3253,15 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
+
+
+
+
+
+
+
+
+
 
 
 

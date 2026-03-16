@@ -28,6 +28,7 @@
   </div>
   <div class="d-flex gap-2 flex-wrap">
     <a href="{{ route('dashboard.buy-shares') }}?miner={{ $miner->slug }}" class="btn btn-primary btn-sm">Buy shares</a>
+    <a href="{{ route('dashboard.miner-report', ['miner' => $miner->slug]) }}" class="btn btn-outline-secondary btn-sm">Open Daily Miner Report</a>
     <a href="{{ route('dashboard.profile') }}" class="btn btn-outline-primary btn-sm">Personal profile</a>
   </div>
 </div>
@@ -95,6 +96,92 @@
         <p class="text-secondary mb-1">Monthly output</p>
         <h3 class="mb-2">${{ number_format((float) $miner->monthly_output_usd, 2) }}</h3>
         <div class="text-secondary small">Active packages: {{ $miner->packages->count() }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-xl-8 grid-margin stretch-card">
+    <div class="card">
+      <div class="card-body">
+        @php($latestPerformanceLog = $livePerformanceSummary['latest_log'] ?? null)
+        @php($latestPerformanceCosts = $latestPerformanceLog ? ((float) $latestPerformanceLog->electricity_cost_usd + (float) $latestPerformanceLog->maintenance_cost_usd) : 0)
+        <div class="d-flex justify-content-between align-items-baseline mb-3 flex-wrap gap-2">
+          <div>
+            <h6 class="card-title mb-1">Live miner performance</h6>
+            <p class="text-secondary mb-0">Today&apos;s miner result feeds the daily per-share distributions investors receive from this unit.</p>
+          </div>
+          <span class="badge bg-light text-dark">{{ $latestPerformanceLog?->logged_on?->format('M d, Y') ?? 'No snapshot yet' }}</span>
+        </div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">Current hashrate</div>
+              <div class="fs-4 fw-semibold">{{ number_format((float) ($latestPerformanceLog?->hashrate_th ?? 0), 2) }} TH/s</div>
+              <div class="text-secondary small">7-day avg {{ number_format((float) ($livePerformanceSummary['average_hashrate'] ?? 0), 2) }} TH/s</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">Current uptime</div>
+              <div class="fs-4 fw-semibold">{{ number_format((float) ($latestPerformanceLog?->uptime_percentage ?? 0), 2) }}%</div>
+              <div class="text-secondary small">7-day avg {{ number_format((float) ($livePerformanceSummary['average_uptime'] ?? 0), 2) }}%</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">Revenue per share</div>
+              <div class="fs-4 fw-semibold">${{ number_format((float) ($latestPerformanceLog?->revenue_per_share_usd ?? 0), 4) }}</div>
+              <div class="text-secondary small">7-day avg ${{ number_format((float) ($livePerformanceSummary['average_revenue_per_share'] ?? 0), 4) }}</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100">
+              <div class="text-secondary small">Today&apos;s revenue</div>
+              <div class="fw-semibold fs-5">${{ number_format((float) ($latestPerformanceLog?->revenue_usd ?? 0), 2) }}</div>
+              <div class="text-secondary small">7-day total ${{ number_format((float) ($livePerformanceSummary['total_revenue'] ?? 0), 2) }}</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100">
+              <div class="text-secondary small">Today&apos;s costs</div>
+              <div class="fw-semibold fs-5">${{ number_format((float) $latestPerformanceCosts, 2) }}</div>
+              <div class="text-secondary small">7-day total ${{ number_format((float) ($livePerformanceSummary['total_costs'] ?? 0), 2) }}</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100">
+              <div class="text-secondary small">Today&apos;s net profit</div>
+              <div class="fw-semibold fs-5">${{ number_format((float) ($latestPerformanceLog?->net_profit_usd ?? 0), 2) }}</div>
+              <div class="text-secondary small">Margin {{ number_format((float) ($livePerformanceSummary['margin_rate'] ?? 0), 2) }}%</div>
+            </div>
+          </div>
+        </div>
+        <div class="border rounded p-3">
+          <div class="fw-semibold mb-1">7-day income engine</div>
+          <div class="text-secondary small mb-3">Revenue, operating costs, and net profit move together here before the per-share amount is distributed.</div>
+          <div id="minerLivePerformanceChart"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-4 grid-margin stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="card-title mb-3">How investor payouts are produced</h6>
+        <div class="border rounded p-3 bg-light mb-3">
+          <div class="fw-semibold mb-1">1. Daily miner snapshot</div>
+          <div class="text-secondary small">Hashrate, uptime, revenue, electricity, and maintenance are captured for the day.</div>
+        </div>
+        <div class="border rounded p-3 bg-light mb-3">
+          <div class="fw-semibold mb-1">2. Net profit becomes share value</div>
+          <div class="text-secondary small">The miner net profit is divided by active sold shares to produce today&apos;s revenue per share.</div>
+        </div>
+        <div class="border rounded p-3 bg-light">
+          <div class="fw-semibold mb-1">3. Investors receive daily share earnings</div>
+          <div class="text-secondary small">Every active investor receives a daily earning row based on owned shares in this miner.</div>
+        </div>
       </div>
     </div>
   </div>
@@ -378,6 +465,58 @@
             gradient: {
               opacityFrom: 0.35,
               opacityTo: 0.05
+            }
+          }
+        }).render();
+      }
+
+      const livePerformanceElement = document.querySelector('#minerLivePerformanceChart');
+      if (livePerformanceElement) {
+        new ApexCharts(livePerformanceElement, {
+          chart: {
+            type: 'line',
+            height: 290,
+            toolbar: { show: false }
+          },
+          series: [{
+            name: 'Revenue',
+            data: @json($performanceRevenueData)
+          }, {
+            name: 'Costs',
+            data: @json($performanceCostData)
+          }, {
+            name: 'Net profit',
+            data: @json($performanceNetProfitData)
+          }],
+          xaxis: {
+            categories: @json($performanceLabels)
+          },
+          stroke: {
+            curve: 'smooth',
+            width: 3
+          },
+          dataLabels: { enabled: false },
+          colors: ['#6571ff', '#fbbc06', '#05a34a'],
+          legend: {
+            position: 'top',
+            horizontalAlign: 'left'
+          },
+          grid: {
+            borderColor: 'rgba(101, 113, 255, 0.12)',
+            strokeDashArray: 4
+          },
+          yaxis: {
+            labels: {
+              formatter: function (value) {
+                return '$' + Number(value).toFixed(2);
+              }
+            }
+          },
+          tooltip: {
+            y: {
+              formatter: function (value) {
+                return '$' + Number(value).toFixed(2);
+              }
             }
           }
         }).render();

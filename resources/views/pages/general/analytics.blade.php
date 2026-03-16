@@ -9,7 +9,7 @@
         <p class="text-secondary mb-0">Business overview of investments, payout exposure, wallet liabilities, referral performance, and miner traction.</p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <a href="{{ route('dashboard.analytics.export') }}" class="btn btn-outline-success btn-icon-text">
+        <a href="{{ route('dashboard.analytics.export', ['miner' => $selectedMinerSlug]) }}" class="btn btn-outline-success btn-icon-text">
           <i data-lucide="download" class="btn-icon-prepend"></i> Export CSV
         </a>
         <a href="{{ route('dashboard.users') }}" class="btn btn-outline-primary btn-icon-text">
@@ -199,6 +199,73 @@
 </div>
 
 <div class="row mb-4">
+  <div class="col-12 grid-margin stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
+            <h5 class="mb-1">Selected miner daily performance</h5>
+            <p class="text-secondary mb-0">Track the last 7 days of revenue, operating costs, net profit, and per-share earnings for {{ $miner->name }}.</p>
+          </div>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="badge bg-light text-dark">Slug: {{ $selectedMinerSlug }}</span>
+            <span class="badge bg-primary">{{ $selectedMinerPerformanceLogs->count() }} daily logs</span>
+          </div>
+        </div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-4 col-xl-2"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">7-day revenue</div><div class="fw-semibold fs-5">${{ number_format($selectedMinerPerformanceSummary['total_revenue'], 2) }}</div></div></div>
+          <div class="col-md-4 col-xl-2"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">7-day net profit</div><div class="fw-semibold fs-5">${{ number_format($selectedMinerPerformanceSummary['total_net_profit'], 2) }}</div></div></div>
+          <div class="col-md-4 col-xl-2"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">Avg uptime</div><div class="fw-semibold fs-5">{{ number_format($selectedMinerPerformanceSummary['average_uptime'], 2) }}%</div></div></div>
+          <div class="col-md-4 col-xl-2"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">Avg hashrate</div><div class="fw-semibold fs-5">{{ number_format($selectedMinerPerformanceSummary['average_hashrate'], 2) }} TH/s</div></div></div>
+          <div class="col-md-4 col-xl-2"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">Avg per share</div><div class="fw-semibold fs-5">${{ number_format($selectedMinerPerformanceSummary['average_per_share'], 4) }}</div></div></div>
+          <div class="col-md-4 col-xl-2"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">Automatic runs</div><div class="fw-semibold fs-5">{{ $selectedMinerPerformanceSummary['automatic_runs'] }}</div></div></div>
+        </div>
+        <div class="row g-4 align-items-stretch">
+          <div class="col-xl-7">
+            <div class="border rounded p-3 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                <div>
+                  <div class="fw-semibold">Daily trend</div>
+                  <div class="text-secondary small">Revenue, costs, and net profit over the last 7 logged days.</div>
+                </div>
+                <span class="badge bg-dark">{{ $miner->name }}</span>
+              </div>
+              <div id="selectedMinerPerformanceChart" style="min-height: 320px;"></div>
+            </div>
+          </div>
+          <div class="col-xl-5">
+            <div class="border rounded p-3 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                <div>
+                  <div class="fw-semibold">Recent daily logs</div>
+                  <div class="text-secondary small">Per-share income and operational source for the selected miner.</div>
+                </div>
+                <span class="badge bg-light text-dark">{{ $miner->slug }}</span>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead><tr><th>Date</th><th>Source</th><th>Net</th><th>Per share</th></tr></thead>
+                  <tbody>
+                    @foreach ($selectedMinerPerformanceLogs as $log)
+                      <tr>
+                        <td>{{ $log->logged_on?->format('M d') }}</td>
+                        <td><span class="badge bg-light text-dark text-capitalize">{{ str_replace('_', ' ', $log->source ?? 'manual') }}</span></td>
+                        <td>${{ number_format((float) $log->net_profit_usd, 2) }}</td>
+                        <td>${{ number_format((float) $log->revenue_per_share_usd, 4) }}</td>
+                      </tr>
+                    @endforeach
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-4">
   <div class="col-xl-6 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
@@ -239,5 +306,49 @@
 </div>
 @endsection
 
+@push('plugin-scripts')
+  <script src="{{ asset('build/plugins/apexcharts/apexcharts.min.js') }}"></script>
+@endpush
 
+@push('custom-scripts')
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!window.ApexCharts) {
+      return;
+    }
 
+    const performanceChartElement = document.querySelector('#selectedMinerPerformanceChart');
+    if (!performanceChartElement) {
+      return;
+    }
+
+    const labels = @json($selectedMinerPerformanceLogs->map(fn ($log) => $log->logged_on?->format('M d'))->values());
+    const revenueSeries = @json($selectedMinerPerformanceLogs->map(fn ($log) => round((float) $log->revenue_usd, 2))->values());
+    const costSeries = @json($selectedMinerPerformanceLogs->map(fn ($log) => round((float) $log->electricity_cost_usd + (float) $log->maintenance_cost_usd, 2))->values());
+    const profitSeries = @json($selectedMinerPerformanceLogs->map(fn ($log) => round((float) $log->net_profit_usd, 2))->values());
+
+    new ApexCharts(performanceChartElement, {
+      chart: {
+        type: 'line',
+        height: 320,
+        toolbar: { show: false },
+        zoom: { enabled: false },
+      },
+      series: [
+        { name: 'Revenue', data: revenueSeries },
+        { name: 'Costs', data: costSeries },
+        { name: 'Net profit', data: profitSeries },
+      ],
+      colors: ['#6571ff', '#ff9f43', '#10b981'],
+      stroke: { width: [3, 3, 4], curve: 'smooth' },
+      markers: { size: 4, hover: { size: 6 } },
+      dataLabels: { enabled: false },
+      grid: { borderColor: 'rgba(101, 113, 255, 0.12)', strokeDashArray: 4 },
+      xaxis: { categories: labels, axisBorder: { show: false }, axisTicks: { show: false } },
+      yaxis: { labels: { formatter: function (value) { return '$' + Number(value).toFixed(0); } } },
+      legend: { position: 'top', horizontalAlign: 'left' },
+      tooltip: { y: { formatter: function (value) { return '$' + Number(value).toFixed(2); } } }
+    }).render();
+  });
+</script>
+@endpush

@@ -18,6 +18,7 @@
   </div>
   <div class="d-flex gap-2 flex-wrap">
     <a href="{{ route('dashboard') }}?miner={{ $miner->slug }}" class="btn btn-outline-primary btn-sm">Back to overview</a>
+    <a href="{{ route('dashboard.miner-report', ['miner' => $miner->slug]) }}" class="btn btn-outline-secondary btn-sm">Daily miner report</a>
     <a href="{{ route('dashboard.investment-orders') }}" class="btn btn-outline-secondary btn-sm">Order history</a>
   </div>
 </div>

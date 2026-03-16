@@ -1,4 +1,4 @@
-@extends('layout.master')
+﻿@extends('layout.master')
 
 @push('plugin-scripts')
   <script src="{{ asset('build/plugins/apexcharts/apexcharts.min.js') }}"></script>
@@ -41,6 +41,366 @@
 </div>
 
 <div class="row g-3 mb-4">
+  <div class="col-12">
+    <div class="card border-0 shadow-sm overflow-hidden">
+      <div class="card-body p-0">
+        <div class="row g-0">
+          <div class="col-xl-4">
+            <div class="h-100 p-4 p-lg-5 text-white" style="background: linear-gradient(135deg, #274690 0%, #6571ff 100%);">
+              <div class="text-uppercase small opacity-75 mb-2">Profile power</div>
+              <div class="d-flex align-items-end gap-3 mb-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center bg-white bg-opacity-10 border border-white border-opacity-25" style="width: 58px; height: 58px;">
+                  <i data-lucide="{{ $profilePower['rank_icon'] }}" class="icon-lg"></i>
+                </div>
+                <div class="display-4 fw-bold mb-0">{{ $profilePower['score'] }}</div>
+                <div class="pb-2">/ 100</div>
+              </div>
+              <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+                <span class="badge bg-white text-dark">{{ $profilePower['rank_label'] }}</span>
+                <span class="small opacity-75">{{ $profilePower['active_direct_investors'] }} active team investors</span>
+              </div>
+              <p class="mb-4 opacity-75">Your profile becomes stronger as you verify more invites, convert more direct investors, and build a stronger mining account.</p>
+              <div class="small opacity-75 mb-1">Next rank target</div>
+              <div class="fw-semibold mb-2">
+                {{ $profilePower['next_rank_label'] }}
+                @if ($profilePower['points_to_next_rank'] > 0)
+                  <span class="fw-normal opacity-75">- {{ $profilePower['points_to_next_rank'] }} points to go</span>
+                @endif
+              </div>
+              <div class="progress bg-white bg-opacity-25" style="height: 8px;">
+                <div class="progress-bar bg-white" role="progressbar" style="width: {{ $profilePower['progress_within_rank'] }}%"></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-xl-8">
+            <div class="p-4 p-lg-5">
+              <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+                <div>
+                  <h5 class="mb-1">Power components</h5>
+                  <p class="text-secondary mb-0">These are the exact pieces that strengthen your account profile inside ZagChain.</p>
+                </div>
+                <a href="{{ route('dashboard.network') }}" class="btn btn-outline-primary btn-sm">Grow network power</a>
+              </div>
+              <div class="row g-3 mb-4">
+                <div class="col-md-4">
+                  <div class="border rounded p-3 h-100 bg-light">
+                    <div class="text-secondary small mb-1">Verified invites</div>
+                    <div class="fw-semibold fs-4">{{ $profilePower['verified_invites'] }}</div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="border rounded p-3 h-100 bg-light">
+                    <div class="text-secondary small mb-1">Registered referrals</div>
+                    <div class="fw-semibold fs-4">{{ $profilePower['registered_referrals'] }}</div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="border rounded p-3 h-100 bg-light">
+                    <div class="text-secondary small mb-1">Active packages</div>
+                    <div class="fw-semibold fs-4">{{ $profilePower['active_package_count'] }}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="d-flex flex-column gap-3">
+                @foreach ($profilePower['components'] as $component)
+                  <div class="border rounded p-3">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                      <div>
+                        <div class="fw-semibold">{{ $component['label'] }}</div>
+                        <div class="text-secondary small">{{ $component['description'] }}</div>
+                      </div>
+                      <div class="text-end">
+                        <div class="fw-semibold">{{ $component['display'] }}</div>
+                        <div class="text-secondary small">+{{ $component['value'] }} pts</div>
+                      </div>
+                    </div>
+                    <div class="progress" style="height: 8px;">
+                      <div class="progress-bar bg-primary" role="progressbar" style="width: {{ min(($component['value'] / 30) * 100, 100) }}%"></div>
+                    </div>
+                  </div>
+                @endforeach
+              </div>
+              <div class="row g-3 mt-1">
+                <div class="col-lg-6">
+                  <div class="border rounded p-3 h-100">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                      <i data-lucide="{{ $profilePower['rank_icon'] }}" class="icon-md text-primary"></i>
+                      <h6 class="mb-0">Achievement badges</h6>
+                    </div>
+                    <p class="text-secondary small mb-3">Visible wins that show how strong your account journey has become.</p>
+                    <div class="d-flex flex-column gap-2">
+                      @foreach ($profilePower['achievements'] as $achievement)
+                        <div class="d-flex align-items-start justify-content-between gap-3 border rounded p-3 {{ $achievement['unlocked'] ? 'bg-success bg-opacity-10 border-success-subtle' : 'bg-light' }}">
+                          <div class="d-flex align-items-start gap-2">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center {{ $achievement['unlocked'] ? 'bg-success text-white' : 'bg-white text-secondary border' }}" style="width: 38px; height: 38px;">
+                              <i data-lucide="{{ $achievement['icon'] }}" class="icon-sm"></i>
+                            </div>
+                            <div>
+                              <div class="fw-semibold">{{ $achievement['title'] }}</div>
+                              <div class="text-secondary small">{{ $achievement['description'] }}</div>
+                            </div>
+                          </div>
+                          <span class="badge {{ $achievement['unlocked'] ? 'bg-success' : 'bg-light text-dark' }}">{{ $achievement['unlocked'] ? 'Unlocked' : 'Locked' }}</span>
+                        </div>
+                      @endforeach
+                    </div>
+                  </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="border rounded p-3 h-100">
+                    <h6 class="mb-1">Milestone unlocks</h6>
+                    <p class="text-secondary small mb-3">Track the next checkpoints that change your account strength.</p>
+                    <div class="d-flex flex-column gap-2">
+                      @foreach ($profilePower['milestones'] as $milestone)
+                        @php
+                          $milestoneBadgeClasses = match ($milestone['status']) {
+                              'completed' => 'bg-success',
+                              'ready' => 'bg-info',
+                              'in_progress' => 'bg-warning text-dark',
+                              default => 'bg-light text-dark',
+                          };
+                          $milestoneLabel = match ($milestone['status']) {
+                              'completed' => 'Completed',
+                              'ready' => 'Ready',
+                              'in_progress' => 'In progress',
+                              default => 'Locked',
+                          };
+                        @endphp
+                        <div class="border rounded p-3">
+                          <div class="d-flex align-items-start justify-content-between gap-3 mb-1">
+                            <div>
+                              <div class="fw-semibold">{{ $milestone['title'] }}</div>
+                              <div class="text-secondary small">{{ $milestone['description'] }}</div>
+                            </div>
+                            <span class="badge {{ $milestoneBadgeClasses }}">{{ $milestoneLabel }}</span>
+                          </div>
+                          @if (!empty($milestone['current']))
+                            <div class="text-secondary small">{{ $milestone['current'] }}</div>
+                          @endif
+                        </div>
+                      @endforeach
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="border rounded p-3 mt-3">
+                <h6 class="mb-1">How to gain power faster</h6>
+                <p class="text-secondary small mb-3">These are the next best actions to strengthen your rank as fast as possible.</p>
+                <div class="row g-3">
+                  @foreach ($profilePower['recommended_actions'] as $action)
+                    <div class="col-lg-6">
+                      <div class="border rounded p-3 h-100 bg-light">
+                        <div class="d-flex align-items-start gap-3">
+                          <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary text-white" style="width: 40px; height: 40px;">
+                            <i data-lucide="{{ $action['icon'] }}" class="icon-sm"></i>
+                          </div>
+                          <div class="flex-grow-1">
+                            <div class="fw-semibold mb-1">{{ $action['title'] }}</div>
+                            <div class="text-secondary small mb-2">{{ $action['description'] }}</div>
+                            <div class="small fw-semibold mb-3">Target: {{ $action['target'] }}</div>
+                            <a href="{{ $action['route'] }}" class="btn btn-sm btn-outline-primary">{{ $action['route_label'] }}</a>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  @endforeach
+                </div>
+              </div>
+              <div class="row g-3 mt-1">
+                <div class="col-lg-5">
+                  <div class="border rounded p-3 h-100">
+                    <h6 class="mb-1">Rank perks</h6>
+                    <p class="text-secondary small mb-3">Your current rank already gives you these visible advantages.</p>
+                    <div class="d-flex flex-column gap-2">
+                      @foreach ($profilePower['rank_perks'] as $perk)
+                        <div class="d-flex align-items-start gap-2">
+                          <i data-lucide="shield-check" class="icon-sm text-success mt-1"></i>
+                          <div class="small">{{ $perk }}</div>
+                        </div>
+                      @endforeach
+                    </div>
+                  </div>
+                </div>
+                <div class="col-lg-7">
+                  <div class="border rounded p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                      <div>
+                        <h6 class="mb-1">Power leaderboard</h6>
+                        <p class="text-secondary small mb-0">See where your account stands among the strongest verified profiles.</p>
+                      </div>
+                      @if ($leaderboardPosition)
+                        <span class="badge bg-primary">Your position: #{{ $leaderboardPosition }}</span>
+                      @endif
+                    </div>
+                    <div class="d-flex flex-column gap-2">
+                      @foreach ($profilePowerLeaderboard as $leaderRow)
+                        <div class="d-flex justify-content-between align-items-center gap-3 border rounded p-3 {{ $leaderRow['user']->is($user) ? 'border-primary bg-primary-subtle' : 'bg-light' }}">
+                          <div class="d-flex align-items-center gap-3">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center fw-semibold {{ $leaderRow['user']->is($user) ? 'bg-primary text-white' : 'bg-white border text-dark' }}" style="width: 36px; height: 36px;">
+                              {{ $loop->iteration }}
+                            </div>
+                            <div>
+                              <div class="fw-semibold">{{ $leaderRow['user']->name }}{{ $leaderRow['user']->is($user) ? ' (You)' : '' }}</div>
+                              <div class="text-secondary small">{{ $leaderRow['summary']['rank_label'] }}</div>
+                            </div>
+                          </div>
+                          <div class="text-end">
+                            <div class="fw-semibold">{{ $leaderRow['summary']['score'] }}/100</div>
+                            <div class="text-secondary small">{{ $leaderRow['summary']['verified_invites'] }} verified invites</div>
+                          </div>
+                        </div>
+                      @endforeach
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="border rounded p-3 mt-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                  <div>
+                    <h6 class="mb-1">Weekly momentum</h6>
+                    <p class="text-secondary small mb-0">Your current movement over the last 7 days.</p>
+                  </div>
+                  <span class="badge bg-info">Momentum {{ $weeklyMomentum['score'] }}/100</span>
+                </div>
+                <div class="row g-3">
+                  <div class="col-md-3">
+                    <div class="border rounded p-3 h-100 bg-light">
+                      <div class="text-secondary small mb-1">Verified this week</div>
+                      <div class="fw-semibold fs-4">{{ $weeklyMomentum['verified_invites'] }}</div>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="border rounded p-3 h-100 bg-light">
+                      <div class="text-secondary small mb-1">Registered this week</div>
+                      <div class="fw-semibold fs-4">{{ $weeklyMomentum['registered_referrals'] }}</div>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="border rounded p-3 h-100 bg-light">
+                      <div class="text-secondary small mb-1">New active investors</div>
+                      <div class="fw-semibold fs-4">{{ $weeklyMomentum['new_active_direct_investors'] }}</div>
+                    </div>
+                  </div>
+                  <div class="col-md-3">
+                    <div class="border rounded p-3 h-100 bg-light">
+                      <div class="text-secondary small mb-1">Mining streak</div>
+                      <div class="fw-semibold fs-4">{{ $weeklyMomentum['streak_days'] }} day{{ $weeklyMomentum['streak_days'] === 1 ? '' : 's' }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="row g-3 mt-1">
+                <div class="col-lg-5">
+                  <div class="border rounded p-3 h-100">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                      <div>
+                        <h6 class="mb-1">Monthly champion push</h6>
+                        <p class="text-secondary small mb-0">Your broader month-to-date momentum across team and mining activity.</p>
+                      </div>
+                      <span class="badge bg-warning text-dark">{{ $monthlyMomentum['score'] }}/100</span>
+                    </div>
+                    <div class="d-flex flex-column gap-2">
+                      <div class="small"><span class="fw-semibold">{{ $monthlyMomentum['verified_invites'] }}</span> verified invites this month</div>
+                      <div class="small"><span class="fw-semibold">{{ $monthlyMomentum['registered_referrals'] }}</span> registered referrals this month</div>
+                      <div class="small"><span class="fw-semibold">{{ $monthlyMomentum['new_active_direct_investors'] }}</span> new active direct investors this month</div>
+                      <div class="small"><span class="fw-semibold">${{ number_format($monthlyMomentum['mining_income'], 2) }}</span> miner daily-share income this month</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-lg-7">
+                  <div class="border rounded p-3 h-100">
+                    <h6 class="mb-1">Recent weekly history</h6>
+                    <p class="text-secondary small mb-3">Rolling weekly history resets automatically as each new week begins.</p>
+                    <div class="d-flex flex-column gap-2">
+                      @foreach ($weeklyMomentumHistory as $historyRow)
+                        <div class="d-flex justify-content-between align-items-center gap-3 border rounded p-3 {{ $loop->first ? 'bg-info-subtle border-info-subtle' : 'bg-light' }}">
+                          <div>
+                            <div class="fw-semibold">Week of {{ $historyRow['week_label'] }}</div>
+                            <div class="text-secondary small">{{ $historyRow['verified_invites'] }} verified · {{ $historyRow['registered_referrals'] }} registered · {{ $historyRow['new_active_direct_investors'] }} investors</div>
+                          </div>
+                          <div class="text-end">
+                            <div class="fw-semibold">{{ $historyRow['score'] }}/100</div>
+                            <div class="text-secondary small">${{ number_format($historyRow['mining_income'], 2) }}</div>
+                          </div>
+                        </div>
+                      @endforeach
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="border rounded p-3 mt-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                  <div>
+                    <h6 class="mb-1">Champion wins</h6>
+                    <p class="text-secondary small mb-0">Your saved Hall of Fame victories across weekly momentum and monthly champion runs.</p>
+                  </div>
+                  <div class="d-flex gap-2 flex-wrap">
+                    <span class="badge bg-success">Weekly wins: {{ $hallOfFameWinCounts['weekly'] }}</span>
+                    <span class="badge bg-warning text-dark">Monthly wins: {{ $hallOfFameWinCounts['monthly'] }}</span>
+                  </div>
+                </div>
+                @if ($recentHallOfFameWins->isEmpty())
+                  <div class="text-secondary small">Your Hall of Fame wins will appear here as soon as you land in the weekly or monthly top spot.</div>
+                @else
+                  <div class="row g-3">
+                    @foreach ($recentHallOfFameWins as $win)
+                      @php($isMonthlyWin = ($win->data['event_key'] ?? null) === 'hall_of_fame_monthly_winner')
+                      <div class="col-lg-6">
+                        <div class="border rounded p-3 h-100 {{ $isMonthlyWin ? 'bg-warning bg-opacity-10 border-warning-subtle' : 'bg-success bg-opacity-10 border-success-subtle' }}">
+                          <div class="d-flex align-items-start gap-3">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center {{ $isMonthlyWin ? 'bg-warning text-dark' : 'bg-success text-white' }}" style="width: 42px; height: 42px;">
+                              <i data-lucide="{{ $win->data['rank_icon'] ?? 'trophy' }}" class="icon-sm"></i>
+                            </div>
+                            <div>
+                              <div class="fw-semibold">{{ $win->data['subject'] ?? 'Champion win' }}</div>
+                              <div class="text-secondary small mb-2">{{ $win->data['message'] ?? '' }}</div>
+                              <div class="small">{{ $win->data['context_value'] ?? '' }}</div>
+                              <div class="small fw-semibold mt-2">{{ $win->created_at?->format('M d, Y') }}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    @endforeach
+                  </div>
+                @endif
+              </div>
+              <div class="border rounded p-3 mt-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                  <div>
+                    <h6 class="mb-1">Recent celebrations</h6>
+                    <p class="text-secondary small mb-0">Your latest profile-rank wins and milestone moments.</p>
+                  </div>
+                  <span class="badge bg-light text-dark">{{ $recentRankCelebrations->count() }} recent</span>
+                </div>
+                @if ($recentRankCelebrations->isEmpty())
+                  <div class="text-secondary small">Your next rank celebration will appear here when your profile power crosses a new tier.</div>
+                @else
+                  <div class="row g-3">
+                    @foreach ($recentRankCelebrations as $celebration)
+                      <div class="col-lg-4">
+                        <div class="border rounded p-3 h-100 bg-success bg-opacity-10 border-success-subtle">
+                          <div class="d-flex align-items-start gap-3">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center bg-success text-white" style="width: 42px; height: 42px;">
+                              <i data-lucide="{{ $celebration->data['rank_icon'] ?? 'award' }}" class="icon-sm"></i>
+                            </div>
+                            <div>
+                              <div class="fw-semibold">{{ $celebration->data['subject'] ?? 'New profile rank unlocked' }}</div>
+                              <div class="text-secondary small mb-2">{{ $celebration->data['message'] ?? '' }}</div>
+                              <div class="small fw-semibold">{{ $celebration->created_at?->format('M d, Y') }}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    @endforeach
+                  </div>
+                @endif
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
   <div class="col-md-6 col-xl-3">
     <div class="card h-100">
       <div class="card-body">
@@ -332,3 +692,4 @@
     });
   </script>
 @endpush
+

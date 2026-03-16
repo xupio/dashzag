@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Earning;
 use App\Models\FriendInvitation;
+use App\Models\HallOfFameSnapshot;
 use App\Models\InvestmentOrder;
 use App\Models\InvestmentPackage;
 use App\Models\Miner;
@@ -660,9 +661,7 @@ class MiningPlatform
 
     public static function teamBonusRate(User $user): float
     {
-        $activeDirectInvestors = $user->sponsoredUsers()
-            ->whereHas('investments', fn ($query) => $query->where('status', 'active')->where('amount', '>', 0))
-            ->count();
+        $activeDirectInvestors = self::activeDirectInvestorCount($user);
 
         $teamInvestorBonus = match (true) {
             $activeDirectInvestors >= 5 => 0.0100,
@@ -672,6 +671,567 @@ class MiningPlatform
         };
 
         return round(self::invitationBonusRate($user) + $teamInvestorBonus, 4);
+    }
+
+    public static function activeDirectInvestorCount(User $user): int
+    {
+        if ($user->relationLoaded('sponsoredUsers')) {
+            return $user->sponsoredUsers
+                ->filter(fn (User $sponsoredUser) => $sponsoredUser->investments->where('status', 'active')->where('amount', '>', 0)->isNotEmpty())
+                ->count();
+        }
+
+        return $user->sponsoredUsers()
+            ->whereHas('investments', fn ($query) => $query->where('status', 'active')->where('amount', '>', 0))
+            ->count();
+    }
+
+    public static function profilePowerSummary(User $user): array
+    {
+        $level = $user->relationLoaded('userLevel') && $user->userLevel
+            ? $user->userLevel
+            : self::syncUserLevel($user);
+        $starterProgress = self::starterUpgradeProgress($user);
+
+        $verifiedInvites = $user->relationLoaded('friendInvitations')
+            ? $user->friendInvitations->whereNotNull('verified_at')->count()
+            : $user->friendInvitations()->whereNotNull('verified_at')->count();
+
+        $registeredReferrals = $user->relationLoaded('friendInvitations')
+            ? $user->friendInvitations->whereNotNull('registered_at')->count()
+            : $user->friendInvitations()->whereNotNull('registered_at')->count();
+
+        $activeInvestments = $user->relationLoaded('investments')
+            ? $user->investments->where('status', 'active')
+            : $user->investments()->where('status', 'active')->get();
+
+        $activePackageCount = $activeInvestments->count();
+        $totalInvested = (float) $activeInvestments->sum('amount');
+        $activeDirectInvestors = self::activeDirectInvestorCount($user);
+
+        $components = [
+            [
+                'label' => 'Level strength',
+                'value' => min(((int) $level->rank) * 18, 30),
+                'display' => $level->name,
+                'description' => 'Your current investor level adds stable account weight.',
+            ],
+            [
+                'label' => 'Verified invites',
+                'value' => min($verifiedInvites * 2, 20),
+                'display' => (string) $verifiedInvites,
+                'description' => 'Verified contacts prove real network reach.',
+            ],
+            [
+                'label' => 'Registered referrals',
+                'value' => min($registeredReferrals * 2, 20),
+                'display' => (string) $registeredReferrals,
+                'description' => 'Registered team members increase your conversion power.',
+            ],
+            [
+                'label' => 'Active team investors',
+                'value' => min($activeDirectInvestors * 8, 20),
+                'display' => (string) $activeDirectInvestors,
+                'description' => 'Direct investors make your profile stronger fastest.',
+            ],
+            [
+                'label' => 'Investment commitment',
+                'value' => min((int) floor($totalInvested / 250), 10),
+                'display' => '$'.number_format($totalInvested, 0),
+                'description' => 'Capital commitment supports rank credibility.',
+            ],
+        ];
+
+        $score = min((int) round(collect($components)->sum('value')), 100);
+
+        $ranks = [
+            ['min' => 0, 'max' => 24, 'label' => 'Starter Signal', 'accent' => 'secondary', 'icon' => 'sparkles'],
+            ['min' => 25, 'max' => 44, 'label' => 'Builder Rank', 'accent' => 'info', 'icon' => 'hammer'],
+            ['min' => 45, 'max' => 64, 'label' => 'Connector Rank', 'accent' => 'primary', 'icon' => 'network'],
+            ['min' => 65, 'max' => 84, 'label' => 'Influencer Rank', 'accent' => 'warning', 'icon' => 'badge-plus'],
+            ['min' => 85, 'max' => 100, 'label' => 'Powerhouse Rank', 'accent' => 'success', 'icon' => 'crown'],
+        ];
+
+        $currentRank = collect($ranks)->first(fn (array $rank) => $score >= $rank['min'] && $score <= $rank['max']) ?? $ranks[0];
+        $nextRank = collect($ranks)->first(fn (array $rank) => $rank['min'] > $score);
+        $currentMin = (int) $currentRank['min'];
+        $nextThreshold = $nextRank['min'] ?? 100;
+        $progressDenominator = max($nextThreshold - $currentMin, 1);
+        $progressWithinRank = min(max((($score - $currentMin) / $progressDenominator) * 100, 0), 100);
+
+        $achievements = collect([
+            [
+                'title' => 'Verified circle',
+                'icon' => 'badge-check',
+                'description' => 'Reach 10 verified invites.',
+                'unlocked' => $verifiedInvites >= 10,
+            ],
+            [
+                'title' => 'Conversion builder',
+                'icon' => 'user-round-check',
+                'description' => 'Convert 3 referrals into registered members.',
+                'unlocked' => $registeredReferrals >= 3,
+            ],
+            [
+                'title' => 'Investor magnet',
+                'icon' => 'gem',
+                'description' => 'Bring in your first active direct investor.',
+                'unlocked' => $activeDirectInvestors >= 1,
+            ],
+            [
+                'title' => 'Capital anchor',
+                'icon' => 'wallet-cards',
+                'description' => 'Hold at least $1,000 in active mining capital.',
+                'unlocked' => $totalInvested >= 1000,
+            ],
+        ])->values()->all();
+
+        $milestones = collect([
+            [
+                'title' => 'Starter mission',
+                'status' => $starterProgress['has_unlocked_basic'] ? 'completed' : ($starterProgress['qualifies'] ? 'ready' : 'in_progress'),
+                'description' => 'Complete the free upgrade mission for Basic 100 access.',
+                'current' => $starterProgress['verified_invites'].'/'.$starterProgress['required_verified_invites'].' verified and '.$starterProgress['direct_basic_subscribers'].'/'.$starterProgress['required_direct_basic_subscribers'].' direct basic investors',
+            ],
+            [
+                'title' => 'Network bonus unlocked',
+                'status' => $activeDirectInvestors >= 1 ? 'completed' : 'locked',
+                'description' => 'Your first direct investor activates team-bonus growth.',
+                'current' => $activeDirectInvestors.' / 1 active direct investors',
+            ],
+            [
+                'title' => 'Connector threshold',
+                'status' => $score >= 45 ? 'completed' : 'locked',
+                'description' => 'Cross 45 profile power to establish visible network strength.',
+                'current' => $score.' / 45 profile power',
+            ],
+            [
+                'title' => 'Powerhouse threshold',
+                'status' => $score >= 85 ? 'completed' : 'locked',
+                'description' => 'Reach elite profile power with strong capital and team conversion.',
+                'current' => $score.' / 85 profile power',
+            ],
+        ])->values()->all();
+
+        $recommendedActions = collect();
+
+        if (! $starterProgress['has_unlocked_basic']) {
+            $recommendedActions->push([
+                'title' => 'Complete your starter mission',
+                'description' => 'Finish the free upgrade mission to unlock Basic 100 and a visible profile jump.',
+                'target' => $starterProgress['verified_invites'].'/'.$starterProgress['required_verified_invites'].' verified and '.$starterProgress['direct_basic_subscribers'].'/'.$starterProgress['required_direct_basic_subscribers'].' direct basic investors',
+                'route' => route('dashboard.friends'),
+                'route_label' => 'Grow starter mission',
+                'icon' => 'rocket',
+            ]);
+        }
+
+        if ($registeredReferrals < 3) {
+            $recommendedActions->push([
+                'title' => 'Turn invites into registrations',
+                'description' => 'Focus on getting invited contacts to complete registration so your rank grows faster.',
+                'target' => '3 registered referrals',
+                'route' => route('dashboard.network'),
+                'route_label' => 'Open network',
+                'icon' => 'users',
+            ]);
+        }
+
+        if ($activeDirectInvestors < 1) {
+            $recommendedActions->push([
+                'title' => 'Get your first active investor',
+                'description' => 'One direct investor is the fastest way to unlock visible power and team bonus growth.',
+                'target' => '1 active direct investor',
+                'route' => route('dashboard.buy-shares'),
+                'route_label' => 'Review packages',
+                'icon' => 'gem',
+            ]);
+        }
+
+        if ($totalInvested < 1000) {
+            $recommendedActions->push([
+                'title' => 'Strengthen capital commitment',
+                'description' => 'Larger active capital improves both profile credibility and long-term earnings momentum.',
+                'target' => '$1,000 active capital',
+                'route' => route('dashboard.buy-shares'),
+                'route_label' => 'Buy shares',
+                'icon' => 'wallet',
+            ]);
+        }
+
+        if ($recommendedActions->isEmpty()) {
+            $recommendedActions->push([
+                'title' => 'Maintain your growth pace',
+                'description' => 'Keep scaling both capital and direct investor quality to hold your current profile advantage.',
+                'target' => 'Stay above your current rank',
+                'route' => route('dashboard.network'),
+                'route_label' => 'Review team',
+                'icon' => 'shield-check',
+            ]);
+        }
+
+        $rankPerks = match ($currentRank['label']) {
+            'Starter Signal' => [
+                'Visible starter badge on your profile',
+                'Entry-level power tracking unlocked',
+            ],
+            'Builder Rank' => [
+                'Builder badge styling across network views',
+                'More visible credibility in investor pipeline rows',
+            ],
+            'Connector Rank' => [
+                'Connector badge styling and stronger branch presence',
+                'Milestone visibility becomes more persuasive to downline viewers',
+            ],
+            'Influencer Rank' => [
+                'Influencer badge styling across profile and network surfaces',
+                'Higher social proof for referrals and investor conversion',
+            ],
+            default => [
+                'Elite Powerhouse badge styling across the platform',
+                'Top-tier social proof inside investor and team views',
+            ],
+        };
+
+        return [
+            'score' => $score,
+            'rank_label' => $currentRank['label'],
+            'rank_accent' => $currentRank['accent'],
+            'rank_icon' => $currentRank['icon'],
+            'next_rank_label' => $nextRank['label'] ?? 'Maximum rank reached',
+            'next_rank_threshold' => $nextThreshold,
+            'points_to_next_rank' => max($nextThreshold - $score, 0),
+            'progress_within_rank' => $progressWithinRank,
+            'verified_invites' => $verifiedInvites,
+            'registered_referrals' => $registeredReferrals,
+            'active_direct_investors' => $activeDirectInvestors,
+            'active_package_count' => $activePackageCount,
+            'total_invested' => $totalInvested,
+            'components' => $components,
+            'achievements' => $achievements,
+            'milestones' => $milestones,
+            'recommended_actions' => $recommendedActions->values()->all(),
+            'rank_perks' => $rankPerks,
+            'starter_progress' => $starterProgress,
+        ];
+    }
+
+    public static function profilePowerLeaderboard(int $limit = 5): Collection
+    {
+        $users = User::query()
+            ->whereNotNull('email_verified_at')
+            ->with([
+                'userLevel',
+                'friendInvitations',
+                'sponsoredUsers.investments',
+                'investments',
+            ])
+            ->get();
+
+        return $users
+            ->map(function (User $user) {
+                return [
+                    'user' => $user,
+                    'summary' => self::profilePowerSummary($user),
+                ];
+            })
+            ->sortByDesc(fn (array $row) => $row['summary']['score'])
+            ->values()
+            ->take($limit);
+    }
+
+    public static function miningEarningsStreak(User $user): int
+    {
+        $earningDates = $user->earnings()
+            ->where('source', 'mining_daily_share')
+            ->orderByDesc('earned_on')
+            ->pluck('earned_on')
+            ->map(fn ($date) => Carbon::parse($date)->toDateString())
+            ->unique()
+            ->values();
+
+        if ($earningDates->isEmpty()) {
+            return 0;
+        }
+
+        $streak = 0;
+        $cursor = Carbon::parse($earningDates->first());
+
+        foreach ($earningDates as $date) {
+            if ($date !== $cursor->toDateString()) {
+                break;
+            }
+
+            $streak++;
+            $cursor = $cursor->copy()->subDay();
+        }
+
+        return $streak;
+    }
+
+    public static function weeklyMomentumSummary(User $user): array
+    {
+        return self::momentumSummaryForWindow($user, now()->subDays(6)->startOfDay(), 'Last 7 days', 7);
+    }
+
+    public static function momentumSummaryForWindow(User $user, Carbon $start, string $label, int $days): array
+    {
+        $end = $start->copy()->addDays(max($days - 1, 0))->endOfDay();
+
+        $verifiedInvites = $user->friendInvitations()
+            ->whereNotNull('verified_at')
+            ->where('verified_at', '>=', $start)
+            ->where('verified_at', '<=', $end)
+            ->count();
+
+        $registeredReferrals = $user->friendInvitations()
+            ->whereNotNull('registered_at')
+            ->where('registered_at', '>=', $start)
+            ->where('registered_at', '<=', $end)
+            ->count();
+
+        $newActiveDirectInvestors = $user->sponsoredUsers()
+            ->whereHas('investments', fn ($query) => $query->where('status', 'active')->where('amount', '>', 0)->whereBetween('subscribed_at', [$start, $end]))
+            ->count();
+
+        $miningIncome = (float) $user->earnings()
+            ->where('source', 'mining_daily_share')
+            ->whereBetween('earned_on', [$start->toDateString(), $end->toDateString()])
+            ->sum('amount');
+
+        $streak = $days === 7 ? self::miningEarningsStreak($user) : 0;
+        $score = min(
+            ($verifiedInvites * 10)
+            + ($registeredReferrals * 12)
+            + ($newActiveDirectInvestors * 20)
+            + min($streak * 4, 20)
+            + min((int) floor($miningIncome / 5), 20),
+            100
+        );
+
+        return [
+            'score' => $score,
+            'verified_invites' => $verifiedInvites,
+            'registered_referrals' => $registeredReferrals,
+            'new_active_direct_investors' => $newActiveDirectInvestors,
+            'mining_income' => round($miningIncome, 2),
+            'streak_days' => $streak,
+            'window_label' => $label,
+        ];
+    }
+
+    public static function weeklyMomentumHistory(User $user, int $weeks = 4): Collection
+    {
+        return collect(range(0, $weeks - 1))
+            ->map(function (int $offset) use ($user) {
+                $start = now()->startOfWeek()->subWeeks($offset);
+                $summary = self::momentumSummaryForWindow($user, $start, 'Week of '.$start->format('M d'), 7);
+                $summary['week_label'] = $start->format('M d');
+
+                return $summary;
+            })
+            ->values();
+    }
+
+    public static function monthlyMomentumSummary(User $user): array
+    {
+        $start = now()->startOfMonth();
+
+        return self::momentumSummaryForWindow($user, $start, $start->format('F').' momentum', $start->daysInMonth);
+    }
+
+    public static function competitionLeaderboard(string $category, int $limit = 10): Collection
+    {
+        $users = User::query()
+            ->whereNotNull('email_verified_at')
+            ->with([
+                'userLevel',
+                'friendInvitations',
+                'sponsoredUsers.investments',
+                'investments',
+            ])
+            ->get()
+            ->map(function (User $user) {
+                return [
+                    'user' => $user,
+                    'profile_power' => self::profilePowerSummary($user),
+                    'weekly_momentum' => self::weeklyMomentumSummary($user),
+                    'monthly_momentum' => self::monthlyMomentumSummary($user),
+                ];
+            });
+
+        $sorted = match ($category) {
+            'weekly' => $users->sortByDesc(fn (array $row) => $row['weekly_momentum']['score']),
+            'monthly' => $users->sortByDesc(fn (array $row) => $row['monthly_momentum']['score']),
+            default => $users->sortByDesc(fn (array $row) => $row['profile_power']['score']),
+        };
+
+        return $sorted->values()->take($limit);
+    }
+
+    public static function captureCompetitionSnapshot(string $category, int $limit = 10): Collection
+    {
+        [$periodStart, $periodEnd] = match ($category) {
+            'weekly' => [now()->startOfWeek(), now()->endOfWeek()],
+            'monthly' => [now()->startOfMonth(), now()->endOfMonth()],
+            default => throw new RuntimeException('Unsupported competition snapshot category.'),
+        };
+
+        $leaders = self::competitionLeaderboard($category, $limit);
+
+        foreach ($leaders as $index => $leader) {
+            $metric = $category === 'weekly' ? $leader['weekly_momentum'] : $leader['monthly_momentum'];
+
+            $snapshot = HallOfFameSnapshot::query()
+                ->where('category', $category)
+                ->where('user_id', $leader['user']->id)
+                ->whereDate('period_start', $periodStart->toDateString())
+                ->first() ?? new HallOfFameSnapshot([
+                    'category' => $category,
+                    'period_start' => $periodStart->toDateString(),
+                    'user_id' => $leader['user']->id,
+                ]);
+
+            $snapshot->fill([
+                'period_end' => $periodEnd->toDateString(),
+                'rank_position' => $index + 1,
+                'score' => $metric['score'],
+                'profile_power_score' => $leader['profile_power']['score'],
+                'rank_label' => $leader['profile_power']['rank_label'],
+                'highlights' => [
+                    'verified_invites' => $metric['verified_invites'],
+                    'registered_referrals' => $metric['registered_referrals'],
+                    'new_active_direct_investors' => $metric['new_active_direct_investors'],
+                    'mining_income' => $metric['mining_income'],
+                ],
+            ])->save();
+
+            if ($index === 0) {
+                self::maybeCelebrateHallOfFameWinner(
+                    $leader['user'],
+                    $category,
+                    $periodStart,
+                    $periodEnd,
+                    $metric['score'],
+                    $leader['profile_power']
+                );
+            }
+        }
+
+        return $leaders;
+    }
+
+    public static function hallOfFameWinnerHistory(string $category, int $periods = 6): Collection
+    {
+        return HallOfFameSnapshot::query()
+            ->with('user')
+            ->where('category', $category)
+            ->where('rank_position', 1)
+            ->latest('period_start')
+            ->take($periods)
+            ->get()
+            ->map(function (HallOfFameSnapshot $snapshot) {
+                return [
+                    'user' => $snapshot->user,
+                    'period_start' => $snapshot->period_start,
+                    'period_end' => $snapshot->period_end,
+                    'score' => $snapshot->score,
+                    'profile_power_score' => $snapshot->profile_power_score,
+                    'rank_label' => $snapshot->rank_label,
+                    'highlights' => $snapshot->highlights ?? [],
+                ];
+            })
+            ->values();
+    }
+
+    public static function maybeCelebrateHallOfFameWinner(
+        User $user,
+        string $category,
+        Carbon $periodStart,
+        Carbon $periodEnd,
+        int $score,
+        array $profilePower
+    ): void {
+        $eventKey = 'hall_of_fame_'.$category.'_winner';
+
+        $alreadyCelebrated = $user->notifications()
+            ->where('type', ActivityFeedNotification::class)
+            ->get()
+            ->contains(function ($notification) use ($eventKey, $periodStart) {
+                return ($notification->data['event_key'] ?? null) === $eventKey
+                    && ($notification->data['period_start'] ?? null) === $periodStart->toDateString();
+            });
+
+        if ($alreadyCelebrated) {
+            return;
+        }
+
+        $label = $category === 'weekly' ? 'Weekly Hall of Fame winner' : 'Monthly Hall of Fame champion';
+        $notes = $category === 'weekly'
+            ? 'You led the weekly momentum board and secured the top spot in the Hall of Fame.'
+            : 'You led the monthly branch-building board and secured the top champion spot in the Hall of Fame.';
+
+        $user->notify(new ActivityFeedNotification([
+            'event_key' => $eventKey,
+            'category' => 'milestone',
+            'status' => 'success',
+            'subject' => $label,
+            'message' => 'You reached #1 in the '.$category.' Hall of Fame with '.$score.' points.',
+            'context_label' => 'Period',
+            'context_value' => $periodStart->format('M d').' - '.$periodEnd->format('M d'),
+            'status_line' => 'Rank secured: '.$profilePower['rank_label'],
+            'notes_line' => $notes,
+            'period_start' => $periodStart->toDateString(),
+            'period_end' => $periodEnd->toDateString(),
+            'power_score' => $profilePower['score'],
+            'rank_label' => $profilePower['rank_label'],
+            'rank_icon' => $profilePower['rank_icon'],
+            'force_mail' => false,
+        ]));
+    }
+
+    public static function maybeCelebrateProfilePower(User $user): void
+    {
+        $user->loadMissing([
+            'userLevel',
+            'friendInvitations',
+            'sponsoredUsers.investments',
+            'investments',
+        ]);
+
+        $summary = self::profilePowerSummary($user);
+
+        if ($summary['score'] < 25) {
+            return;
+        }
+
+        $alreadyCelebrated = $user->notifications()
+            ->where('type', ActivityFeedNotification::class)
+            ->get()
+            ->contains(function ($notification) use ($summary) {
+                return ($notification->data['event_key'] ?? null) === 'profile_power_rank'
+                    && ($notification->data['rank_label'] ?? null) === $summary['rank_label'];
+            });
+
+        if ($alreadyCelebrated) {
+            return;
+        }
+
+        $user->notify(new ActivityFeedNotification([
+            'event_key' => 'profile_power_rank',
+            'category' => 'milestone',
+            'status' => 'success',
+            'subject' => 'New profile rank unlocked',
+            'message' => 'You reached '.$summary['rank_label'].' with '.$summary['score'].' profile power.',
+            'context_label' => 'Current power',
+            'context_value' => $summary['score'].' / 100',
+            'status_line' => 'Rank unlocked: '.$summary['rank_label'],
+            'notes_line' => 'Keep growing verified invites, direct investors, and active capital to reach '.$summary['next_rank_label'].'.',
+            'rank_label' => $summary['rank_label'],
+            'rank_icon' => $summary['rank_icon'],
+            'power_score' => $summary['score'],
+            'force_mail' => false,
+        ]));
     }
 
     public static function refreshInvestmentBonusRates(User $user): User
@@ -784,6 +1344,7 @@ class MiningPlatform
             $user,
             $investment,
         );
+        self::maybeCelebrateProfilePower($user->fresh());
 
         return $investment;
     }
@@ -898,6 +1459,7 @@ class MiningPlatform
             $user->forceFill(['account_type' => 'shareholder'])->save();
             $refreshedUser = self::refreshInvestmentBonusRates($user->fresh());
             $investment->refresh();
+            self::maybeCelebrateProfilePower($refreshedUser->fresh());
 
             Earning::firstOrCreate(
                 [
@@ -950,6 +1512,7 @@ class MiningPlatform
             $user,
             null,
         );
+        self::maybeCelebrateProfilePower($invitation->user->fresh());
 
         return $invitation->user;
     }
@@ -1005,25 +1568,29 @@ class MiningPlatform
             ? round((float) ($attributes['revenue_per_share_usd'] ?? ($netProfit / $activeShares)), 4)
             : 0;
 
-        $log = MinerPerformanceLog::updateOrCreate(
-            [
+        $log = MinerPerformanceLog::query()
+            ->where('miner_id', $miner->id)
+            ->whereDate('logged_on', $loggedOn)
+            ->first() ?? new MinerPerformanceLog([
                 'miner_id' => $miner->id,
                 'logged_on' => $loggedOn,
-            ],
-            [
-                'revenue_usd' => $revenue,
-                'electricity_cost_usd' => $electricityCost,
-                'maintenance_cost_usd' => $maintenanceCost,
-                'net_profit_usd' => $netProfit,
-                'hashrate_th' => round((float) ($attributes['hashrate_th'] ?? 0), 2),
-                'uptime_percentage' => round((float) ($attributes['uptime_percentage'] ?? 0), 2),
-                'active_shares' => $activeShares,
-                'revenue_per_share_usd' => $revenuePerShare,
-                'source' => $source,
-                'auto_generated_at' => $source === 'automatic' ? now() : null,
-                'notes' => $attributes['notes'] ?? null,
-            ],
-        );
+            ]);
+
+        $log->fill([
+            'revenue_usd' => $revenue,
+            'electricity_cost_usd' => $electricityCost,
+            'maintenance_cost_usd' => $maintenanceCost,
+            'net_profit_usd' => $netProfit,
+            'hashrate_th' => round((float) ($attributes['hashrate_th'] ?? 0), 2),
+            'uptime_percentage' => round((float) ($attributes['uptime_percentage'] ?? 0), 2),
+            'active_shares' => $activeShares,
+            'revenue_per_share_usd' => $revenuePerShare,
+            'source' => $source,
+            'auto_generated_at' => $source === 'automatic' ? now() : null,
+            'notes' => $attributes['notes'] ?? null,
+        ]);
+
+        $log->save();
 
         self::distributeDailyPerformanceEarnings($log);
 
@@ -1048,20 +1615,104 @@ class MiningPlatform
             ->map(function (UserInvestment $investment) use ($log) {
                 $amount = round((float) $investment->shares_owned * (float) $log->revenue_per_share_usd, 2);
 
-                return Earning::updateOrCreate(
-                    [
+                $earning = Earning::query()
+                    ->where('user_id', $investment->user_id)
+                    ->where('investment_id', $investment->id)
+                    ->whereDate('earned_on', $log->logged_on->toDateString())
+                    ->where('source', 'mining_daily_share')
+                    ->first() ?? new Earning([
                         'user_id' => $investment->user_id,
                         'investment_id' => $investment->id,
                         'earned_on' => $log->logged_on->toDateString(),
                         'source' => 'mining_daily_share',
-                    ],
-                    [
-                        'amount' => $amount,
-                        'status' => 'available',
-                        'notes' => 'Daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share.',
-                    ],
-                );
-            });
+                    ]);
+
+                $earning->fill([
+                    'amount' => $amount,
+                    'status' => 'available',
+                    'notes' => 'Daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share.',
+                ]);
+
+                $earning->save();
+
+                return $earning;
+                });
+    }
+
+    public static function minerPerformanceSummary(Miner $miner, int $days = 7): array
+    {
+        $logs = $miner->relationLoaded('performanceLogs')
+            ? $miner->performanceLogs
+                ->sortByDesc(fn (MinerPerformanceLog $log) => optional($log->logged_on)?->timestamp ?? 0)
+                ->take($days)
+                ->values()
+            : $miner->performanceLogs()
+                ->orderByDesc('logged_on')
+                ->limit($days)
+                ->get();
+
+        $latestLog = $logs->first();
+        $trendLogs = $logs
+            ->sortBy(fn (MinerPerformanceLog $log) => optional($log->logged_on)?->timestamp ?? 0)
+            ->values();
+
+        $totalRevenue = round((float) $trendLogs->sum('revenue_usd'), 2);
+        $totalCosts = round((float) $trendLogs->sum(function (MinerPerformanceLog $log) {
+            return (float) $log->electricity_cost_usd + (float) $log->maintenance_cost_usd;
+        }), 2);
+        $totalNetProfit = round((float) $trendLogs->sum('net_profit_usd'), 2);
+
+        return [
+            'latest_log' => $latestLog,
+            'logs' => $trendLogs,
+            'total_revenue' => $totalRevenue,
+            'total_costs' => $totalCosts,
+            'total_net_profit' => $totalNetProfit,
+            'average_hashrate' => round((float) $trendLogs->avg('hashrate_th'), 2),
+            'average_uptime' => round((float) $trendLogs->avg('uptime_percentage'), 2),
+            'average_revenue_per_share' => round((float) $trendLogs->avg('revenue_per_share_usd'), 4),
+            'margin_rate' => $totalRevenue > 0 ? round(($totalNetProfit / $totalRevenue) * 100, 2) : 0.0,
+        ];
+    }
+
+    public static function investmentLivePerformanceSummary(UserInvestment $investment, int $days = 7): array
+    {
+        $investment->loadMissing(['miner', 'package']);
+
+        $startDate = now()->copy()->subDays(max($days - 1, 0))->startOfDay()->toDateString();
+        $logs = $investment->miner
+            ? $investment->miner->performanceLogs()
+                ->whereDate('logged_on', '>=', $startDate)
+                ->orderByDesc('logged_on')
+                ->limit($days)
+                ->get()
+            : collect();
+
+        $latestLog = $logs->first();
+        $trendLogs = $logs
+            ->sortBy(fn (MinerPerformanceLog $log) => optional($log->logged_on)?->timestamp ?? 0)
+            ->values();
+
+        $recentEarnings = $investment->earnings()
+            ->where('source', 'mining_daily_share')
+            ->whereDate('earned_on', '>=', $startDate)
+            ->orderByDesc('earned_on')
+            ->limit($days)
+            ->get();
+
+        $latestEarning = $recentEarnings->first();
+        $sevenDayTotal = round((float) $recentEarnings->sum('amount'), 2);
+
+        return [
+            'investment' => $investment,
+            'latest_log' => $latestLog,
+            'latest_earning' => $latestEarning,
+            'tracked_days' => (int) $recentEarnings->count(),
+            'seven_day_total' => $sevenDayTotal,
+            'average_daily_earning' => $recentEarnings->count() > 0 ? round($sevenDayTotal / $recentEarnings->count(), 2) : 0.0,
+            'trend_labels' => $trendLogs->map(fn (MinerPerformanceLog $log) => $log->logged_on?->format('M d'))->values()->all(),
+            'trend_values' => $trendLogs->map(fn (MinerPerformanceLog $log) => round((float) $log->revenue_per_share_usd * (float) $investment->shares_owned, 2))->values()->all(),
+        ];
     }
 
     public static function expectedMonthlyEarnings(User $user): float
@@ -1093,6 +1744,8 @@ class MiningPlatform
     public static function awardReferralRegistration(User $registeredUser): Collection
     {
         return FriendInvitation::query()->with('user')->where('email', $registeredUser->email)->get()->map(function (FriendInvitation $invitation) use ($registeredUser) {
+            self::maybeCelebrateProfilePower($invitation->user->fresh());
+
             return Earning::firstOrCreate(
                 ['user_id' => $invitation->user_id, 'investment_id' => null, 'earned_on' => now()->toDateString(), 'source' => 'referral_registration', 'notes' => 'Referral registration reward for '.$registeredUser->email.'.'],
                 ['amount' => (float) self::rewardSetting('referral_registration_reward'), 'status' => 'available'],
@@ -1105,6 +1758,8 @@ class MiningPlatform
         $rewardAmount = round((float) $investment->amount * (float) self::rewardSetting('referral_subscription_reward_rate'), 2);
 
         $rewards = FriendInvitation::query()->with('user')->where('email', $referredUser->email)->get()->map(function (FriendInvitation $invitation) use ($referredUser, $investment, $rewardAmount) {
+            self::maybeCelebrateProfilePower($invitation->user->fresh());
+
             return Earning::firstOrCreate(
                 ['user_id' => $invitation->user_id, 'investment_id' => null, 'earned_on' => now()->toDateString(), 'source' => 'referral_subscription', 'notes' => 'Referral subscription reward for '.$referredUser->email.' on investment #'.$investment->id.'.'],
                 ['amount' => $rewardAmount, 'status' => 'available'],
@@ -1177,9 +1832,12 @@ class MiningPlatform
             }
 
             if ($depth === 1) {
-                self::refreshInvestmentBonusRates($currentSponsor->fresh());
-                self::attemptStarterUpgrade($currentSponsor->fresh());
+                $refreshedSponsor = self::refreshInvestmentBonusRates($currentSponsor->fresh());
+                self::attemptStarterUpgrade($refreshedSponsor->fresh());
+                self::maybeCelebrateProfilePower($refreshedSponsor->fresh());
             }
+
+            self::maybeCelebrateProfilePower($currentSponsor->fresh());
 
             $currentSponsor = $currentSponsor->sponsor()->first();
             $depth++;
@@ -1416,6 +2074,8 @@ class MiningPlatform
         }
     }
 }
+
+
 
 
 

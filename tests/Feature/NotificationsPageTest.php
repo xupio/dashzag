@@ -328,4 +328,28 @@ test('notifications page shows override approval entries with grouped labels', f
     $response->assertSee('Bank desk confirmed the transfer manually.');
 });
 
+test('notifications page shows hall of fame winner entries with champion grouping', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $user->notify(new ActivityFeedNotification([
+        'event_key' => 'hall_of_fame_weekly_winner',
+        'category' => 'milestone',
+        'status' => 'success',
+        'subject' => 'Weekly Hall of Fame winner',
+        'message' => 'You reached #1 in the weekly Hall of Fame with 68 points.',
+        'context_label' => 'Period',
+        'context_value' => 'Mar 09 - Mar 15',
+    ]));
+
+    $response = $this->actingAs($user)->get(route('dashboard.notifications', ['filter' => 'milestone']));
+
+    $response->assertOk();
+    $response->assertSee('Champion Win');
+    $response->assertSee('Hall of Fame');
+    $response->assertSee('Weekly Hall of Fame winner');
+    $response->assertSee('You reached #1 in the weekly Hall of Fame with 68 points.');
+});
+
 

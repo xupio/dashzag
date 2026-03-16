@@ -23,8 +23,9 @@ class InternalMailController extends Controller
     {
         $user = $request->user();
         $search = trim((string) $request->query('search', ''));
+        $label = $this->normalizeLabel($request->query('label'));
 
-        $query = $this->recipientMailboxQuery($user, $search)
+        $query = $this->recipientMailboxQuery($user, $search, $label)
             ->whereNull('deleted_at')
             ->whereNull('trashed_at');
 
@@ -35,6 +36,8 @@ class InternalMailController extends Controller
             'messages' => $messages,
             'messageCounts' => $this->messageCounts($user),
             'search' => $search,
+            'selectedLabel' => $label,
+            'labels' => InternalMessage::labelOptions(),
             'mailIdentity' => $user->email,
         ]);
     }
@@ -43,8 +46,9 @@ class InternalMailController extends Controller
     {
         $user = $request->user();
         $search = trim((string) $request->query('search', ''));
+        $label = $this->normalizeLabel($request->query('label'));
 
-        $messages = $this->recipientMailboxQuery($user, $search)
+        $messages = $this->recipientMailboxQuery($user, $search, $label)
             ->whereNull('deleted_at')
             ->whereNull('trashed_at')
             ->whereNotNull('starred_at')
@@ -57,6 +61,8 @@ class InternalMailController extends Controller
             'messages' => $messages,
             'messageCounts' => $this->messageCounts($user),
             'search' => $search,
+            'selectedLabel' => $label,
+            'labels' => InternalMessage::labelOptions(),
             'mailIdentity' => $user->email,
         ]);
     }
@@ -65,8 +71,9 @@ class InternalMailController extends Controller
     {
         $user = $request->user();
         $search = trim((string) $request->query('search', ''));
+        $label = $this->normalizeLabel($request->query('label'));
 
-        $messages = $this->recipientMailboxQuery($user, $search)
+        $messages = $this->recipientMailboxQuery($user, $search, $label)
             ->whereNotNull('deleted_at')
             ->whereNull('trashed_at')
             ->latest('deleted_at')
@@ -78,6 +85,8 @@ class InternalMailController extends Controller
             'messages' => $messages,
             'messageCounts' => $this->messageCounts($user),
             'search' => $search,
+            'selectedLabel' => $label,
+            'labels' => InternalMessage::labelOptions(),
             'mailIdentity' => $user->email,
         ]);
     }
@@ -86,8 +95,9 @@ class InternalMailController extends Controller
     {
         $user = $request->user();
         $search = trim((string) $request->query('search', ''));
+        $label = $this->normalizeLabel($request->query('label'));
 
-        $messages = $this->recipientMailboxQuery($user, $search)
+        $messages = $this->recipientMailboxQuery($user, $search, $label)
             ->whereNotNull('trashed_at')
             ->latest('trashed_at')
             ->paginate(12)
@@ -98,6 +108,8 @@ class InternalMailController extends Controller
             'messages' => $messages,
             'messageCounts' => $this->messageCounts($user),
             'search' => $search,
+            'selectedLabel' => $label,
+            'labels' => InternalMessage::labelOptions(),
             'mailIdentity' => $user->email,
         ]);
     }
@@ -106,11 +118,16 @@ class InternalMailController extends Controller
     {
         $user = $request->user();
         $search = trim((string) $request->query('search', ''));
+        $label = $this->normalizeLabel($request->query('label'));
 
         $query = InternalMessage::query()
             ->with('attachments')
             ->where('sender_id', $user->id)
             ->where('is_draft', true);
+
+        if ($label) {
+            $query->where('label', $label);
+        }
 
         if ($search !== '') {
             $query->where(function ($draftQuery) use ($search) {
@@ -126,6 +143,8 @@ class InternalMailController extends Controller
             'messages' => $messages,
             'messageCounts' => $this->messageCounts($user),
             'search' => $search,
+            'selectedLabel' => $label,
+            'labels' => InternalMessage::labelOptions(),
             'mailIdentity' => $user->email,
         ]);
     }
@@ -134,11 +153,16 @@ class InternalMailController extends Controller
     {
         $user = $request->user();
         $search = trim((string) $request->query('search', ''));
+        $label = $this->normalizeLabel($request->query('label'));
 
         $query = InternalMessage::query()
             ->with(['recipients.user', 'sender', 'attachments'])
             ->where('sender_id', $user->id)
             ->where('is_draft', false);
+
+        if ($label) {
+            $query->where('label', $label);
+        }
 
         if ($search !== '') {
             $query->where(function ($messageQuery) use ($search) {
@@ -155,6 +179,8 @@ class InternalMailController extends Controller
             'messages' => $messages,
             'messageCounts' => $this->messageCounts($user),
             'search' => $search,
+            'selectedLabel' => $label,
+            'labels' => InternalMessage::labelOptions(),
             'mailIdentity' => $user->email,
         ]);
     }
@@ -168,6 +194,7 @@ class InternalMailController extends Controller
         $prefillCc = collect();
         $prefillSubject = '';
         $prefillBody = '';
+        $prefillLabel = InternalMessage::LABEL_GENERAL;
         $replyContext = null;
 
         if ($request->filled('draft')) {
@@ -181,6 +208,7 @@ class InternalMailController extends Controller
             $prefillCc = collect($draftMessage->draft_cc ?? []);
             $prefillSubject = (string) $draftMessage->subject;
             $prefillBody = (string) $draftMessage->body;
+            $prefillLabel = (string) ($draftMessage->label ?: InternalMessage::LABEL_GENERAL);
 
             if ($draftMessage->reply_to_message_id) {
                 $replyMessage = InternalMessage::query()
@@ -210,6 +238,7 @@ class InternalMailController extends Controller
                 ->values();
 
             $prefillSubject = str($replyMessage->subject)->startsWith('Re: ') ? $replyMessage->subject : 'Re: '.$replyMessage->subject;
+            $prefillLabel = (string) ($replyMessage->label ?: InternalMessage::LABEL_GENERAL);
         }
 
         $users = User::query()
@@ -228,6 +257,8 @@ class InternalMailController extends Controller
             'prefillCc' => $prefillCc,
             'prefillSubject' => $prefillSubject,
             'prefillBody' => $prefillBody,
+            'prefillLabel' => $prefillLabel,
+            'labels' => InternalMessage::labelOptions(),
             'replyContext' => $replyContext,
         ]);
     }
@@ -254,6 +285,7 @@ class InternalMailController extends Controller
                 'cc.*' => ['integer', Rule::exists('users', 'id')->where(fn ($query) => $query->where('id', '!=', $user->id))],
                 'subject' => ['nullable', 'string', 'max:255'],
                 'body' => ['nullable', 'string'],
+                'label' => ['nullable', Rule::in(array_keys(InternalMessage::labelOptions()))],
                 'reply_to_message_id' => ['nullable', 'integer'],
                 'attachments' => ['nullable', 'array'],
                 'attachments.*' => ['file', 'max:10240'],
@@ -268,6 +300,7 @@ class InternalMailController extends Controller
                 collect($validated['cc'] ?? [])->map(fn ($id) => (int) $id)->values(),
                 (string) ($validated['subject'] ?? ''),
                 (string) ($validated['body'] ?? ''),
+                (string) ($validated['label'] ?? InternalMessage::LABEL_GENERAL),
                 $replyMessage,
             );
 
@@ -285,6 +318,7 @@ class InternalMailController extends Controller
             'cc.*' => ['integer', Rule::exists('users', 'id')->where(fn ($query) => $query->where('id', '!=', $user->id))],
             'subject' => ['required', 'string', 'max:255'],
             'body' => ['required', 'string'],
+            'label' => ['nullable', Rule::in(array_keys(InternalMessage::labelOptions()))],
             'reply_to_message_id' => ['nullable', 'integer'],
             'attachments' => ['nullable', 'array'],
             'attachments.*' => ['file', 'max:10240'],
@@ -300,6 +334,7 @@ class InternalMailController extends Controller
                 'thread_root_id' => $replyMessage ? ($replyMessage->thread_root_id ?: $replyMessage->id) : null,
                 'reply_to_message_id' => $replyMessage?->id,
                 'is_draft' => false,
+                'label' => (string) ($validated['label'] ?? InternalMessage::LABEL_GENERAL),
                 'draft_to' => null,
                 'draft_cc' => null,
                 'subject' => $validated['subject'],
@@ -370,6 +405,7 @@ class InternalMailController extends Controller
                 'sender_id' => $user->id,
                 'thread_root_id' => $message->thread_root_id ?: $message->id,
                 'reply_to_message_id' => $message->id,
+                'label' => $message->label ?: InternalMessage::LABEL_GENERAL,
                 'subject' => str($message->subject)->startsWith('Re: ') ? $message->subject : 'Re: '.$message->subject,
                 'body' => $validated['body'],
             ]);
@@ -603,13 +639,14 @@ class InternalMailController extends Controller
         }
     }
 
-    protected function saveDraft(User $user, ?InternalMessage $draft, Collection $toRecipients, Collection $ccRecipients, string $subject, string $body, ?InternalMessage $replyMessage): InternalMessage
+    protected function saveDraft(User $user, ?InternalMessage $draft, Collection $toRecipients, Collection $ccRecipients, string $subject, string $body, string $label, ?InternalMessage $replyMessage): InternalMessage
     {
         $attributes = [
             'sender_id' => $user->id,
             'thread_root_id' => $replyMessage ? ($replyMessage->thread_root_id ?: $replyMessage->id) : null,
             'reply_to_message_id' => $replyMessage?->id,
             'is_draft' => true,
+            'label' => $label,
             'draft_to' => $toRecipients->all(),
             'draft_cc' => $ccRecipients->reject(fn ($id) => $toRecipients->contains($id))->values()->all(),
             'subject' => $subject,
@@ -636,11 +673,15 @@ class InternalMailController extends Controller
         return $replyMessage;
     }
 
-    protected function recipientMailboxQuery(User $user, string $search = '')
+    protected function recipientMailboxQuery(User $user, string $search = '', ?string $label = null)
     {
         $query = InternalMessageRecipient::query()
             ->with(['message.sender', 'message.recipients.user', 'message.attachments'])
             ->where('user_id', $user->id);
+
+        if ($label) {
+            $query->whereHas('message', fn ($messageQuery) => $messageQuery->where('label', $label));
+        }
 
         if ($search !== '') {
             $query->whereHas('message', function ($messageQuery) use ($search) {
@@ -694,6 +735,13 @@ class InternalMailController extends Controller
             'drafts' => InternalMessage::query()->where('sender_id', $user->id)->where('is_draft', true)->count(),
             'sent' => InternalMessage::query()->where('sender_id', $user->id)->where('is_draft', false)->count(),
         ];
+    }
+
+    protected function normalizeLabel(mixed $label): ?string
+    {
+        $label = is_string($label) ? trim($label) : '';
+
+        return array_key_exists($label, InternalMessage::labelOptions()) ? $label : null;
     }
 }
 

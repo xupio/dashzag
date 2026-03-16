@@ -8,9 +8,14 @@
         <h4 class="mb-1">Users</h4>
         <p class="text-secondary mb-0">Manage registered users, monitor their level and investment totals, and update admin access.</p>
       </div>
-      <a href="{{ route('dashboard.operations') }}" class="btn btn-outline-primary btn-icon-text">
-        <i data-lucide="briefcase-business" class="btn-icon-prepend"></i> Operations
-      </a>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ route('dashboard.users.export', ['search' => $search, 'role' => $selectedRole, 'account_type' => $selectedAccountType, 'verification' => $selectedVerification]) }}" class="btn btn-outline-success btn-icon-text">
+          <i data-lucide="download" class="btn-icon-prepend"></i> Export CSV
+        </a>
+        <a href="{{ route('dashboard.operations') }}" class="btn btn-outline-primary btn-icon-text">
+          <i data-lucide="briefcase-business" class="btn-icon-prepend"></i> Operations
+        </a>
+      </div>
     </div>
   </div>
 </div>
@@ -18,6 +23,55 @@
 @if (session('users_success'))
   <div class="alert alert-success">{{ session('users_success') }}</div>
 @endif
+
+<div class="row mb-4">
+  <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Admins</p><h4 class="mb-0">{{ $userBreakdown['admins'] }}</h4></div></div></div>
+  <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Standard users</p><h4 class="mb-0">{{ $userBreakdown['users'] }}</h4></div></div></div>
+  <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Verified</p><h4 class="mb-0">{{ $userBreakdown['verified'] }}</h4></div></div></div>
+  <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Shareholders</p><h4 class="mb-0">{{ $userBreakdown['shareholders'] }}</h4></div></div></div>
+</div>
+
+<div class="row mb-4">
+  <div class="col-12 stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <form method="GET" action="{{ route('dashboard.users') }}" class="row g-3 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label">Search</label>
+            <input type="text" name="search" value="{{ $search }}" class="form-control" placeholder="Name or email">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Role</label>
+            <select name="role" class="form-select">
+              <option value="">All roles</option>
+              <option value="user" @selected($selectedRole === 'user')>User</option>
+              <option value="admin" @selected($selectedRole === 'admin')>Admin</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Account type</label>
+            <select name="account_type" class="form-select">
+              <option value="">All account types</option>
+              <option value="user" @selected($selectedAccountType === 'user')>User</option>
+              <option value="shareholder" @selected($selectedAccountType === 'shareholder')>Shareholder</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Verification</label>
+            <select name="verification" class="form-select">
+              <option value="">All</option>
+              <option value="verified" @selected($selectedVerification === 'verified')>Verified</option>
+              <option value="unverified" @selected($selectedVerification === 'unverified')>Unverified</option>
+            </select>
+          </div>
+          <div class="col-md-1 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Apply</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="row">
   <div class="col-12 stretch-card">
@@ -37,6 +91,7 @@
               <tr>
                 <th>User</th>
                 <th>Role</th>
+                <th>Verification</th>
                 <th>Level</th>
                 <th>Account type</th>
                 <th>Total invested</th>
@@ -53,6 +108,7 @@
                     <div class="text-secondary small">{{ $listedUser->email }}</div>
                   </td>
                   <td><span class="badge {{ $listedUser->role === 'admin' ? 'bg-danger' : 'bg-secondary' }}">{{ ucfirst($listedUser->role) }}</span></td>
+                  <td><span class="badge {{ $listedUser->email_verified_at ? 'bg-success' : 'bg-warning text-dark' }}">{{ $listedUser->email_verified_at ? 'Verified' : 'Pending' }}</span></td>
                   <td>{{ $listedUser->userLevel?->name ?? 'Starter' }}</td>
                   <td class="text-capitalize">{{ $listedUser->account_type }}</td>
                   <td>${{ number_format((float) $listedUser->investments->where('status', 'active')->sum('amount'), 2) }}</td>
@@ -78,4 +134,3 @@
   </div>
 </div>
 @endsection
-

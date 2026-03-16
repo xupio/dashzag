@@ -19,12 +19,15 @@ test('user can switch dashboard and sell pages between miners', function () {
         ->assertOk()
         ->assertSee('Beta Flux Overview')
         ->assertSee('Share status')
+        ->assertSee('Live miner performance')
+        ->assertSee('Open Daily Miner Report')
         ->assertSee('Open Hall of Fame');
 
     $this->actingAs($user)
         ->get(route('dashboard.buy-shares').'?miner=beta-flux')
         ->assertOk()
         ->assertSee('Buy Beta Flux Shares')
+        ->assertSee('Daily miner report')
         ->assertSee('Momentum 300');
 });
 

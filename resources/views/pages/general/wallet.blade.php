@@ -47,6 +47,32 @@
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Total earnings</p><h4 class="mb-0">${{ number_format($wallet['total'], 2) }}</h4></div></div></div>
 </div>
 
+<div class="row mb-4">
+  <div class="col-12 stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
+            <h5 class="mb-1">Earnings source breakdown</h5>
+            <p class="text-secondary mb-0">Understand how your wallet balance is split between miner payouts, monthly returns, and network rewards.</p>
+          </div>
+          <span class="badge bg-primary">{{ count($walletSourceBreakdown) }} sources</span>
+        </div>
+        <div class="row g-3">
+          @foreach ($walletSourceBreakdown as $source)
+            <div class="col-md-6 col-xl-3">
+              <div class="border rounded p-3 h-100 bg-light">
+                <div class="text-secondary small">{{ $source['label'] }}</div>
+                <div class="fw-semibold fs-4">${{ number_format($source['amount'], 2) }}</div>
+              </div>
+            </div>
+          @endforeach
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="row">
   <div class="col-xl-4 grid-margin stretch-card">
     <div class="card">
@@ -72,6 +98,13 @@
           </div>
           <span class="badge bg-primary">{{ $earnings->count() }} entries</span>
         </div>
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          @foreach ($walletSourceOptions as $sourceKey => $sourceOption)
+            <a href="{{ route('dashboard.wallet', ['source' => $sourceKey === 'all' ? null : $sourceKey]) }}" class="btn btn-sm {{ $activeSource === $sourceKey ? 'btn-primary' : 'btn-outline-primary' }}">
+              {{ $sourceOption['label'] }}
+            </a>
+          @endforeach
+        </div>
         @if ($earnings->isEmpty())
           <div class="text-center py-5">
             <h5 class="mb-2">No wallet entries yet</h5>
@@ -95,14 +128,14 @@
                   <tr>
                     <td>{{ $earning->earned_on?->format('M d, Y') }}</td>
                     <td>{{ str($earning->source)->replace('_', ' ')->title() }}</td>
-                    <td>{{ $earning->investment?->package?->name ?? 'â€”' }}</td>
+                    <td>{{ $earning->investment?->package?->name ?? '—' }}</td>
                     <td>
                       <span class="badge {{ $earning->status === 'available' ? 'bg-success' : ($earning->status === 'paid' ? 'bg-primary' : 'bg-warning text-dark') }}">
                         {{ str($earning->status)->replace('_', ' ')->title() }}
                       </span>
                     </td>
                     <td>${{ number_format((float) $earning->amount, 2) }}</td>
-                    <td>{{ $earning->notes ?: 'â€”' }}</td>
+                    <td>{{ $earning->notes ?: '—' }}</td>
                   </tr>
                 @endforeach
               </tbody>
@@ -153,13 +186,13 @@
                     <td>{{ $request->destination }}</td>
                     <td><span class="badge {{ $request->status === 'paid' ? 'bg-primary' : ($request->status === 'approved' ? 'bg-info' : 'bg-warning text-dark') }}">{{ str($request->status)->title() }}</span></td>
                     <td>
-                      <div class="text-secondary small">Approved: {{ $request->approved_at?->format('M d, Y h:i A') ?? 'â€”' }}</div>
-                      <div class="text-secondary small">Paid: {{ $request->processed_at?->format('M d, Y h:i A') ?? 'â€”' }}</div>
-                      <div class="text-secondary small">Reference: {{ $request->transaction_reference ?: 'â€”' }}</div>
+                      <div class="text-secondary small">Approved: {{ $request->approved_at?->format('M d, Y h:i A') ?? '—' }}</div>
+                      <div class="text-secondary small">Paid: {{ $request->processed_at?->format('M d, Y h:i A') ?? '—' }}</div>
+                      <div class="text-secondary small">Reference: {{ $request->transaction_reference ?: '—' }}</div>
                     </td>
                     <td>
-                      <div>{{ $request->notes ?: 'â€”' }}</div>
-                      <div class="text-secondary small mt-1">Admin: {{ $request->admin_notes ?: 'â€”' }}</div>
+                      <div>{{ $request->notes ?: '—' }}</div>
+                      <div class="text-secondary small mt-1">Admin: {{ $request->admin_notes ?: '—' }}</div>
                     </td>
                   </tr>
                 @endforeach
@@ -207,7 +240,7 @@
           <div class="border rounded p-3 bg-light mb-3">
             <div class="fw-semibold mb-2">Method rules</div>
             <div class="text-secondary small" id="payoutInstructionText">{{ $defaultPayoutMethod['instruction'] ?? 'No payout method is currently available.' }}</div>
-            <div class="text-secondary small mt-2" id="payoutProcessingText">Processing time: {{ $defaultPayoutMethod['processing_time'] ?? 'â€”' }}</div>
+            <div class="text-secondary small mt-2" id="payoutProcessingText">Processing time: {{ $defaultPayoutMethod['processing_time'] ?? '—' }}</div>
             <div class="text-secondary small mt-1" id="payoutMinimumText">Minimum: ${{ number_format((float) ($defaultPayoutMethod['minimum_amount'] ?? 0), 2) }}</div>
             <div class="text-secondary small mt-1" id="payoutFeeText">Fees: ${{ number_format((float) ($defaultPayoutMethod['fixed_fee'] ?? 0), 2) }} fixed + {{ number_format((float) (($defaultPayoutMethod['percentage_fee_rate'] ?? 0) * 100), 2) }}%</div>
             <div class="fw-semibold mt-3" id="payoutNetEstimateText">Estimated net: $0.00</div>
@@ -246,7 +279,7 @@
           var selectedOption = methodSelect.options[methodSelect.selectedIndex];
           var placeholder = selectedOption ? selectedOption.getAttribute('data-placeholder') : 'Enter payout destination';
           var instruction = selectedOption ? selectedOption.getAttribute('data-instruction') : 'No payout method is currently available.';
-          var processing = selectedOption ? selectedOption.getAttribute('data-processing') : 'â€”';
+          var processing = selectedOption ? selectedOption.getAttribute('data-processing') : '—';
           var minimum = selectedOption ? parseFloat(selectedOption.getAttribute('data-minimum') || '0') : 0;
           var fixedFee = selectedOption ? parseFloat(selectedOption.getAttribute('data-fixed-fee') || '0') : 0;
           var rate = selectedOption ? parseFloat(selectedOption.getAttribute('data-rate') || '0') : 0;
@@ -257,7 +290,7 @@
           destinationInput.placeholder = placeholder || 'Enter payout destination';
           destinationHelp.textContent = placeholder || 'Enter payout destination';
           if (instructionText) instructionText.textContent = instruction || 'No payout method is currently available.';
-          if (processingText) processingText.textContent = 'Processing time: ' + (processing || 'â€”');
+          if (processingText) processingText.textContent = 'Processing time: ' + (processing || '—');
           if (minimumText) minimumText.textContent = 'Minimum: $' + minimum.toFixed(2);
           if (feeText) feeText.textContent = 'Fees: $' + fixedFee.toFixed(2) + ' fixed + ' + (rate * 100).toFixed(2) + '%';
           if (netEstimateText) netEstimateText.textContent = 'Estimated net: $' + netAmount.toFixed(2);
@@ -281,4 +314,3 @@
     });
   </script>
 @endpush
-

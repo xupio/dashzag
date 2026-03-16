@@ -5,6 +5,7 @@ use App\Models\Miner;
 use App\Models\User;
 use App\Models\UserInvestment;
 use App\Support\MiningPlatform;
+use Illuminate\Http\UploadedFile;
 
 beforeEach(function () {
     MiningPlatform::ensureDefaults();
@@ -116,6 +117,76 @@ test('automatic snapshot generates daily per share earnings for active investors
     expect((float) $log->revenue_per_share_usd)->toBeGreaterThan(0);
     expect($earning)->not->toBeNull();
     expect((float) $earning->amount)->toBe(round((float) $log->revenue_per_share_usd * (float) $investment->shares_owned, 2));
+});
+
+test('admin can import miner performance logs from csv', function () {
+    $user = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $csv = implode("\n", [
+        'logged_on,revenue_usd,electricity_cost_usd,maintenance_cost_usd,hashrate_th,uptime_percentage,notes',
+        '2026-03-10,1550.75,220.10,70.25,498.40,98.50,Imported row one',
+        '2026-03-11,1625.25,230.00,72.50,503.10,99.10,Imported row two',
+    ]);
+
+    $response = $this->actingAs($user)->post(route('dashboard.miner.logs.import'), [
+        'miner_slug' => 'alpha-one',
+        'csv_file' => UploadedFile::fake()->createWithContent('alpha-logs.csv', $csv),
+    ]);
+
+    $response->assertRedirect(route('dashboard.miner').'?miner=alpha-one');
+
+    $miner = Miner::where('slug', 'alpha-one')->firstOrFail();
+
+    expect((float) $miner->performanceLogs()->whereDate('logged_on', '2026-03-10')->firstOrFail()->revenue_usd)->toBe(1550.75);
+    expect((float) $miner->performanceLogs()->whereDate('logged_on', '2026-03-11')->firstOrFail()->net_profit_usd)->toBe(round(1625.25 - 230.00 - 72.50, 2));
+});
+
+test('admin can download miner performance csv template', function () {
+    $user = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.miner.logs.template', ['miner' => 'alpha-one']));
+
+    $response->assertOk();
+    $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+    expect($response->streamedContent())->toContain('logged_on,revenue_usd,electricity_cost_usd,maintenance_cost_usd,hashrate_th,uptime_percentage,notes');
+});
+
+test('admin can copy previous miner performance log forward', function () {
+    $user = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $miner = Miner::where('slug', 'alpha-one')->firstOrFail();
+
+    MiningPlatform::savePerformanceLog($miner, [
+        'logged_on' => '2026-03-19',
+        'revenue_usd' => 1400.50,
+        'electricity_cost_usd' => 220.20,
+        'maintenance_cost_usd' => 60.30,
+        'hashrate_th' => 490.10,
+        'uptime_percentage' => 98.25,
+        'notes' => 'Original source row.',
+    ], 'manual');
+
+    $response = $this->actingAs($user)->post(route('dashboard.miner.logs.copy-yesterday'), [
+        'miner_slug' => 'alpha-one',
+        'logged_on' => '2026-03-20',
+    ]);
+
+    $response->assertRedirect(route('dashboard.miner').'?miner=alpha-one');
+
+    $copiedLog = $miner->performanceLogs()
+        ->whereDate('logged_on', '2026-03-20')
+        ->where('notes', 'like', '%Copied forward from 2026-03-19.%')
+        ->firstOrFail();
+
+    expect((float) $copiedLog->revenue_usd)->toBe(1400.50);
+    expect((float) $copiedLog->hashrate_th)->toBe(490.10);
+    expect($copiedLog->notes)->toContain('Copied forward from 2026-03-19.');
 });
 
 test('non admin user cannot manage miner data', function () {

@@ -16,6 +16,7 @@ test('verified user can send an internal email to another user', function () {
 
     $response = $this->actingAs($sender)->post(route('email.store'), [
         'to' => [$recipient->id],
+        'label' => 'operations',
         'subject' => 'Welcome to ZagChain',
         'body' => 'This is an internal platform message.',
         'mail_action' => 'send',
@@ -28,7 +29,46 @@ test('verified user can send an internal email to another user', function () {
     expect($message)->not->toBeNull();
     expect($message->sender_id)->toBe($sender->id);
     expect($message->is_draft)->toBeFalse();
+    expect($message->label)->toBe('operations');
     expect($message->recipients()->count())->toBe(1);
+});
+
+test('user can filter inbox messages by label', function () {
+    $sender = User::factory()->create(['email_verified_at' => now()]);
+    $recipient = User::factory()->create(['email_verified_at' => now()]);
+
+    $financeMessage = InternalMessage::create([
+        'sender_id' => $sender->id,
+        'label' => 'finance',
+        'subject' => 'Finance update',
+        'body' => 'Payment reconciliation is complete.',
+    ]);
+
+    $teamMessage = InternalMessage::create([
+        'sender_id' => $sender->id,
+        'label' => 'team',
+        'subject' => 'Team sync',
+        'body' => 'Weekly team meeting starts at 10.',
+    ]);
+
+    InternalMessageRecipient::create([
+        'internal_message_id' => $financeMessage->id,
+        'user_id' => $recipient->id,
+        'recipient_type' => 'to',
+    ]);
+
+    InternalMessageRecipient::create([
+        'internal_message_id' => $teamMessage->id,
+        'user_id' => $recipient->id,
+        'recipient_type' => 'to',
+    ]);
+
+    $this->actingAs($recipient)
+        ->get(route('email.inbox', ['label' => 'finance']))
+        ->assertOk()
+        ->assertSee('Finance update')
+        ->assertSee('Finance')
+        ->assertDontSee('Team sync');
 });
 
 test('recipient can view a message in inbox and it becomes read', function () {

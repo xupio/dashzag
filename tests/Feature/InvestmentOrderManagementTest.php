@@ -115,6 +115,9 @@ test('admin can export filtered investment orders csv', function () {
 
     $csv = $response->streamedContent();
 
+    expect($csv)->toContain('Filter');
+    expect($csv)->toContain('pending');
+    expect($csv)->toContain('Gamma');
     expect($csv)->toContain('EXPORT-MATCH-001');
     expect($csv)->not->toContain('EXPORT-OTHER-002');
 });

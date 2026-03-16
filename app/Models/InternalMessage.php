@@ -11,11 +11,18 @@ class InternalMessage extends Model
 {
     use HasFactory;
 
+    public const LABEL_GENERAL = 'general';
+    public const LABEL_SUPPORT = 'support';
+    public const LABEL_FINANCE = 'finance';
+    public const LABEL_OPERATIONS = 'operations';
+    public const LABEL_TEAM = 'team';
+
     protected $fillable = [
         'sender_id',
         'thread_root_id',
         'reply_to_message_id',
         'is_draft',
+        'label',
         'draft_to',
         'draft_cc',
         'subject',
@@ -28,6 +35,17 @@ class InternalMessage extends Model
             'is_draft' => 'boolean',
             'draft_to' => 'array',
             'draft_cc' => 'array',
+        ];
+    }
+
+    public static function labelOptions(): array
+    {
+        return [
+            self::LABEL_GENERAL => 'General',
+            self::LABEL_SUPPORT => 'Support',
+            self::LABEL_FINANCE => 'Finance',
+            self::LABEL_OPERATIONS => 'Operations',
+            self::LABEL_TEAM => 'Team',
         ];
     }
 

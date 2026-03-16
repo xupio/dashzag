@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Earning;
 use App\Models\InvestmentOrder;
 use App\Models\User;
 use App\Support\MiningPlatform;
@@ -21,9 +22,10 @@ test('verified user can view investments page', function () {
 
     $response->assertOk();
     $response->assertSee('My Investments');
+    $response->assertSee('Daily miner report');
 });
 
-test('investments page shows subscribed package history', function () {
+test('investments page shows subscribed package history and daily earnings section', function () {
     $admin = User::factory()->create([
         'email_verified_at' => now(),
         'role' => 'admin',
@@ -50,9 +52,55 @@ test('investments page shows subscribed package history', function () {
         ->post(route('dashboard.operations.investment-orders.approve', $order->fresh()))
         ->assertRedirect(route('dashboard.operations'));
 
+    $investment = $user->fresh()->investments()->firstOrFail();
+
+    Earning::create([
+        'user_id' => $user->id,
+        'investment_id' => $investment->id,
+        'earned_on' => now()->toDateString(),
+        'amount' => 12.50,
+        'source' => 'mining_daily_share',
+        'status' => 'available',
+        'notes' => 'Daily miner distribution test row.',
+    ]);
+
     $response = $this->actingAs($user)->get(route('dashboard.investments'));
 
     $response->assertOk();
     $response->assertSee('Growth 500');
     $response->assertSee('Alpha One');
+    $response->assertSee('Earnings activity');
+    $response->assertSee('Live miner payout tracking');
+    $response->assertSee('How this pays you');
+    $response->assertSee('12.50');
 });
+
+test('investments page can filter earnings activity by source', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'shareholder',
+    ]);
+
+    foreach ([
+        ['amount' => 12.50, 'source' => 'mining_daily_share', 'notes' => 'Daily miner distribution test row.'],
+        ['amount' => 18.00, 'source' => 'mining_return', 'notes' => 'Monthly return test row.'],
+        ['amount' => 25.00, 'source' => 'referral_registration', 'notes' => 'Referral reward test row.'],
+    ] as $earning) {
+        Earning::create([
+            'user_id' => $user->id,
+            'investment_id' => null,
+            'earned_on' => now()->toDateString(),
+            'status' => 'available',
+        ] + $earning);
+    }
+
+    $response = $this->actingAs($user)->get(route('dashboard.investments', ['source' => 'monthly_return']));
+
+    $response->assertOk();
+    $response->assertSee('Monthly return');
+    $response->assertSee('Monthly return test row.');
+    $response->assertDontSee('Daily miner distribution test row.');
+    $response->assertDontSee('Referral reward test row.');
+});
+
+
