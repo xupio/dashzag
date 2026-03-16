@@ -134,3 +134,107 @@ test('non admin user cannot access analytics page', function () {
 
     $this->actingAs($user)->get(route('dashboard.analytics'))->assertForbidden();
 });
+
+test('analytics tree can focus on one investor branch', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $focusUser = User::factory()->create([
+        'email_verified_at' => now(),
+        'name' => 'Focus Root',
+        'email' => 'focusroot@example.com',
+    ]);
+
+    $otherRoot = User::factory()->create([
+        'email_verified_at' => now(),
+        'name' => 'Other Root',
+        'email' => 'otherroot@example.com',
+    ]);
+
+    User::factory()->create([
+        'email_verified_at' => now(),
+        'sponsor_user_id' => $focusUser->id,
+        'name' => 'Focus Child',
+        'email' => 'focuschild@example.com',
+    ]);
+
+    User::factory()->create([
+        'email_verified_at' => now(),
+        'sponsor_user_id' => $otherRoot->id,
+        'name' => 'Other Child',
+        'email' => 'otherchild@example.com',
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('dashboard.analytics', [
+        'tree_focus' => $focusUser->id,
+        'tree_depth' => 2,
+    ]));
+
+    $response->assertOk();
+    $response->assertSee('Focused on');
+    $response->assertSee('Focus Root');
+    $response->assertSee('The tree now shows only this visible branch.');
+    $response->assertSee('Depth 2');
+});
+
+test('analytics can export the focused tree branch', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $focusUser = User::factory()->create([
+        'email_verified_at' => now(),
+        'name' => 'Analytics Export Root',
+        'email' => 'analyticsexportroot@example.com',
+    ]);
+
+    User::factory()->create([
+        'email_verified_at' => now(),
+        'sponsor_user_id' => $focusUser->id,
+        'name' => 'Analytics Export Child',
+        'email' => 'analyticsexportchild@example.com',
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('dashboard.analytics.tree-export', [
+        'tree_focus' => $focusUser->id,
+        'tree_depth' => 2,
+    ]));
+
+    $response->assertOk();
+    $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+    $csv = $response->streamedContent();
+    expect($csv)->toContain('Focused branch');
+    expect($csv)->toContain('analyticsexportroot@example.com');
+    expect($csv)->toContain('Analytics Export Child');
+});
+
+test('analytics can open a printable focused branch summary', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $focusUser = User::factory()->create([
+        'email_verified_at' => now(),
+        'name' => 'Printable Analytics Root',
+        'email' => 'printableanalyticsroot@example.com',
+    ]);
+
+    User::factory()->create([
+        'email_verified_at' => now(),
+        'sponsor_user_id' => $focusUser->id,
+        'name' => 'Printable Analytics Child',
+        'email' => 'printableanalyticschild@example.com',
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('dashboard.analytics.tree-print', [
+        'tree_focus' => $focusUser->id,
+        'tree_depth' => 2,
+    ]));
+
+    $response->assertOk();
+    $response->assertSee('Branch Summary');
+    $response->assertSee('Analytics Branch View');
+    $response->assertSee('printableanalyticsroot@example.com');
+    $response->assertSee('Printable Analytics Child');
+});

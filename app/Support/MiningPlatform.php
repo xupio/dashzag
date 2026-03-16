@@ -695,6 +695,20 @@ class MiningPlatform
         return self::mapReferralTreeNodes($usersBySponsor, 'root', 1, $maxDepth)->values();
     }
 
+    public static function referralSubtree(Collection $users, User $focusUser, int $maxDepth = 5): Collection
+    {
+        $usersBySponsor = $users
+            ->sortBy(fn (User $user) => Str::lower($user->name))
+            ->groupBy(fn (User $user) => $user->sponsor_user_id ?? 'root');
+
+        $rootNode = self::mapReferralTreeNode($usersBySponsor, $focusUser, 1, $maxDepth);
+        $rootNode['situation'] = self::treeNodeSituation($rootNode);
+
+        return collect([
+            $rootNode,
+        ])->values();
+    }
+
     public static function referralTreeSummary(Collection $tree): array
     {
         $flattened = self::flattenReferralTree($tree);
@@ -705,6 +719,11 @@ class MiningPlatform
             'max_depth' => (int) $flattened->max('depth'),
             'leaf_nodes' => $flattened->where('children_count', 0)->count(),
         ];
+    }
+
+    public static function flattenedReferralTree(Collection $tree): Collection
+    {
+        return self::flattenReferralTree($tree);
     }
 
     public static function compactTreePowerSummary(User $user): array
@@ -2214,41 +2233,44 @@ class MiningPlatform
     protected static function mapReferralTreeNodes(Collection $usersBySponsor, string|int $parentKey, int $depth, int $maxDepth): Collection
     {
         return collect($usersBySponsor->get($parentKey, collect()))
-            ->map(function (User $user) use ($usersBySponsor, $depth, $maxDepth) {
-                $children = $depth < $maxDepth
-                    ? self::mapReferralTreeNodes($usersBySponsor, $user->id, $depth + 1, $maxDepth)
-                    : collect();
-
-                $activeInvestments = $user->relationLoaded('investments')
-                    ? $user->investments->where('status', 'active')->where('amount', '>', 0)
-                    : $user->investments()->where('status', 'active')->where('amount', '>', 0)->get();
-
-                return [
-                    'user' => $user,
-                    'depth' => $depth,
-                    'level_name' => $user->userLevel?->name ?? 'Starter',
-                    'sponsor_name' => $user->sponsor?->name ?? 'Top-level',
-                    'verified_invites' => $user->relationLoaded('friendInvitations')
-                        ? $user->friendInvitations->whereNotNull('verified_at')->count()
-                        : 0,
-                    'active_capital' => (float) $activeInvestments->sum('amount'),
-                    'active_shares' => (int) $activeInvestments->sum('shares_owned'),
-                    'direct_team' => (int) collect($usersBySponsor->get($user->id, collect()))->count(),
-                    'active_direct_investors' => self::activeDirectInvestorCount($user),
-                    'children' => $children->values(),
-                    'children_count' => $children->count(),
-                    'visible_descendants' => (int) $children->sum(fn (array $child) => 1 + $child['visible_descendants']),
-                    'branch_active_capital' => (float) ((float) $activeInvestments->sum('amount') + $children->sum('branch_active_capital')),
-                    'branch_active_investors' => (int) ($activeInvestments->isNotEmpty() ? 1 : 0) + (int) $children->sum('branch_active_investors'),
-                    'power_summary' => self::compactTreePowerSummary($user),
-                ];
-            })
+            ->map(fn (User $user) => self::mapReferralTreeNode($usersBySponsor, $user, $depth, $maxDepth))
             ->map(function (array $node) {
                 $node['situation'] = self::treeNodeSituation($node);
 
                 return $node;
             })
             ->values();
+    }
+
+    protected static function mapReferralTreeNode(Collection $usersBySponsor, User $user, int $depth, int $maxDepth): array
+    {
+        $children = $depth < $maxDepth
+            ? self::mapReferralTreeNodes($usersBySponsor, $user->id, $depth + 1, $maxDepth)
+            : collect();
+
+        $activeInvestments = $user->relationLoaded('investments')
+            ? $user->investments->where('status', 'active')->where('amount', '>', 0)
+            : $user->investments()->where('status', 'active')->where('amount', '>', 0)->get();
+
+        return [
+            'user' => $user,
+            'depth' => $depth,
+            'level_name' => $user->userLevel?->name ?? 'Starter',
+            'sponsor_name' => $user->sponsor?->name ?? 'Top-level',
+            'verified_invites' => $user->relationLoaded('friendInvitations')
+                ? $user->friendInvitations->whereNotNull('verified_at')->count()
+                : 0,
+            'active_capital' => (float) $activeInvestments->sum('amount'),
+            'active_shares' => (int) $activeInvestments->sum('shares_owned'),
+            'direct_team' => (int) collect($usersBySponsor->get($user->id, collect()))->count(),
+            'active_direct_investors' => self::activeDirectInvestorCount($user),
+            'children' => $children->values(),
+            'children_count' => $children->count(),
+            'visible_descendants' => (int) $children->sum(fn (array $child) => 1 + $child['visible_descendants']),
+            'branch_active_capital' => (float) ((float) $activeInvestments->sum('amount') + $children->sum('branch_active_capital')),
+            'branch_active_investors' => (int) ($activeInvestments->isNotEmpty() ? 1 : 0) + (int) $children->sum('branch_active_investors'),
+            'power_summary' => self::compactTreePowerSummary($user),
+        ];
     }
 
     protected static function flattenReferralTree(Collection $tree): Collection

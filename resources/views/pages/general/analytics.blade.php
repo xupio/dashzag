@@ -44,6 +44,56 @@
             <span class="badge bg-dark">Depth {{ $networkTreeSummary['max_depth'] }}</span>
           </div>
         </div>
+        <form method="GET" action="{{ route('dashboard.analytics') }}" class="row g-3 align-items-end mb-3">
+          <input type="hidden" name="miner" value="{{ $selectedMinerSlug }}">
+          <div class="col-md-4">
+            <label class="form-label">Find investor</label>
+            <input type="text" name="tree_search" value="{{ $treeSearch }}" class="form-control" placeholder="Search by name or email">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Focus branch</label>
+            <select name="tree_focus" class="form-select">
+              <option value="">All visible roots</option>
+              @if ($selectedTreeFocus)
+                <option value="{{ $selectedTreeFocus->id }}" selected>{{ $selectedTreeFocus->name }} (selected)</option>
+              @endif
+              @foreach ($treeSearchResults as $treeResult)
+                @if (! $selectedTreeFocus || $treeResult->id !== $selectedTreeFocus->id)
+                  <option value="{{ $treeResult->id }}">{{ $treeResult->name }} - {{ $treeResult->email }}</option>
+                @endif
+              @endforeach
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Tree depth</label>
+            <select name="tree_depth" class="form-select">
+              @foreach ([2, 3, 4, 5, 6] as $depthOption)
+                <option value="{{ $depthOption }}" @selected($treeDepth === $depthOption)>Depth {{ $depthOption }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-primary w-100">Apply</button>
+            <a href="{{ route('dashboard.analytics', ['miner' => $selectedMinerSlug]) }}" class="btn btn-outline-secondary">Reset</a>
+          </div>
+          <div class="col-12">
+            <a href="{{ route('dashboard.analytics.tree-export', ['miner' => $selectedMinerSlug, 'tree_search' => $treeSearch, 'tree_focus' => $selectedTreeFocus?->id, 'tree_depth' => $treeDepth]) }}" class="btn btn-outline-success btn-sm">
+              Export Focused Branch CSV
+            </a>
+            <a href="{{ route('dashboard.analytics.tree-print', ['miner' => $selectedMinerSlug, 'tree_search' => $treeSearch, 'tree_focus' => $selectedTreeFocus?->id, 'tree_depth' => $treeDepth]) }}" target="_blank" class="btn btn-outline-primary btn-sm ms-2">
+              Print Branch Summary
+            </a>
+          </div>
+          @if ($selectedTreeFocus)
+            <div class="col-12">
+              <div class="text-secondary small">Focused on <strong>{{ $selectedTreeFocus->name }}</strong>. The tree now shows only this visible branch.</div>
+            </div>
+          @elseif($treeSearch !== '' && $treeSearchResults->isEmpty())
+            <div class="col-12">
+              <div class="text-secondary small">No matching investor found for this search yet.</div>
+            </div>
+          @endif
+        </form>
         @if ($networkTree->isEmpty())
           <p class="text-secondary mb-0">The sponsor tree snapshot will appear here once referrals begin to build across the platform.</p>
         @else

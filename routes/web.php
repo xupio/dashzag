@@ -1210,19 +1210,32 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             return redirect()->route('dashboard.miners')->with('miners_success', $miner->name.' has been created with starter packages and baseline logs.');
         })->name('dashboard.miners.store');
-        Route::get('/dashboard/analytics', function () {
+        Route::get('/dashboard/analytics', function (Request $request) {
             MiningPlatform::ensureDefaults();
 
             $users = User::with(['sponsor', 'userLevel', 'friendInvitations', 'sponsoredUsers.investments', 'investments', 'earnings'])->get();
             $packages = InvestmentPackage::with('investments')->orderBy('display_order')->get();
-            $miner = MiningPlatform::resolveMiner(request()->query('miner'));
+            $miner = MiningPlatform::resolveMiner($request->query('miner'));
             $miner->load([
                 'performanceLogs' => fn ($query) => $query->orderBy('logged_on')->limit(7),
             ]);
             $miners = Miner::with(['investments.user', 'packages'])->orderBy('name')->get();
             $selectedMinerPerformanceLogs = $miner->performanceLogs;
             $selectedMinerSlug = $miner->slug;
-            $networkTree = MiningPlatform::referralTree($users, 3);
+            $treeDepth = max(2, min((int) $request->query('tree_depth', 3), 6));
+            $treeSearch = trim((string) $request->query('tree_search', ''));
+            $focusUser = $request->filled('tree_focus')
+                ? $users->firstWhere('id', (int) $request->query('tree_focus'))
+                : null;
+            $treeSearchResults = $treeSearch === ''
+                ? collect()
+                : $users
+                    ->filter(fn (User $user) => str_contains(strtolower($user->name), strtolower($treeSearch)) || str_contains(strtolower($user->email), strtolower($treeSearch)))
+                    ->take(8)
+                    ->values();
+            $networkTree = $focusUser
+                ? MiningPlatform::referralSubtree($users, $focusUser, $treeDepth)
+                : MiningPlatform::referralTree($users, $treeDepth);
             $networkTreeSummary = MiningPlatform::referralTreeSummary($networkTree);
             $networkTreeChart = MiningPlatform::referralTreeChartPayload($networkTree, 'Analytics');
 
@@ -1275,6 +1288,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'networkTree' => $networkTree,
                 'networkTreeSummary' => $networkTreeSummary,
                 'networkTreeChart' => $networkTreeChart,
+                'treeDepth' => $treeDepth,
+                'treeSearch' => $treeSearch,
+                'treeSearchResults' => $treeSearchResults,
+                'selectedTreeFocus' => $focusUser,
             ]);
         })->name('dashboard.analytics');
 
@@ -1335,6 +1352,83 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 fclose($handle);
             }, $filename, ['Content-Type' => 'text/csv']);
         })->name('dashboard.analytics.export');
+
+        Route::get('/dashboard/analytics/tree-export', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $users = User::with(['sponsor', 'userLevel', 'friendInvitations', 'sponsoredUsers.investments', 'investments'])->get();
+            $treeDepth = max(2, min((int) $request->query('tree_depth', 3), 6));
+            $treeSearch = trim((string) $request->query('tree_search', ''));
+            $focusUser = $request->filled('tree_focus')
+                ? $users->firstWhere('id', (int) $request->query('tree_focus'))
+                : null;
+
+            $networkTree = $focusUser
+                ? MiningPlatform::referralSubtree($users, $focusUser, $treeDepth)
+                : MiningPlatform::referralTree($users, $treeDepth);
+            $rows = MiningPlatform::flattenedReferralTree($networkTree);
+
+            $filename = 'analytics-tree-'.now()->format('Ymd-His').'.csv';
+
+            return response()->streamDownload(function () use ($rows, $focusUser, $treeDepth, $treeSearch) {
+                $handle = fopen('php://output', 'w');
+                fputcsv($handle, ['Filter', 'Value']);
+                fputcsv($handle, ['Tree depth', $treeDepth]);
+                fputcsv($handle, ['Search term', $treeSearch === '' ? 'All' : $treeSearch]);
+                fputcsv($handle, ['Focused branch', $focusUser?->email ?? 'All visible roots']);
+                fputcsv($handle, []);
+                fputcsv($handle, ['Name', 'Email', 'Sponsor', 'Level', 'Depth', 'Health', 'Priority', 'Power', 'Direct team', 'Active direct investors', 'Active capital', 'Branch capital', 'Visible descendants', 'Branch investors', 'Verified invites']);
+
+                foreach ($rows as $node) {
+                    fputcsv($handle, [
+                        $node['user']->name,
+                        $node['user']->email,
+                        $node['sponsor_name'],
+                        $node['level_name'],
+                        $node['depth'],
+                        $node['situation']['health'],
+                        $node['situation']['priority'],
+                        $node['power_summary']['score'].'/100',
+                        $node['direct_team'],
+                        $node['active_direct_investors'],
+                        number_format((float) $node['active_capital'], 2, '.', ''),
+                        number_format((float) $node['branch_active_capital'], 2, '.', ''),
+                        $node['visible_descendants'],
+                        $node['branch_active_investors'],
+                        $node['verified_invites'],
+                    ]);
+                }
+
+                fclose($handle);
+            }, $filename, ['Content-Type' => 'text/csv']);
+        })->name('dashboard.analytics.tree-export');
+
+        Route::get('/dashboard/analytics/tree-print', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $users = User::with(['sponsor', 'userLevel', 'friendInvitations', 'sponsoredUsers.investments', 'investments'])->get();
+            $treeDepth = max(2, min((int) $request->query('tree_depth', 3), 6));
+            $treeSearch = trim((string) $request->query('tree_search', ''));
+            $focusUser = $request->filled('tree_focus')
+                ? $users->firstWhere('id', (int) $request->query('tree_focus'))
+                : null;
+
+            $networkTree = $focusUser
+                ? MiningPlatform::referralSubtree($users, $focusUser, $treeDepth)
+                : MiningPlatform::referralTree($users, $treeDepth);
+            $rows = MiningPlatform::flattenedReferralTree($networkTree);
+
+            return view('pages.general.network-branch-print', [
+                'pageTitle' => 'Analytics Branch View',
+                'summary' => MiningPlatform::referralTreeSummary($networkTree),
+                'rows' => $rows,
+                'focusUser' => $focusUser,
+                'treeDepth' => $treeDepth,
+                'treeSearch' => $treeSearch,
+                'branchCapital' => (float) $rows->sum('active_capital'),
+                'branchInvestorCount' => (int) $rows->filter(fn (array $node) => (float) $node['active_capital'] > 0)->count(),
+            ]);
+        })->name('dashboard.analytics.tree-print');
 
         Route::get('/dashboard/digests', function (Request $request) {
             MiningPlatform::ensureDefaults();
@@ -1643,8 +1737,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 fclose($handle);
             }, $filename, ['Content-Type' => 'text/csv']);
         })->name('dashboard.digests.history.export');
-
-        Route::get('/dashboard/network-admin', function () {
+        Route::get('/dashboard/network-admin', function (Request $request) {
             MiningPlatform::ensureDefaults();
 
             $users = User::with([
@@ -1655,7 +1748,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'investments.miner',
                 'sponsoredUsers.investments',
             ])->orderBy('name')->get();
-            $networkTree = MiningPlatform::referralTree($users, 5);
+            $treeDepth = max(2, min((int) $request->query('tree_depth', 5), 6));
+            $treeSearch = trim((string) $request->query('tree_search', ''));
+            $focusUser = $request->filled('tree_focus')
+                ? $users->firstWhere('id', (int) $request->query('tree_focus'))
+                : null;
+            $treeSearchResults = $treeSearch === ''
+                ? collect()
+                : $users
+                    ->filter(fn (User $user) => str_contains(strtolower($user->name), strtolower($treeSearch)) || str_contains(strtolower($user->email), strtolower($treeSearch)))
+                    ->take(8)
+                    ->values();
+            $networkTree = $focusUser
+                ? MiningPlatform::referralSubtree($users, $focusUser, $treeDepth)
+                : MiningPlatform::referralTree($users, $treeDepth);
             $networkTreeSummary = MiningPlatform::referralTreeSummary($networkTree);
             $networkTreeChart = MiningPlatform::referralTreeChartPayload($networkTree, 'Network Admin');
 
@@ -1664,12 +1770,109 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'networkTree' => $networkTree,
                 'networkTreeSummary' => $networkTreeSummary,
                 'networkTreeChart' => $networkTreeChart,
+                'treeDepth' => $treeDepth,
+                'treeSearch' => $treeSearch,
+                'treeSearchResults' => $treeSearchResults,
+                'selectedTreeFocus' => $focusUser,
                 'events' => ReferralEvent::with(['sponsor', 'relatedUser', 'investment.package'])
                     ->latest()
                     ->limit(25)
                     ->get(),
             ]);
         })->name('dashboard.network-admin');
+
+        Route::get('/dashboard/network-admin/export', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $users = User::with([
+                'sponsor',
+                'userLevel',
+                'friendInvitations',
+                'investments.package',
+                'investments.miner',
+                'sponsoredUsers.investments',
+            ])->orderBy('name')->get();
+
+            $treeDepth = max(2, min((int) $request->query('tree_depth', 5), 6));
+            $treeSearch = trim((string) $request->query('tree_search', ''));
+            $focusUser = $request->filled('tree_focus')
+                ? $users->firstWhere('id', (int) $request->query('tree_focus'))
+                : null;
+
+            $networkTree = $focusUser
+                ? MiningPlatform::referralSubtree($users, $focusUser, $treeDepth)
+                : MiningPlatform::referralTree($users, $treeDepth);
+            $rows = MiningPlatform::flattenedReferralTree($networkTree);
+
+            $filename = 'network-admin-tree-'.now()->format('Ymd-His').'.csv';
+
+            return response()->streamDownload(function () use ($rows, $focusUser, $treeDepth, $treeSearch) {
+                $handle = fopen('php://output', 'w');
+                fputcsv($handle, ['Filter', 'Value']);
+                fputcsv($handle, ['Tree depth', $treeDepth]);
+                fputcsv($handle, ['Search term', $treeSearch === '' ? 'All' : $treeSearch]);
+                fputcsv($handle, ['Focused branch', $focusUser?->email ?? 'All visible roots']);
+                fputcsv($handle, []);
+                fputcsv($handle, ['Name', 'Email', 'Sponsor', 'Level', 'Depth', 'Health', 'Priority', 'Power', 'Direct team', 'Active direct investors', 'Active capital', 'Branch capital', 'Visible descendants', 'Branch investors', 'Verified invites']);
+
+                foreach ($rows as $node) {
+                    fputcsv($handle, [
+                        $node['user']->name,
+                        $node['user']->email,
+                        $node['sponsor_name'],
+                        $node['level_name'],
+                        $node['depth'],
+                        $node['situation']['health'],
+                        $node['situation']['priority'],
+                        $node['power_summary']['score'].'/100',
+                        $node['direct_team'],
+                        $node['active_direct_investors'],
+                        number_format((float) $node['active_capital'], 2, '.', ''),
+                        number_format((float) $node['branch_active_capital'], 2, '.', ''),
+                        $node['visible_descendants'],
+                        $node['branch_active_investors'],
+                        $node['verified_invites'],
+                    ]);
+                }
+
+                fclose($handle);
+            }, $filename, ['Content-Type' => 'text/csv']);
+        })->name('dashboard.network-admin.export');
+
+        Route::get('/dashboard/network-admin/print', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $users = User::with([
+                'sponsor',
+                'userLevel',
+                'friendInvitations',
+                'investments.package',
+                'investments.miner',
+                'sponsoredUsers.investments',
+            ])->orderBy('name')->get();
+
+            $treeDepth = max(2, min((int) $request->query('tree_depth', 5), 6));
+            $treeSearch = trim((string) $request->query('tree_search', ''));
+            $focusUser = $request->filled('tree_focus')
+                ? $users->firstWhere('id', (int) $request->query('tree_focus'))
+                : null;
+
+            $networkTree = $focusUser
+                ? MiningPlatform::referralSubtree($users, $focusUser, $treeDepth)
+                : MiningPlatform::referralTree($users, $treeDepth);
+            $rows = MiningPlatform::flattenedReferralTree($networkTree);
+
+            return view('pages.general.network-branch-print', [
+                'pageTitle' => 'Network Admin Branch View',
+                'summary' => MiningPlatform::referralTreeSummary($networkTree),
+                'rows' => $rows,
+                'focusUser' => $focusUser,
+                'treeDepth' => $treeDepth,
+                'treeSearch' => $treeSearch,
+                'branchCapital' => (float) $rows->sum('active_capital'),
+                'branchInvestorCount' => (int) $rows->filter(fn (array $node) => (float) $node['active_capital'] > 0)->count(),
+            ]);
+        })->name('dashboard.network-admin.print');
 
         Route::get('/dashboard/shareholders', function (Request $request) {
             MiningPlatform::ensureDefaults();
