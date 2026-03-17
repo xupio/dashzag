@@ -4,6 +4,7 @@ use App\Models\Earning;
 use App\Models\FriendInvitation;
 use App\Models\InvestmentOrder;
 use App\Models\User;
+use App\Notifications\ActivityFeedNotification;
 use App\Support\MiningPlatform;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -177,6 +178,48 @@ test('network page can filter reward ledger and invitation pipeline', function (
     $response->assertDontSee('MLM reward row.');
     $response->assertSee('Pending Friend');
     $response->assertDontSee('Direct Investor');
+});
+
+test('network page shows unlocked reward cap badges on branch members', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $branchMember = User::factory()->create([
+        'email_verified_at' => now(),
+        'sponsor_user_id' => $user->id,
+        'account_type' => 'shareholder',
+    ]);
+
+    $miner = \App\Models\Miner::query()->where('slug', 'alpha-one')->firstOrFail();
+    $package = \App\Models\InvestmentPackage::query()->where('slug', 'growth-500')->firstOrFail();
+
+    \App\Models\UserInvestment::query()->create([
+        'user_id' => $branchMember->id,
+        'miner_id' => $miner->id,
+        'package_id' => $package->id,
+        'amount' => 500,
+        'shares_owned' => 5,
+        'monthly_return_rate' => 0,
+        'level_bonus_rate' => 0,
+        'team_bonus_rate' => 0,
+        'status' => 'active',
+        'subscribed_at' => now(),
+    ]);
+
+    $branchMember->notify(new ActivityFeedNotification([
+        'event_key' => 'profile_power_reward_cap',
+        'reward_cap_tier' => 'growth',
+        'category' => 'milestone',
+        'status' => 'success',
+        'subject' => 'Growth 500 full reward cap unlocked',
+        'message' => 'You unlocked the full 6.00% profile power reward cap for Growth 500.',
+    ]));
+
+    $response = $this->actingAs($user)->get(route('dashboard.network'));
+
+    $response->assertOk();
+    $response->assertSee('6% cap');
 });
 
 

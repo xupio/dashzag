@@ -319,6 +319,7 @@
             <span class="badge bg-light text-dark" data-org-modal-level>Level</span>
             <span class="badge bg-dark" data-org-modal-priority>Priority</span>
           </div>
+          <div class="d-flex gap-2 flex-wrap mb-3" data-org-modal-reward-caps></div>
           <div class="border rounded p-3 mb-3 bg-light network-org-health-card" data-org-modal-health-card>
             <div class="text-secondary small">Branch health</div>
             <div class="fw-semibold mb-1" data-org-modal-health></div>
@@ -403,6 +404,7 @@
           users: modalElement.querySelector('[data-org-modal-users-link]'),
           shareholders: modalElement.querySelector('[data-org-modal-shareholders-link]'),
           profile: modalElement.querySelector('[data-org-modal-profile-link]'),
+          rewardCaps: modalElement.querySelector('[data-org-modal-reward-caps]'),
         };
 
         document.querySelectorAll('[data-network-org-node]').forEach(function (node) {
@@ -445,6 +447,18 @@
             nodeModalFields.users.classList.toggle('d-none', !node.dataset.usersLink);
             nodeModalFields.shareholders.classList.toggle('d-none', !node.dataset.shareholdersLink);
             nodeModalFields.profile.classList.toggle('d-none', !node.dataset.profile);
+            nodeModalFields.rewardCaps.innerHTML = '';
+
+            if (node.dataset.rewardCaps) {
+              node.dataset.rewardCaps.split('|').filter(Boolean).forEach(function (cap) {
+                const badge = document.createElement('span');
+                badge.className = 'badge bg-info-subtle text-info border border-info-subtle';
+                badge.textContent = cap;
+                nodeModalFields.rewardCaps.appendChild(badge);
+              });
+            }
+
+            nodeModalFields.rewardCaps.classList.toggle('d-none', !node.dataset.rewardCaps);
             modal.show();
           });
         });

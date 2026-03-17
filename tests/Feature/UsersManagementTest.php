@@ -1,11 +1,105 @@
 <?php
 
+use App\Models\FriendInvitation;
+use App\Models\InvestmentPackage;
+use App\Models\Miner;
 use App\Models\User;
+use App\Models\UserInvestment;
+use App\Models\UserLevel;
 use App\Support\MiningPlatform;
 
 beforeEach(function () {
     MiningPlatform::ensureDefaults();
 });
+
+function createStrongRewardCapUser(string $name = 'Reward Cap User', string $email = 'reward-cap-user@example.com'): User
+{
+    $miner = Miner::query()->where('slug', 'alpha-one')->firstOrFail();
+    $basicPackage = InvestmentPackage::query()->where('slug', 'starter-100')->firstOrFail();
+    $growthPackage = InvestmentPackage::query()->where('slug', 'growth-500')->firstOrFail();
+    $scalePackage = InvestmentPackage::query()->where('slug', 'scale-1000')->firstOrFail();
+    $platinum = UserLevel::query()->where('slug', 'platinum')->firstOrFail();
+
+    $user = User::factory()->create([
+        'name' => $name,
+        'email' => $email,
+        'email_verified_at' => now(),
+        'user_level_id' => $platinum->id,
+        'account_type' => 'shareholder',
+    ]);
+
+    foreach (range(1, 10) as $index) {
+        FriendInvitation::query()->create([
+            'user_id' => $user->id,
+            'name' => 'Invite '.$index,
+            'email' => 'users-cap-'.$index.'@example.test',
+            'verified_at' => now(),
+            'registered_at' => now(),
+        ]);
+    }
+
+    foreach (range(1, 3) as $index) {
+        $directUser = User::factory()->create([
+            'email_verified_at' => now(),
+            'sponsor_user_id' => $user->id,
+            'account_type' => 'shareholder',
+        ]);
+
+        UserInvestment::query()->create([
+            'user_id' => $directUser->id,
+            'miner_id' => $miner->id,
+            'package_id' => $basicPackage->id,
+            'amount' => 100,
+            'shares_owned' => 1,
+            'monthly_return_rate' => 0,
+            'level_bonus_rate' => 0,
+            'team_bonus_rate' => 0,
+            'status' => 'active',
+            'subscribed_at' => now(),
+        ]);
+    }
+
+    UserInvestment::query()->create([
+        'user_id' => $user->id,
+        'miner_id' => $miner->id,
+        'package_id' => $growthPackage->id,
+        'amount' => 500,
+        'shares_owned' => 5,
+        'monthly_return_rate' => 0,
+        'level_bonus_rate' => 0,
+        'team_bonus_rate' => 0,
+        'status' => 'active',
+        'subscribed_at' => now(),
+    ]);
+
+    UserInvestment::query()->create([
+        'user_id' => $user->id,
+        'miner_id' => $miner->id,
+        'package_id' => $scalePackage->id,
+        'amount' => 1000,
+        'shares_owned' => 10,
+        'monthly_return_rate' => 0,
+        'level_bonus_rate' => 0,
+        'team_bonus_rate' => 0,
+        'status' => 'active',
+        'subscribed_at' => now(),
+    ]);
+
+    UserInvestment::query()->create([
+        'user_id' => $user->id,
+        'miner_id' => $miner->id,
+        'package_id' => $scalePackage->id,
+        'amount' => 1000,
+        'shares_owned' => 10,
+        'monthly_return_rate' => 0,
+        'level_bonus_rate' => 0,
+        'team_bonus_rate' => 0,
+        'status' => 'active',
+        'subscribed_at' => now(),
+    ]);
+
+    return $user->fresh();
+}
 
 test('admin can view users page', function () {
     $admin = User::factory()->admin()->create([
@@ -116,5 +210,29 @@ test('admin can export filtered users as csv', function () {
     expect($csv)->toContain('Name');
     expect($csv)->toContain('Growth Shareholder');
     expect($csv)->not->toContain('Hidden Admin');
+});
+
+test('admin can filter users by unlocked reward cap', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $rewardCapUser = createStrongRewardCapUser('Reward Cap User', 'reward-cap-users@example.com');
+
+    User::factory()->create([
+        'name' => 'Plain Shareholder',
+        'email' => 'plain-shareholder@example.com',
+        'email_verified_at' => now(),
+        'account_type' => 'shareholder',
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('dashboard.users', [
+        'reward_cap' => 'growth',
+    ]));
+
+    $response->assertOk();
+    $response->assertSee($rewardCapUser->name);
+    $response->assertSee('6% cap');
+    $response->assertDontSee('Plain Shareholder');
 });
 

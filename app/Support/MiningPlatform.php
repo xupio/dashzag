@@ -52,6 +52,9 @@ class MiningPlatform
             'team_level_3_subscription_reward_rate' => '0.0050',
             'team_level_4_subscription_reward_rate' => '0.0025',
             'team_level_5_subscription_reward_rate' => '0.0010',
+            'profile_power_basic_max_rate' => '0.0400',
+            'profile_power_growth_max_rate' => '0.0600',
+            'profile_power_scale_max_rate' => '0.0700',
         ];
     }
 
@@ -441,6 +444,85 @@ class MiningPlatform
             5 => (float) self::rewardSetting('team_level_5_subscription_reward_rate'),
             default => 0.0000,
         };
+    }
+
+    public static function investmentProfilePowerRewardCap(float $amount): float
+    {
+        return match (true) {
+            $amount >= 1000 => (float) self::rewardSetting('profile_power_scale_max_rate'),
+            $amount >= 500 => (float) self::rewardSetting('profile_power_growth_max_rate'),
+            $amount > 0 => (float) self::rewardSetting('profile_power_basic_max_rate'),
+            default => 0.0000,
+        };
+    }
+
+    public static function investmentProfilePowerRewardRate(UserInvestment $investment): float
+    {
+        $investment->loadMissing(['user.userLevel', 'user.friendInvitations', 'user.investments', 'user.sponsoredUsers.investments']);
+
+        if ((float) $investment->amount <= 0 || ! $investment->user) {
+            return 0.0000;
+        }
+
+        $maxRate = self::investmentProfilePowerRewardCap((float) $investment->amount);
+        $powerScore = (float) (self::profilePowerSummary($investment->user)['score'] ?? 0);
+
+        return round($maxRate * min(max($powerScore, 0), 100) / 100, 4);
+    }
+
+    public static function investmentTotalRewardRate(UserInvestment $investment): float
+    {
+        return round(
+            (float) $investment->monthly_return_rate
+            + (float) $investment->level_bonus_rate
+            + (float) $investment->team_bonus_rate
+            + self::investmentProfilePowerRewardRate($investment),
+            4
+        );
+    }
+
+    public static function investmentProjectedRewardAmount(UserInvestment $investment): float
+    {
+        return round((float) $investment->amount * self::investmentTotalRewardRate($investment), 2);
+    }
+
+    public static function unlockedRewardCapBadges(User $user): array
+    {
+        $user->loadMissing(['userLevel', 'friendInvitations', 'investments.package', 'sponsoredUsers.investments']);
+
+        $score = (int) (self::profilePowerSummary($user)['score'] ?? 0);
+        $activeInvestments = $user->investments->where('status', 'active');
+
+        $tiers = [
+            'basic' => [
+                'label' => 'Basic 100',
+                'short' => '4% cap',
+                'matches' => fn (UserInvestment $investment) => (float) $investment->amount > 0 && (float) $investment->amount < 500,
+            ],
+            'growth' => [
+                'label' => 'Growth 500',
+                'short' => '6% cap',
+                'matches' => fn (UserInvestment $investment) => (float) $investment->amount >= 500 && (float) $investment->amount < 1000,
+            ],
+            'scale' => [
+                'label' => 'Scale 1000+',
+                'short' => '7% cap',
+                'matches' => fn (UserInvestment $investment) => (float) $investment->amount >= 1000,
+            ],
+        ];
+
+        return collect($tiers)
+            ->map(function (array $tier, string $key) use ($score, $activeInvestments) {
+                return [
+                    'key' => $key,
+                    'label' => $tier['label'],
+                    'short' => $tier['short'],
+                    'unlocked' => $score >= 100 && $activeInvestments->contains($tier['matches']),
+                ];
+            })
+            ->filter(fn (array $tier) => $tier['unlocked'])
+            ->values()
+            ->all();
     }
 
     public static function ensureDefaults(): void
@@ -1352,42 +1434,114 @@ class MiningPlatform
             'userLevel',
             'friendInvitations',
             'sponsoredUsers.investments',
-            'investments',
+            'investments.package',
         ]);
 
         $summary = self::profilePowerSummary($user);
 
-        if ($summary['score'] < 25) {
+        if ($summary['score'] >= 25) {
+            $alreadyCelebrated = $user->notifications()
+                ->where('type', ActivityFeedNotification::class)
+                ->get()
+                ->contains(function ($notification) use ($summary) {
+                    return ($notification->data['event_key'] ?? null) === 'profile_power_rank'
+                        && ($notification->data['rank_label'] ?? null) === $summary['rank_label'];
+                });
+
+            if (! $alreadyCelebrated) {
+                $user->notify(new ActivityFeedNotification([
+                    'event_key' => 'profile_power_rank',
+                    'category' => 'milestone',
+                    'status' => 'success',
+                    'subject' => 'New profile rank unlocked',
+                    'message' => 'You reached '.$summary['rank_label'].' with '.$summary['score'].' profile power.',
+                    'context_label' => 'Current power',
+                    'context_value' => $summary['score'].' / 100',
+                    'status_line' => 'Rank unlocked: '.$summary['rank_label'],
+                    'notes_line' => 'Keep growing verified invites, direct investors, and active capital to reach '.$summary['next_rank_label'].'.',
+                    'rank_label' => $summary['rank_label'],
+                    'rank_icon' => $summary['rank_icon'],
+                    'power_score' => $summary['score'],
+                    'force_mail' => false,
+                ]));
+            }
+        }
+
+        self::maybeCelebrateProfilePowerRewardCaps($user, $summary);
+    }
+
+    public static function maybeCelebrateProfilePowerRewardCaps(User $user, ?array $summary = null): void
+    {
+        $resolvedSummary = $summary ?? self::profilePowerSummary($user);
+
+        if (($resolvedSummary['score'] ?? 0) < 100) {
             return;
         }
 
-        $alreadyCelebrated = $user->notifications()
+        $user->loadMissing(['investments.package']);
+
+        $activeInvestments = $user->investments->where('status', 'active')->where('amount', '>', 0);
+
+        if ($activeInvestments->isEmpty()) {
+            return;
+        }
+
+        $existingCelebrations = $user->notifications()
             ->where('type', ActivityFeedNotification::class)
-            ->get()
-            ->contains(function ($notification) use ($summary) {
-                return ($notification->data['event_key'] ?? null) === 'profile_power_rank'
-                    && ($notification->data['rank_label'] ?? null) === $summary['rank_label'];
+            ->get();
+
+        $tiers = [
+            [
+                'key' => 'basic',
+                'label' => 'Basic 100',
+                'max_rate' => (float) self::rewardSetting('profile_power_basic_max_rate'),
+                'matches' => fn (UserInvestment $investment) => (float) $investment->amount > 0 && (float) $investment->amount < 500,
+            ],
+            [
+                'key' => 'growth',
+                'label' => 'Growth 500',
+                'max_rate' => (float) self::rewardSetting('profile_power_growth_max_rate'),
+                'matches' => fn (UserInvestment $investment) => (float) $investment->amount >= 500 && (float) $investment->amount < 1000,
+            ],
+            [
+                'key' => 'scale',
+                'label' => 'Scale 1000+',
+                'max_rate' => (float) self::rewardSetting('profile_power_scale_max_rate'),
+                'matches' => fn (UserInvestment $investment) => (float) $investment->amount >= 1000,
+            ],
+        ];
+
+        foreach ($tiers as $tier) {
+            if (! $activeInvestments->contains($tier['matches'])) {
+                continue;
+            }
+
+            $alreadyCelebrated = $existingCelebrations->contains(function ($notification) use ($tier) {
+                return ($notification->data['event_key'] ?? null) === 'profile_power_reward_cap'
+                    && ($notification->data['reward_cap_tier'] ?? null) === $tier['key'];
             });
 
-        if ($alreadyCelebrated) {
-            return;
-        }
+            if ($alreadyCelebrated) {
+                continue;
+            }
 
-        $user->notify(new ActivityFeedNotification([
-            'event_key' => 'profile_power_rank',
-            'category' => 'milestone',
-            'status' => 'success',
-            'subject' => 'New profile rank unlocked',
-            'message' => 'You reached '.$summary['rank_label'].' with '.$summary['score'].' profile power.',
-            'context_label' => 'Current power',
-            'context_value' => $summary['score'].' / 100',
-            'status_line' => 'Rank unlocked: '.$summary['rank_label'],
-            'notes_line' => 'Keep growing verified invites, direct investors, and active capital to reach '.$summary['next_rank_label'].'.',
-            'rank_label' => $summary['rank_label'],
-            'rank_icon' => $summary['rank_icon'],
-            'power_score' => $summary['score'],
-            'force_mail' => false,
-        ]));
+            $user->notify(new ActivityFeedNotification([
+                'event_key' => 'profile_power_reward_cap',
+                'reward_cap_tier' => $tier['key'],
+                'category' => 'milestone',
+                'status' => 'success',
+                'subject' => $tier['label'].' full reward cap unlocked',
+                'message' => 'You unlocked the full '.number_format($tier['max_rate'] * 100, 2).'% profile power reward cap for '.$tier['label'].'.',
+                'context_label' => 'Unlocked cap',
+                'context_value' => number_format($tier['max_rate'] * 100, 2).'% monthly boost',
+                'status_line' => 'Power score: '.($resolvedSummary['score'] ?? 100).' / 100',
+                'notes_line' => 'This package tier now receives its full profile-power reward on top of the base return, level bonus, and team bonus.',
+                'rank_label' => $resolvedSummary['rank_label'] ?? null,
+                'rank_icon' => 'badge-percent',
+                'power_score' => $resolvedSummary['score'] ?? 100,
+                'force_mail' => false,
+            ]));
+        }
     }
 
     public static function refreshInvestmentBonusRates(User $user): User
@@ -1487,7 +1641,7 @@ class MiningPlatform
                 'notes' => 'Starter upgrade unlocked '.$package->name.' automatically.',
             ],
             [
-                'amount' => round((float) $investment->amount * ((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate + (float) $investment->team_bonus_rate), 2),
+                'amount' => self::investmentProjectedRewardAmount($investment),
                 'status' => 'pending',
             ],
         );
@@ -1625,7 +1779,7 @@ class MiningPlatform
                     'source' => 'projected_return',
                 ],
                 [
-                    'amount' => round((float) $investment->amount * ((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate + (float) $investment->team_bonus_rate), 2),
+                    'amount' => self::investmentProjectedRewardAmount($investment),
                     'status' => 'pending',
                     'notes' => 'Initial projected monthly return generated after investment order approval.',
                 ],
@@ -1874,7 +2028,7 @@ class MiningPlatform
     public static function expectedMonthlyEarnings(User $user): float
     {
         return (float) $user->investments()->where('status', 'active')->get()->sum(function (UserInvestment $investment) {
-            return (float) $investment->amount * ((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate + (float) $investment->team_bonus_rate);
+            return self::investmentProjectedRewardAmount($investment);
         });
     }
 
@@ -1888,7 +2042,7 @@ class MiningPlatform
             ->where('amount', '>', 0)
             ->get()
             ->map(function (UserInvestment $investment) use ($user, $period) {
-                $amount = round((float) $investment->amount * ((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate + (float) $investment->team_bonus_rate), 2);
+                $amount = self::investmentProjectedRewardAmount($investment);
 
                 return Earning::firstOrCreate(
                     ['user_id' => $user->id, 'investment_id' => $investment->id, 'earned_on' => $period->toDateString(), 'source' => 'mining_return'],
@@ -2270,6 +2424,7 @@ class MiningPlatform
             'branch_active_capital' => (float) ((float) $activeInvestments->sum('amount') + $children->sum('branch_active_capital')),
             'branch_active_investors' => (int) ($activeInvestments->isNotEmpty() ? 1 : 0) + (int) $children->sum('branch_active_investors'),
             'power_summary' => self::compactTreePowerSummary($user),
+            'reward_caps' => self::unlockedRewardCapBadges($user),
         ];
     }
 

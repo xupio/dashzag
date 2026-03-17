@@ -3,6 +3,7 @@
 use App\Models\Earning;
 use App\Models\InvestmentOrder;
 use App\Models\User;
+use App\Notifications\ActivityFeedNotification;
 use App\Support\MiningPlatform;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -71,8 +72,49 @@ test('investments page shows subscribed package history and daily earnings secti
     $response->assertSee('Alpha One');
     $response->assertSee('Earnings activity');
     $response->assertSee('Live miner payout tracking');
+    $response->assertSee('Profile power reward boost');
+    $response->assertSee('Current unlocked boost');
+    $response->assertSee('To reach full cap');
     $response->assertSee('How this pays you');
     $response->assertSee('12.50');
+});
+
+test('investments page shows reward cap unlock milestone on matching package tier', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'shareholder',
+    ]);
+
+    $miner = \App\Models\Miner::query()->where('slug', 'alpha-one')->firstOrFail();
+    $package = \App\Models\InvestmentPackage::query()->where('slug', 'growth-500')->firstOrFail();
+
+    \App\Models\UserInvestment::query()->create([
+        'user_id' => $user->id,
+        'miner_id' => $miner->id,
+        'package_id' => $package->id,
+        'amount' => 500,
+        'shares_owned' => 5,
+        'monthly_return_rate' => 0,
+        'level_bonus_rate' => 0,
+        'team_bonus_rate' => 0,
+        'status' => 'active',
+        'subscribed_at' => now(),
+    ]);
+
+    $user->notify(new ActivityFeedNotification([
+        'event_key' => 'profile_power_reward_cap',
+        'reward_cap_tier' => 'growth',
+        'category' => 'milestone',
+        'status' => 'success',
+        'subject' => 'Growth 500 full reward cap unlocked',
+        'message' => 'You unlocked the full 6.00% profile power reward cap for Growth 500.',
+    ]));
+
+    $response = $this->actingAs($user)->get(route('dashboard.investments'));
+
+    $response->assertOk();
+    $response->assertSee('Cap unlocked');
+    $response->assertSee('Growth 500 full reward cap unlocked');
 });
 
 test('investments page can filter earnings activity by source', function () {

@@ -218,6 +218,39 @@
                   </div>
                 @endif
               </div>
+              <div class="border rounded p-3 mt-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                  <div>
+                    <h6 class="mb-1">Reward cap status</h6>
+                    <p class="text-secondary small mb-0">Public view of the profile-power reward caps this investor has already unlocked across the package tiers.</p>
+                  </div>
+                  <span class="badge bg-primary">Power {{ $profilePower['score'] }}/100</span>
+                </div>
+                <div class="row g-3">
+                  @foreach ($publicRewardCapSummary as $rewardTier)
+                    <div class="col-md-4">
+                      <div class="border rounded p-3 h-100 bg-light">
+                        <div class="text-secondary small mb-1">{{ $rewardTier['amount_label'] }}</div>
+                        <div class="fw-semibold mb-2">{{ $rewardTier['label'] }}</div>
+                        <div class="d-flex justify-content-between small mb-2">
+                          <span>Current boost</span>
+                          <span class="fw-semibold text-primary">{{ number_format($rewardTier['current_rate'] * 100, 2) }}%</span>
+                        </div>
+                        <div class="d-flex justify-content-between small mb-2">
+                          <span>Maximum cap</span>
+                          <span class="fw-semibold">{{ number_format($rewardTier['max_rate'] * 100, 2) }}%</span>
+                        </div>
+                        @if ($rewardTier['unlock'])
+                          <div class="small fw-semibold text-success">{{ $rewardTier['unlock']->data['subject'] ?? 'Reward cap unlocked' }}</div>
+                          <div class="text-secondary small">{{ $rewardTier['unlock']->created_at?->format('M d, Y') }}</div>
+                        @else
+                          <div class="text-secondary small">Not fully unlocked yet.</div>
+                        @endif
+                      </div>
+                    </div>
+                  @endforeach
+                </div>
+              </div>
             </div>
           </div>
         </div>

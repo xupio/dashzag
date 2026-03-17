@@ -347,6 +347,9 @@
                           <div class="mt-2 d-flex gap-2 flex-wrap">
                             <span class="badge bg-light text-dark">Power {{ $pipelinePower['score'] }}/100</span>
                             <span class="badge {{ $powerBadgeClasses[$pipelinePower['rank_accent']] ?? 'bg-primary-subtle text-primary' }}">{{ $pipelinePower['rank_label'] }}</span>
+                            @foreach (($pipelineInvestor['reward_cap_badges'] ?? []) as $rewardCapBadge)
+                              <span class="badge {{ $rewardCapBadge['class'] }}">{{ $rewardCapBadge['label'] }}</span>
+                            @endforeach
                             @if ($isWeeklyWinner)
                               <span class="badge bg-success">Weekly winner</span>
                             @endif

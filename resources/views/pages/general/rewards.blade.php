@@ -137,6 +137,35 @@
   </div>
 
   <div class="col-12">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="mb-3">Profile power investment reward caps</h5>
+        <p class="text-secondary mb-3">These caps scale with profile power. At 100 profile power, the user can reach the full package cap below.</p>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Basic package max reward rate</label>
+            <input type="number" step="0.0001" min="0" max="1" name="profile_power_basic_max_rate" class="form-control @error('profile_power_basic_max_rate') is-invalid @enderror" value="{{ old('profile_power_basic_max_rate', $settings['profile_power_basic_max_rate'] ?? 0.04) }}" required>
+            @error('profile_power_basic_max_rate')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            <div class="form-text">Target cap for the first package, for example 0.04 = 4%.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Growth package max reward rate</label>
+            <input type="number" step="0.0001" min="0" max="1" name="profile_power_growth_max_rate" class="form-control @error('profile_power_growth_max_rate') is-invalid @enderror" value="{{ old('profile_power_growth_max_rate', $settings['profile_power_growth_max_rate'] ?? 0.06) }}" required>
+            @error('profile_power_growth_max_rate')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            <div class="form-text">Target cap for the second package, for example 0.06 = 6%.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Scale package max reward rate</label>
+            <input type="number" step="0.0001" min="0" max="1" name="profile_power_scale_max_rate" class="form-control @error('profile_power_scale_max_rate') is-invalid @enderror" value="{{ old('profile_power_scale_max_rate', $settings['profile_power_scale_max_rate'] ?? 0.07) }}" required>
+            @error('profile_power_scale_max_rate')<div class="invalid-feedback">{{ $message }}</div>@enderror
+            <div class="form-text">Target cap for 1000 and above, for example 0.07 = 7%.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12">
     <button type="submit" class="btn btn-primary">Save reward settings</button>
   </div>
 </form>

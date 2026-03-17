@@ -48,6 +48,67 @@
   <div class="col-12 stretch-card">
     <div class="card">
       <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div>
+            <h5 class="mb-1">Profile power reward boost</h5>
+            <p class="text-secondary mb-0">Your current account power unlocks an extra monthly boost on top of the package base return, level bonus, and team bonus.</p>
+          </div>
+          <span class="badge bg-primary">{{ $activeInvestments->count() }} active package{{ $activeInvestments->count() === 1 ? '' : 's' }}</span>
+        </div>
+        <div class="row g-3">
+          @foreach ($activeInvestments as $investment)
+            @php($rewardSummary = $investmentRewardSummaries[$investment->id] ?? ['current_boost_rate' => 0, 'max_boost_rate' => 0, 'total_reward_rate' => 0, 'projected_reward_amount' => 0])
+            <div class="col-xl-4 col-md-6">
+              <div class="border rounded p-3 h-100 bg-light">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <div>
+                    <div class="fw-semibold">{{ $investment->package?->name ?? 'Package removed' }}</div>
+                    <div class="text-secondary small">{{ $investment->miner?->name ?? 'Unknown miner' }} · ${{ number_format((float) $investment->amount, 2) }}</div>
+                  </div>
+                  <span class="badge bg-white text-dark border">{{ number_format((int) $investment->shares_owned) }} shares</span>
+                </div>
+                <div class="d-flex justify-content-between small mb-2">
+                  <span>Current unlocked boost</span>
+                  <span class="fw-semibold text-primary">{{ number_format($rewardSummary['current_boost_rate'] * 100, 2) }}%</span>
+                </div>
+                <div class="d-flex justify-content-between small mb-2">
+                  <span>Package cap</span>
+                  <span class="fw-semibold">{{ number_format($rewardSummary['max_boost_rate'] * 100, 2) }}%</span>
+                </div>
+                @if (!empty($rewardSummary['cap_unlock_subject']))
+                  <div class="d-flex justify-content-between align-items-center small mb-2">
+                    <span class="badge bg-success">Cap unlocked</span>
+                    <span class="text-secondary">{{ optional($rewardSummary['cap_unlock_date'])->format('M d, Y') }}</span>
+                  </div>
+                @endif
+                <div class="d-flex justify-content-between small">
+                  <span>Total monthly rate</span>
+                  <span class="fw-semibold">{{ number_format($rewardSummary['total_reward_rate'] * 100, 2) }}%</span>
+                </div>
+                <div class="border-top pt-2 mt-2">
+                  <div class="text-secondary small mb-1">To reach full cap</div>
+                  @if (!empty($rewardSummary['cap_unlock_subject']))
+                    <div class="small fw-semibold text-success">{{ $rewardSummary['cap_unlock_subject'] }}</div>
+                  @elseif (($rewardSummary['points_to_full_cap'] ?? 0) === 0)
+                    <div class="small fw-semibold text-success">This package already has the full unlocked boost.</div>
+                  @else
+                    <div class="small mb-1">{{ $rewardSummary['points_to_full_cap'] ?? 0 }} more profile power points needed.</div>
+                    <div class="text-secondary small">{{ implode(' • ', $rewardSummary['next_actions'] ?? []) }}</div>
+                  @endif
+                </div>
+              </div>
+            </div>
+          @endforeach
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-4">
+  <div class="col-12 stretch-card">
+    <div class="card">
+      <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
           <div>
             <h5 class="mb-1">Earnings activity</h5>
@@ -213,15 +274,26 @@
               </thead>
               <tbody>
                 @foreach ($investments as $investment)
+                  @php($rewardSummary = $investmentRewardSummaries[$investment->id] ?? ['current_boost_rate' => 0, 'max_boost_rate' => 0, 'total_reward_rate' => ((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate + (float) $investment->team_bonus_rate), 'projected_reward_amount' => 0])
                   <tr>
                     <td>
                       <div class="fw-semibold">{{ $investment->package?->name ?? 'Package removed' }}</div>
                       <div class="text-secondary small">Level bonus {{ number_format((float) $investment->level_bonus_rate * 100, 2) }}% | Team bonus {{ number_format((float) $investment->team_bonus_rate * 100, 2) }}%</div>
+                      <div class="text-secondary small">Profile power boost {{ number_format($rewardSummary['current_boost_rate'] * 100, 2) }}% of {{ number_format($rewardSummary['max_boost_rate'] * 100, 2) }}% max</div>
+                      @if (!empty($rewardSummary['cap_unlock_subject']))
+                        <div class="text-success small fw-semibold">{{ $rewardSummary['cap_unlock_subject'] }}</div>
+                      @endif
+                      @if (($rewardSummary['points_to_full_cap'] ?? 0) > 0)
+                        <div class="text-secondary small">{{ $rewardSummary['points_to_full_cap'] }} more power points to full cap</div>
+                      @endif
                     </td>
                     <td>{{ $investment->miner?->name ?? '—' }}</td>
                     <td>${{ number_format((float) $investment->amount, 2) }}</td>
                     <td>{{ number_format((int) $investment->shares_owned) }}</td>
-                    <td>{{ number_format(((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate + (float) $investment->team_bonus_rate) * 100, 2) }}%</td>
+                    <td>
+                      <div class="fw-semibold">{{ number_format($rewardSummary['total_reward_rate'] * 100, 2) }}%</div>
+                      <div class="text-secondary small">Projected ${{ number_format((float) $rewardSummary['projected_reward_amount'], 2) }}</div>
+                    </td>
                     <td><span class="badge {{ $investment->status === 'active' ? 'bg-success' : 'bg-secondary' }}">{{ str($investment->status)->title() }}</span></td>
                     <td>{{ $investment->subscribed_at?->format('M d, Y h:i A') }}</td>
                   </tr>

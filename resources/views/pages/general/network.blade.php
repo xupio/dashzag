@@ -222,6 +222,9 @@
                     <div class="d-flex gap-2 flex-wrap mb-2">
                       <span class="badge bg-light text-dark">Power {{ $leaderBranch['profile_power']['score'] }}/100</span>
                       <span class="badge {{ $powerBadgeClasses[$leaderBranch['profile_power']['rank_accent']] ?? 'bg-primary-subtle text-primary' }}">{{ $leaderBranch['profile_power']['rank_label'] }}</span>
+                      @foreach (($leaderBranch['reward_cap_badges'] ?? []) as $rewardCapBadge)
+                        <span class="badge {{ $rewardCapBadge['class'] }}">{{ $rewardCapBadge['label'] }}</span>
+                      @endforeach
                       @if ($isWeeklyWinner)
                         <span class="badge bg-success">Weekly winner</span>
                       @endif
@@ -309,6 +312,9 @@
                         <span class="badge bg-light text-dark">Joined {{ $member->created_at?->format('M d, Y') }}</span>
                         <span class="badge bg-light text-dark">Power {{ $branch['profile_power']['score'] }}/100</span>
                         <span class="badge {{ $powerBadgeClasses[$branch['profile_power']['rank_accent']] ?? 'bg-primary-subtle text-primary' }}">{{ $branch['profile_power']['rank_label'] }}</span>
+                        @foreach (($branch['reward_cap_badges'] ?? []) as $rewardCapBadge)
+                          <span class="badge {{ $rewardCapBadge['class'] }}">{{ $rewardCapBadge['label'] }}</span>
+                        @endforeach
                         @if ($isWeeklyWinner)
                           <span class="badge bg-success">Weekly winner</span>
                         @endif
@@ -348,6 +354,9 @@
                               <div class="mt-2 d-flex gap-2 flex-wrap">
                                 <span class="badge bg-light text-dark">Power {{ $downlineRow['profile_power']['score'] }}/100</span>
                                 <span class="badge {{ $powerBadgeClasses[$downlineRow['profile_power']['rank_accent']] ?? 'bg-primary-subtle text-primary' }}">{{ $downlineRow['profile_power']['rank_label'] }}</span>
+                                @foreach (($downlineRow['reward_cap_badges'] ?? []) as $rewardCapBadge)
+                                  <span class="badge {{ $rewardCapBadge['class'] }}">{{ $rewardCapBadge['label'] }}</span>
+                                @endforeach
                               </div>
                             </div>
                           </div>

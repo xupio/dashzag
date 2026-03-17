@@ -9,7 +9,7 @@
         <p class="text-secondary mb-0">Manage registered users, monitor their level and investment totals, and update admin access.</p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <a href="{{ route('dashboard.users.export', ['search' => $search, 'role' => $selectedRole, 'account_type' => $selectedAccountType, 'verification' => $selectedVerification]) }}" class="btn btn-outline-success btn-icon-text">
+        <a href="{{ route('dashboard.users.export', ['search' => $search, 'role' => $selectedRole, 'account_type' => $selectedAccountType, 'verification' => $selectedVerification, 'reward_cap' => $selectedRewardCap]) }}" class="btn btn-outline-success btn-icon-text">
           <i data-lucide="download" class="btn-icon-prepend"></i> Export CSV
         </a>
         <a href="{{ route('dashboard.operations') }}" class="btn btn-outline-primary btn-icon-text">
@@ -29,6 +29,22 @@
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Standard users</p><h4 class="mb-0">{{ $userBreakdown['users'] }}</h4></div></div></div>
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Verified</p><h4 class="mb-0">{{ $userBreakdown['verified'] }}</h4></div></div></div>
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Shareholders</p><h4 class="mb-0">{{ $userBreakdown['shareholders'] }}</h4></div></div></div>
+</div>
+
+<div class="row mb-4">
+  @foreach ($rewardCapBreakdown as $capKey => $cap)
+    <div class="col-md-4 grid-margin stretch-card">
+      <div class="card">
+        <div class="card-body">
+          <a href="{{ route('dashboard.users', array_filter(['search' => $search, 'role' => $selectedRole, 'account_type' => $selectedAccountType, 'verification' => $selectedVerification, 'reward_cap' => $capKey])) }}" class="text-decoration-none">
+            <p class="text-secondary mb-1">{{ $cap['label'] }}</p>
+            <h5 class="mb-1">{{ $cap['count'] }}</h5>
+            <div class="small {{ $selectedRewardCap === $capKey ? 'text-primary fw-semibold' : 'text-secondary' }}">{{ $cap['short'] }}</div>
+          </a>
+        </div>
+      </div>
+    </div>
+  @endforeach
 </div>
 
 <div class="row mb-4">
@@ -64,6 +80,15 @@
               <option value="unverified" @selected($selectedVerification === 'unverified')>Unverified</option>
             </select>
           </div>
+          <div class="col-md-2">
+            <label class="form-label">Reward cap</label>
+            <select name="reward_cap" class="form-select">
+              <option value="all" @selected($selectedRewardCap === 'all')>All caps</option>
+              <option value="basic" @selected($selectedRewardCap === 'basic')>4% cap</option>
+              <option value="growth" @selected($selectedRewardCap === 'growth')>6% cap</option>
+              <option value="scale" @selected($selectedRewardCap === 'scale')>7% cap</option>
+            </select>
+          </div>
           <div class="col-md-1 d-flex gap-2">
             <button type="submit" class="btn btn-primary">Apply</button>
           </div>
@@ -94,6 +119,7 @@
                 <th>Verification</th>
                 <th>Level</th>
                 <th>Account type</th>
+                <th>Reward caps</th>
                 <th>Total invested</th>
                 <th>Available earnings</th>
                 <th>Joined</th>
@@ -111,6 +137,18 @@
                   <td><span class="badge {{ $listedUser->email_verified_at ? 'bg-success' : 'bg-warning text-dark' }}">{{ $listedUser->email_verified_at ? 'Verified' : 'Pending' }}</span></td>
                   <td>{{ $listedUser->userLevel?->name ?? 'Starter' }}</td>
                   <td class="text-capitalize">{{ $listedUser->account_type }}</td>
+                  <td>
+                    @php($caps = $userRewardCaps[$listedUser->id] ?? [])
+                    @if (! empty($caps))
+                      <div class="d-flex flex-wrap gap-1">
+                        @foreach ($caps as $cap)
+                          <span class="badge bg-info-subtle text-info border border-info-subtle">{{ $cap['short'] }}</span>
+                        @endforeach
+                      </div>
+                    @else
+                      <span class="text-secondary">—</span>
+                    @endif
+                  </td>
                   <td>${{ number_format((float) $listedUser->investments->where('status', 'active')->sum('amount'), 2) }}</td>
                   <td>${{ number_format((float) $listedUser->earnings->where('status', 'available')->sum('amount'), 2) }}</td>
                   <td>{{ $listedUser->created_at?->format('M d, Y') }}</td>

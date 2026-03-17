@@ -6,6 +6,7 @@ use App\Models\Miner;
 use App\Models\MinerPerformanceLog;
 use App\Models\User;
 use App\Models\UserInvestment;
+use App\Notifications\ActivityFeedNotification;
 use App\Support\MiningPlatform;
 
 beforeEach(function () {
@@ -97,6 +98,15 @@ test('analytics page shows investment referral miner and daily performance metri
         'subscribed_at' => now(),
     ]);
 
+    $buyer->notify(new ActivityFeedNotification([
+        'event_key' => 'profile_power_reward_cap',
+        'reward_cap_tier' => 'growth',
+        'category' => 'milestone',
+        'status' => 'success',
+        'subject' => 'Growth 500 full reward cap unlocked',
+        'message' => 'You unlocked the full 6.00% profile power reward cap for Growth 500.',
+    ]));
+
     MinerPerformanceLog::updateOrCreate([
         'miner_id' => $alphaMiner->id,
         'logged_on' => '2026-03-15',
@@ -123,6 +133,8 @@ test('analytics page shows investment referral miner and daily performance metri
     $response->assertSee('Network Lead');
     $response->assertSee('Package performance');
     $response->assertSee('Miner performance breakdown');
+    $response->assertSee('Profile power reward analytics');
+    $response->assertSee('Unlocked 6% cap');
     $response->assertSee('Selected miner daily performance');
     $response->assertSee('Alpha One');
     $response->assertSee('Beta Flux');

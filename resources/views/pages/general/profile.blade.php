@@ -370,9 +370,9 @@
                     <h6 class="mb-1">Recent celebrations</h6>
                     <p class="text-secondary small mb-0">Your latest profile-rank wins and milestone moments.</p>
                   </div>
-                  <span class="badge bg-light text-dark">{{ $recentRankCelebrations->count() }} recent</span>
+                  <span class="badge bg-light text-dark">{{ $recentRankCelebrations->count() + $recentRewardCapCelebrations->count() }} recent</span>
                 </div>
-                @if ($recentRankCelebrations->isEmpty())
+                @if ($recentRankCelebrations->isEmpty() && $recentRewardCapCelebrations->isEmpty())
                   <div class="text-secondary small">Your next rank celebration will appear here when your profile power crosses a new tier.</div>
                 @else
                   <div class="row g-3">
@@ -392,8 +392,65 @@
                         </div>
                       </div>
                     @endforeach
+                    @foreach ($recentRewardCapCelebrations as $celebration)
+                      <div class="col-lg-4">
+                        <div class="border rounded p-3 h-100 bg-primary bg-opacity-10 border-primary-subtle">
+                          <div class="d-flex align-items-start gap-3">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center bg-primary text-white" style="width: 42px; height: 42px;">
+                              <i data-lucide="{{ $celebration->data['rank_icon'] ?? 'badge-percent' }}" class="icon-sm"></i>
+                            </div>
+                            <div>
+                              <div class="fw-semibold">{{ $celebration->data['subject'] ?? 'Reward cap unlocked' }}</div>
+                              <div class="text-secondary small mb-2">{{ $celebration->data['message'] ?? '' }}</div>
+                              <div class="small">{{ $celebration->data['context_value'] ?? '' }}</div>
+                              <div class="small fw-semibold mt-2">{{ $celebration->created_at?->format('M d, Y') }}</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    @endforeach
                   </div>
                 @endif
+              </div>
+              <div class="border rounded p-3 mt-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                  <div>
+                    <h6 class="mb-1">Investment reward boost</h6>
+                    <p class="text-secondary small mb-0">Your profile power unlocks extra monthly reward on top of each package return. Higher package tiers can reach higher caps.</p>
+                  </div>
+                  <span class="badge bg-primary">Power unlock: {{ $profilePower['score'] }}%</span>
+                </div>
+                <div class="row g-3">
+                  @foreach ($profileRewardBoostSummary as $rewardTier)
+                    <div class="col-md-4">
+                      <div class="border rounded p-3 h-100 bg-light">
+                        <div class="text-secondary small mb-1">{{ $rewardTier['amount_label'] }}</div>
+                        <div class="fw-semibold mb-2">{{ $rewardTier['label'] }}</div>
+                        <div class="d-flex justify-content-between small mb-2">
+                          <span>Current boost</span>
+                          <span class="fw-semibold text-primary">{{ number_format($rewardTier['current_rate'] * 100, 2) }}%</span>
+                        </div>
+                        <div class="d-flex justify-content-between small mb-2">
+                          <span>Maximum cap</span>
+                          <span class="fw-semibold">{{ number_format($rewardTier['max_rate'] * 100, 2) }}%</span>
+                        </div>
+                        <div class="d-flex justify-content-between small">
+                          <span>Active positions</span>
+                          <span class="fw-semibold">{{ $rewardTier['eligible_count'] }}</span>
+                        </div>
+                        <div class="border-top pt-2 mt-2">
+                          <div class="text-secondary small mb-1">To reach full cap</div>
+                          @if ($rewardTier['points_to_full_cap'] === 0)
+                            <div class="small fw-semibold text-success">You already unlocked the full cap for this tier.</div>
+                          @else
+                            <div class="small mb-1">{{ $rewardTier['points_to_full_cap'] }} more profile power points needed.</div>
+                            <div class="text-secondary small">{{ implode(' • ', $rewardTier['next_actions']) }}</div>
+                          @endif
+                        </div>
+                      </div>
+                    </div>
+                  @endforeach
+                </div>
               </div>
             </div>
           </div>

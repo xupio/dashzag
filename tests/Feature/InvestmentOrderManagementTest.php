@@ -1,8 +1,12 @@
-﻿<?php
+<?php
 
+use App\Models\FriendInvitation;
 use App\Models\InvestmentOrder;
 use App\Models\InvestmentPackage;
+use App\Models\Miner;
 use App\Models\User;
+use App\Models\UserInvestment;
+use App\Models\UserLevel;
 use App\Support\MiningPlatform;
 use Illuminate\Support\Facades\Storage;
 
@@ -29,6 +33,95 @@ function pendingInvestmentOrderFor(User $user, string $reference = 'TX-PENDING-0
         'approved_at' => $status === 'approved' ? now() : null,
         'cancelled_at' => $status === 'cancelled' ? now() : null,
     ]);
+}
+
+function createStrongRewardCapInvestor(string $name = 'Cap Queue Investor', string $email = 'cap-queue@example.com'): User
+{
+    $miner = Miner::query()->where('slug', 'alpha-one')->firstOrFail();
+    $basicPackage = InvestmentPackage::query()->where('slug', 'starter-100')->firstOrFail();
+    $growthPackage = InvestmentPackage::query()->where('slug', 'growth-500')->firstOrFail();
+    $scalePackage = InvestmentPackage::query()->where('slug', 'scale-1000')->firstOrFail();
+    $platinum = UserLevel::query()->where('slug', 'platinum')->firstOrFail();
+
+    $user = User::factory()->create([
+        'name' => $name,
+        'email' => $email,
+        'email_verified_at' => now(),
+        'user_level_id' => $platinum->id,
+        'account_type' => 'shareholder',
+    ]);
+
+    foreach (range(1, 10) as $index) {
+        FriendInvitation::query()->create([
+            'user_id' => $user->id,
+            'name' => 'Invite '.$index,
+            'email' => 'queue-cap-'.$index.'@example.test',
+            'verified_at' => now(),
+            'registered_at' => now(),
+        ]);
+    }
+
+    foreach (range(1, 3) as $index) {
+        $directUser = User::factory()->create([
+            'email_verified_at' => now(),
+            'sponsor_user_id' => $user->id,
+            'account_type' => 'shareholder',
+        ]);
+
+        UserInvestment::query()->create([
+            'user_id' => $directUser->id,
+            'miner_id' => $miner->id,
+            'package_id' => $basicPackage->id,
+            'amount' => 100,
+            'shares_owned' => 1,
+            'monthly_return_rate' => 0,
+            'level_bonus_rate' => 0,
+            'team_bonus_rate' => 0,
+            'status' => 'active',
+            'subscribed_at' => now(),
+        ]);
+    }
+
+    UserInvestment::query()->create([
+        'user_id' => $user->id,
+        'miner_id' => $miner->id,
+        'package_id' => $growthPackage->id,
+        'amount' => 500,
+        'shares_owned' => 5,
+        'monthly_return_rate' => 0,
+        'level_bonus_rate' => 0,
+        'team_bonus_rate' => 0,
+        'status' => 'active',
+        'subscribed_at' => now(),
+    ]);
+
+    UserInvestment::query()->create([
+        'user_id' => $user->id,
+        'miner_id' => $miner->id,
+        'package_id' => $scalePackage->id,
+        'amount' => 1000,
+        'shares_owned' => 10,
+        'monthly_return_rate' => 0,
+        'level_bonus_rate' => 0,
+        'team_bonus_rate' => 0,
+        'status' => 'active',
+        'subscribed_at' => now(),
+    ]);
+
+    UserInvestment::query()->create([
+        'user_id' => $user->id,
+        'miner_id' => $miner->id,
+        'package_id' => $scalePackage->id,
+        'amount' => 1000,
+        'shares_owned' => 10,
+        'monthly_return_rate' => 0,
+        'level_bonus_rate' => 0,
+        'team_bonus_rate' => 0,
+        'status' => 'active',
+        'subscribed_at' => now(),
+    ]);
+
+    return $user->fresh();
 }
 
 test('user can view filtered investment order history and cancel a pending order', function () {
@@ -250,4 +343,21 @@ test('admin can filter operations investment queue by high risk state', function
         ->assertSee('RISK-HIGH-001')
         ->assertSee('High risk only: 1')
         ->assertDontSee('RISK-CLEAN-002');
+});
+
+test('operations queue shows unlocked reward cap badges for strong investors', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'admin',
+    ]);
+
+    $strongInvestor = createStrongRewardCapInvestor();
+    pendingInvestmentOrderFor($strongInvestor, 'CAP-BADGE-001', 'pending');
+
+    $this->actingAs($admin)
+        ->get(route('dashboard.operations', ['investment_status' => 'pending', 'investment_search' => 'CAP-BADGE']))
+        ->assertOk()
+        ->assertSee('Growth 500')
+        ->assertSee('6% cap')
+        ->assertSee('7% cap');
 });

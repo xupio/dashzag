@@ -135,6 +135,7 @@
                 <th>User</th>
                 <th>Sponsor</th>
                 <th>Level</th>
+                <th>Reward caps</th>
                 <th>Direct team</th>
                 <th>Active team</th>
                 <th>Team capital</th>
@@ -150,6 +151,18 @@
                   </td>
                   <td>{{ $networkUser->sponsor?->email ?? 'Top-level' }}</td>
                   <td>{{ $networkUser->userLevel?->name ?? 'Starter' }}</td>
+                  <td>
+                    @php($rewardCaps = \App\Support\MiningPlatform::unlockedRewardCapBadges($networkUser))
+                    @if (! empty($rewardCaps))
+                      <div class="d-flex flex-wrap gap-1">
+                        @foreach ($rewardCaps as $cap)
+                          <span class="badge bg-info-subtle text-info border border-info-subtle">{{ $cap['short'] }}</span>
+                        @endforeach
+                      </div>
+                    @else
+                      <span class="text-secondary">—</span>
+                    @endif
+                  </td>
                   <td>{{ $networkUser->sponsoredUsers->count() }}</td>
                   <td>{{ $networkUser->sponsoredUsers->filter(fn ($member) => $member->investments->where('status', 'active')->where('amount', '>', 0)->isNotEmpty())->count() }}</td>
                   <td>${{ number_format((float) $networkUser->sponsoredUsers->sum(fn ($member) => $member->investments->where('status', 'active')->where('amount', '>', 0)->sum('amount')), 2) }}</td>

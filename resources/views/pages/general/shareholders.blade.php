@@ -9,7 +9,7 @@
         <p class="text-secondary mb-0">Review live ownership by investor, miner, package, and investment status.</p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <a href="{{ route('dashboard.shareholders.export', array_filter(['miner' => $selectedMiner, 'status' => $selectedStatus, 'package' => $selectedPackage, 'search' => $search])) }}" class="btn btn-outline-success btn-icon-text">
+        <a href="{{ route('dashboard.shareholders.export', array_filter(['miner' => $selectedMiner, 'status' => $selectedStatus, 'package' => $selectedPackage, 'reward_cap' => $selectedRewardCap, 'search' => $search])) }}" class="btn btn-outline-success btn-icon-text">
           <i data-lucide="download" class="btn-icon-prepend"></i> Export CSV
         </a>
         <a href="{{ route('dashboard.analytics') }}" class="btn btn-outline-primary btn-icon-text">
@@ -56,6 +56,15 @@
               @endforeach
             </select>
           </div>
+          <div class="col-md-2">
+            <label class="form-label">Reward cap</label>
+            <select name="reward_cap" class="form-select">
+              <option value="all" @selected($selectedRewardCap === 'all')>All caps</option>
+              <option value="basic" @selected($selectedRewardCap === 'basic')>4% cap</option>
+              <option value="growth" @selected($selectedRewardCap === 'growth')>6% cap</option>
+              <option value="scale" @selected($selectedRewardCap === 'scale')>7% cap</option>
+            </select>
+          </div>
           <div class="col-md-2 d-flex gap-2">
             <button type="submit" class="btn btn-primary">Apply</button>
             <a href="{{ route('dashboard.shareholders') }}" class="btn btn-outline-secondary">Reset</a>
@@ -73,6 +82,22 @@
 </div>
 
 <div class="row mb-4">
+  @foreach ($rewardCapBreakdown as $capKey => $cap)
+    <div class="col-md-4 grid-margin stretch-card">
+      <div class="card">
+        <div class="card-body">
+          <a href="{{ route('dashboard.shareholders', array_filter(['search' => $search, 'miner' => $selectedMiner, 'package' => $selectedPackage, 'status' => $selectedStatus, 'reward_cap' => $capKey])) }}" class="text-decoration-none">
+            <p class="text-secondary mb-1">{{ $cap['label'] }}</p>
+            <h5 class="mb-1">{{ $cap['count'] }}</h5>
+            <div class="small {{ $selectedRewardCap === $capKey ? 'text-primary fw-semibold' : 'text-secondary' }}">{{ $cap['short'] }}</div>
+          </a>
+        </div>
+      </div>
+    </div>
+  @endforeach
+</div>
+
+<div class="row mb-4">
   <div class="col-lg-5 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
@@ -85,7 +110,7 @@
         <div class="row g-3">
           @foreach ($statusBreakdown as $statusKey => $count)
             <div class="col-md-4">
-              <a href="{{ route('dashboard.shareholders', array_filter(['search' => $search, 'miner' => $selectedMiner, 'package' => $selectedPackage, 'status' => $statusKey])) }}" class="text-decoration-none">
+                <a href="{{ route('dashboard.shareholders', array_filter(['search' => $search, 'miner' => $selectedMiner, 'package' => $selectedPackage, 'status' => $statusKey, 'reward_cap' => $selectedRewardCap !== 'all' ? $selectedRewardCap : null])) }}" class="text-decoration-none">
                 <div class="border rounded p-3 h-100 {{ $selectedStatus === $statusKey ? 'border-primary bg-primary-subtle' : 'bg-light' }}">
                   <div class="text-secondary small text-capitalize">{{ $statusKey }}</div>
                   <div class="fw-semibold fs-4 text-dark">{{ $count }}</div>
@@ -112,7 +137,7 @@
           <div class="row g-3">
             @foreach ($minerBreakdown as $minerKey => $breakdown)
               <div class="col-md-6 col-xl-4">
-                <a href="{{ route('dashboard.shareholders', array_filter(['search' => $search, 'status' => $selectedStatus, 'package' => $selectedPackage, 'miner' => $minerKey !== 'unknown' ? $minerKey : null])) }}" class="text-decoration-none">
+                <a href="{{ route('dashboard.shareholders', array_filter(['search' => $search, 'status' => $selectedStatus, 'package' => $selectedPackage, 'miner' => $minerKey !== 'unknown' ? $minerKey : null, 'reward_cap' => $selectedRewardCap !== 'all' ? $selectedRewardCap : null])) }}" class="text-decoration-none">
                   <div class="border rounded p-3 h-100 {{ $selectedMiner === $minerKey ? 'border-primary bg-primary-subtle' : 'bg-light' }}">
                     <div class="text-secondary small">{{ $breakdown['name'] }}</div>
                     <div class="fw-semibold fs-4 text-dark">{{ $breakdown['count'] }}</div>
@@ -150,6 +175,7 @@
                 <th>Amount</th>
                 <th>Shares</th>
                 <th>Return rate</th>
+                <th>Reward caps</th>
                 <th>Status</th>
                 <th>Subscribed</th>
                 <th class="text-end">Profile</th>
@@ -162,24 +188,36 @@
                     <div class="fw-semibold">{{ $investment->user?->name }}</div>
                     <div class="text-secondary small">{{ $investment->user?->email }}</div>
                   </td>
-                  <td>{{ $investment->miner?->name ?? '—' }}</td>
-                  <td>{{ $investment->package?->name ?? '—' }}</td>
+                  <td>{{ $investment->miner?->name ?? 'â€”' }}</td>
+                  <td>{{ $investment->package?->name ?? 'â€”' }}</td>
                   <td>${{ number_format((float) $investment->amount, 2) }}</td>
                   <td>{{ number_format((int) $investment->shares_owned) }}</td>
                   <td>{{ number_format(((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate) * 100, 2) }}%</td>
+                  <td>
+                    @php($caps = $investmentRewardCaps[$investment->id] ?? [])
+                    @if (! empty($caps))
+                      <div class="d-flex flex-wrap gap-1">
+                        @foreach ($caps as $cap)
+                          <span class="badge bg-info-subtle text-info border border-info-subtle">{{ $cap['short'] }}</span>
+                        @endforeach
+                      </div>
+                    @else
+                      <span class="text-secondary">â€”</span>
+                    @endif
+                  </td>
                   <td><span class="badge bg-light text-dark text-capitalize">{{ $investment->status }}</span></td>
                   <td>{{ $investment->subscribed_at?->format('M d, Y H:i') }}</td>
                   <td class="text-end">
                     @if ($investment->user)
                       <a href="{{ route('dashboard.investors.show', [$investment->user, 'from' => 'shareholders']) }}" class="btn btn-outline-primary btn-sm">Open profile</a>
                     @else
-                      <span class="text-secondary">—</span>
+                      <span class="text-secondary">â€”</span>
                     @endif
                   </td>
                 </tr>
               @empty
                 <tr>
-                  <td colspan="9" class="text-center text-secondary py-4">No shareholder records match the current filters.</td>
+                  <td colspan="10" class="text-center text-secondary py-4">No shareholder records match the current filters.</td>
                 </tr>
               @endforelse
             </tbody>

@@ -84,6 +84,20 @@
             </a>
           @endforeach
         </div>
+
+        @if (($investmentRewardCapSummary ?? collect())->isNotEmpty())
+          <div class="row g-2 mb-3">
+            @foreach ($investmentRewardCapSummary as $capSummary)
+              <div class="col-md-4">
+                <div class="border rounded p-3 bg-light h-100">
+                  <div class="text-secondary small">{{ $capSummary['label'] }}</div>
+                  <div class="fw-semibold fs-5">{{ $capSummary['count'] }}</div>
+                  <div class="small text-primary">{{ $capSummary['short'] }} investors in this queue</div>
+                </div>
+              </div>
+            @endforeach
+          </div>
+        @endif
         <form method="GET" action="{{ route('dashboard.operations') }}" class="row g-2 mb-3">
           <div class="col-md-2">
             <input type="text" name="investment_search" class="form-control" placeholder="Search by user, email, package, miner, reference" value="{{ $investmentFilters['search'] ?? '' }}">
@@ -228,6 +242,14 @@
                     <td>
                       <div class="fw-semibold">{{ $order->user?->name }}</div>
                       <div class="text-secondary small">{{ $order->user?->email }}</div>
+                      @php($rewardCaps = $investmentOrderRewardCaps[$order->id] ?? [])
+                      @if (! empty($rewardCaps))
+                        <div class="d-flex flex-wrap gap-1 mt-2">
+                          @foreach ($rewardCaps as $cap)
+                            <span class="badge bg-info-subtle text-info border border-info-subtle">{{ $cap['short'] }}</span>
+                          @endforeach
+                        </div>
+                      @endif
                     </td>
                     <td>
                       <div class="fw-semibold">{{ $order->package?->name }}</div>

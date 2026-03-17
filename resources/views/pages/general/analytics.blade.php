@@ -35,6 +35,63 @@
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
           <div>
+            <h5 class="mb-1">Profile power reward analytics</h5>
+            <p class="text-secondary mb-0">Track how many investors have unlocked each reward-cap tier and how much extra monthly exposure this layer adds.</p>
+          </div>
+          <span class="badge bg-primary">${{ number_format($rewardCapAnalyticsSummary['total_extra_monthly_liability'], 2) }} extra monthly liability</span>
+        </div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-6 col-xl-3"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">Unlocked 4% cap</div><div class="fw-semibold fs-4">{{ $rewardCapAnalyticsSummary['basic_unlocked_users'] }}</div></div></div>
+          <div class="col-md-6 col-xl-3"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">Unlocked 6% cap</div><div class="fw-semibold fs-4">{{ $rewardCapAnalyticsSummary['growth_unlocked_users'] }}</div></div></div>
+          <div class="col-md-6 col-xl-3"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">Unlocked 7% cap</div><div class="fw-semibold fs-4">{{ $rewardCapAnalyticsSummary['scale_unlocked_users'] }}</div></div></div>
+          <div class="col-md-6 col-xl-3"><div class="border rounded p-3 h-100 bg-light"><div class="text-secondary small">Extra monthly liability</div><div class="fw-semibold fs-4">${{ number_format($rewardCapAnalyticsSummary['total_extra_monthly_liability'], 2) }}</div></div></div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Power</th>
+                <th>Unlocked caps</th>
+                <th>Extra monthly liability</th>
+              </tr>
+            </thead>
+            <tbody>
+              @forelse ($topRewardCapUsers as $rewardCapUser)
+                <tr>
+                  <td>
+                    <div class="fw-semibold">{{ $rewardCapUser['user']->name }}</div>
+                    <div class="text-secondary small">{{ $rewardCapUser['user']->email }}</div>
+                  </td>
+                  <td>{{ $rewardCapUser['profile_power']['score'] }}/100</td>
+                  <td>
+                    <div class="d-flex gap-2 flex-wrap">
+                      @if ($rewardCapUser['basic_unlocked'])<span class="badge bg-primary-subtle text-primary">4% cap</span>@endif
+                      @if ($rewardCapUser['growth_unlocked'])<span class="badge bg-info-subtle text-info">6% cap</span>@endif
+                      @if ($rewardCapUser['scale_unlocked'])<span class="badge bg-dark text-white">7% cap</span>@endif
+                    </div>
+                  </td>
+                  <td class="fw-semibold">${{ number_format($rewardCapUser['extra_monthly_liability'], 2) }}</td>
+                </tr>
+              @empty
+                <tr>
+                  <td colspan="4" class="text-center text-secondary py-4">No active profile-power reward exposure yet.</td>
+                </tr>
+              @endforelse
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-4">
+  <div class="col-12 grid-margin stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
             <h5 class="mb-1">Network tree snapshot</h5>
             <p class="text-secondary mb-0">A visual view of the current sponsor structure and the visible sub-levels across the platform.</p>
           </div>

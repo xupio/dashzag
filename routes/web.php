@@ -132,6 +132,35 @@ Route::get('/friend-invitations/{friendInvitation}/verify', function (FriendInvi
 Route::get('/dashboard', function (Request $request) {
     MiningPlatform::ensureDefaults();
 
+    $rewardCapBadgesForUser = function (User $targetUser): array {
+        $rewardCapUnlocks = $targetUser->notifications()
+            ->where('type', ActivityFeedNotification::class)
+            ->latest()
+            ->get()
+            ->filter(fn ($notification) => ($notification->data['event_key'] ?? null) === 'profile_power_reward_cap')
+            ->pluck('data.reward_cap_tier')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $badges = [];
+
+        if (in_array('basic', $rewardCapUnlocks, true)) {
+            $badges[] = ['label' => '4% cap', 'class' => 'bg-primary-subtle text-primary'];
+        }
+
+        if (in_array('growth', $rewardCapUnlocks, true)) {
+            $badges[] = ['label' => '6% cap', 'class' => 'bg-info-subtle text-info'];
+        }
+
+        if (in_array('scale', $rewardCapUnlocks, true)) {
+            $badges[] = ['label' => '7% cap', 'class' => 'bg-dark text-white'];
+        }
+
+        return $badges;
+    };
+
     $user = $request->user()->load(['userLevel', 'shareholder', 'investments.package', 'investments.miner', 'friendInvitations']);
     $level = MiningPlatform::syncUserLevel($user);
     $user->load(['userLevel', 'shareholder', 'investments.package', 'investments.miner', 'friendInvitations']);
@@ -189,7 +218,7 @@ Route::get('/dashboard', function (Request $request) {
         ->orderByDesc('subscribed_at')
         ->get()
         ->groupBy('user_id')
-        ->map(function ($investments) {
+        ->map(function ($investments) use ($rewardCapBadgesForUser) {
             $latestInvestment = $investments->sortByDesc(fn ($investment) => optional($investment->subscribed_at)->timestamp ?? 0)->first();
             $investor = $latestInvestment?->user;
 
@@ -202,6 +231,7 @@ Route::get('/dashboard', function (Request $request) {
                 'active_positions' => $investments->count(),
                 'latest_subscribed_at' => $latestInvestment?->subscribed_at,
                 'profile_power' => $investor ? MiningPlatform::profilePowerSummary($investor) : null,
+                'reward_cap_badges' => $investor ? $rewardCapBadgesForUser($investor) : [],
             ];
         })
         ->filter(fn ($row) => $row['user'])
@@ -429,6 +459,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->filter(fn ($notification) => ($notification->data['event_key'] ?? null) === 'profile_power_rank')
             ->take(3)
             ->values();
+        $recentRewardCapCelebrations = $user->notifications()
+            ->where('type', \App\Notifications\ActivityFeedNotification::class)
+            ->latest()
+            ->get()
+            ->filter(fn ($notification) => ($notification->data['event_key'] ?? null) === 'profile_power_reward_cap')
+            ->take(3)
+            ->values();
         $recentHallOfFameWins = $user->notifications()
             ->where('type', \App\Notifications\ActivityFeedNotification::class)
             ->latest()
@@ -444,6 +481,70 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->groupBy(fn ($investment) => $investment->miner?->name ?? 'Unknown miner')
             ->map(fn ($investments) => round((float) $investments->sum('amount'), 2))
             ->sortDesc();
+        $rewardCapUnlocksByTier = $user->notifications()
+            ->where('type', \App\Notifications\ActivityFeedNotification::class)
+            ->latest()
+            ->get()
+            ->filter(fn ($notification) => ($notification->data['event_key'] ?? null) === 'profile_power_reward_cap')
+            ->keyBy(fn ($notification) => $notification->data['reward_cap_tier'] ?? '');
+        $publicRewardCapSummary = collect([
+            [
+                'label' => 'Basic 100',
+                'amount_label' => '$100 tier',
+                'current_rate' => round((float) MiningPlatform::rewardSetting('profile_power_basic_max_rate') * ((float) $profilePower['score'] / 100), 4),
+                'max_rate' => (float) MiningPlatform::rewardSetting('profile_power_basic_max_rate'),
+                'unlock' => $rewardCapUnlocksByTier->get('basic'),
+            ],
+            [
+                'label' => 'Growth 500',
+                'amount_label' => '$500 tier',
+                'current_rate' => round((float) MiningPlatform::rewardSetting('profile_power_growth_max_rate') * ((float) $profilePower['score'] / 100), 4),
+                'max_rate' => (float) MiningPlatform::rewardSetting('profile_power_growth_max_rate'),
+                'unlock' => $rewardCapUnlocksByTier->get('growth'),
+            ],
+            [
+                'label' => 'Scale 1000+',
+                'amount_label' => '$1000+ tier',
+                'current_rate' => round((float) MiningPlatform::rewardSetting('profile_power_scale_max_rate') * ((float) $profilePower['score'] / 100), 4),
+                'max_rate' => (float) MiningPlatform::rewardSetting('profile_power_scale_max_rate'),
+                'unlock' => $rewardCapUnlocksByTier->get('scale'),
+            ],
+        ])->all();
+        $profilePowerPointsToFullCap = max(100 - (int) $profilePower['score'], 0);
+        $profilePowerNextActionLabels = collect($profilePower['recommended_actions'] ?? [])
+            ->take(2)
+            ->pluck('title')
+            ->values()
+            ->all();
+        $profileRewardBoostSummary = collect([
+            [
+                'label' => 'Basic 100',
+                'amount_label' => '$100 tier',
+                'eligible_count' => $activeInvestments->filter(fn ($investment) => (float) $investment->amount > 0 && (float) $investment->amount < 500)->count(),
+                'current_rate' => round((float) MiningPlatform::rewardSetting('profile_power_basic_max_rate') * ((float) $profilePower['score'] / 100), 4),
+                'max_rate' => (float) MiningPlatform::rewardSetting('profile_power_basic_max_rate'),
+                'points_to_full_cap' => $profilePowerPointsToFullCap,
+                'next_actions' => $profilePowerNextActionLabels,
+            ],
+            [
+                'label' => 'Growth 500',
+                'amount_label' => '$500 tier',
+                'eligible_count' => $activeInvestments->filter(fn ($investment) => (float) $investment->amount >= 500 && (float) $investment->amount < 1000)->count(),
+                'current_rate' => round((float) MiningPlatform::rewardSetting('profile_power_growth_max_rate') * ((float) $profilePower['score'] / 100), 4),
+                'max_rate' => (float) MiningPlatform::rewardSetting('profile_power_growth_max_rate'),
+                'points_to_full_cap' => $profilePowerPointsToFullCap,
+                'next_actions' => $profilePowerNextActionLabels,
+            ],
+            [
+                'label' => 'Scale 1000+',
+                'amount_label' => '$1000+ tier',
+                'eligible_count' => $activeInvestments->filter(fn ($investment) => (float) $investment->amount >= 1000)->count(),
+                'current_rate' => round((float) MiningPlatform::rewardSetting('profile_power_scale_max_rate') * ((float) $profilePower['score'] / 100), 4),
+                'max_rate' => (float) MiningPlatform::rewardSetting('profile_power_scale_max_rate'),
+                'points_to_full_cap' => $profilePowerPointsToFullCap,
+                'next_actions' => $profilePowerNextActionLabels,
+            ],
+        ])->all();
 
         $displayTierName = $user->account_type === 'starter'
             ? ($user->investments->firstWhere('package.slug', MiningPlatform::FREE_STARTER_PACKAGE_SLUG)?->package?->name ?? 'Free Starter')
@@ -470,8 +571,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'profilePowerLeaderboard' => $leaderboard,
             'leaderboardPosition' => $leaderboardPosition === false ? null : $leaderboardPosition + 1,
             'recentRankCelebrations' => $recentRankCelebrations,
+            'recentRewardCapCelebrations' => $recentRewardCapCelebrations,
             'recentHallOfFameWins' => $recentHallOfFameWins,
             'hallOfFameWinCounts' => $hallOfFameWinCounts,
+            'profileRewardBoostSummary' => $profileRewardBoostSummary,
             'profileInvestmentLabels' => $investmentAllocation->keys()->values()->all(),
             'profileInvestmentSeries' => $investmentAllocation->values()->all(),
             'profileFinanceLabels' => ['Invested', 'Monthly return', 'Wallet'],
@@ -534,6 +637,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->groupBy(fn ($investment) => $investment->miner?->name ?? 'Unknown miner')
             ->map(fn ($investments) => round((float) $investments->sum('amount'), 2))
             ->sortDesc();
+        $rewardCapUnlocksByTier = $user->notifications()
+            ->where('type', \App\Notifications\ActivityFeedNotification::class)
+            ->latest()
+            ->get()
+            ->filter(fn ($notification) => ($notification->data['event_key'] ?? null) === 'profile_power_reward_cap')
+            ->keyBy(fn ($notification) => $notification->data['reward_cap_tier'] ?? '');
+        $publicRewardCapSummary = collect([
+            [
+                'label' => 'Basic 100',
+                'amount_label' => '$100 tier',
+                'current_rate' => round((float) MiningPlatform::rewardSetting('profile_power_basic_max_rate') * ((float) $profilePower['score'] / 100), 4),
+                'max_rate' => (float) MiningPlatform::rewardSetting('profile_power_basic_max_rate'),
+                'unlock' => $rewardCapUnlocksByTier->get('basic'),
+            ],
+            [
+                'label' => 'Growth 500',
+                'amount_label' => '$500 tier',
+                'current_rate' => round((float) MiningPlatform::rewardSetting('profile_power_growth_max_rate') * ((float) $profilePower['score'] / 100), 4),
+                'max_rate' => (float) MiningPlatform::rewardSetting('profile_power_growth_max_rate'),
+                'unlock' => $rewardCapUnlocksByTier->get('growth'),
+            ],
+            [
+                'label' => 'Scale 1000+',
+                'amount_label' => '$1000+ tier',
+                'current_rate' => round((float) MiningPlatform::rewardSetting('profile_power_scale_max_rate') * ((float) $profilePower['score'] / 100), 4),
+                'max_rate' => (float) MiningPlatform::rewardSetting('profile_power_scale_max_rate'),
+                'unlock' => $rewardCapUnlocksByTier->get('scale'),
+            ],
+        ])->all();
 
         $displayTierName = $user->account_type === 'starter'
             ? ($user->investments->firstWhere('package.slug', MiningPlatform::FREE_STARTER_PACKAGE_SLUG)?->package?->name ?? 'Free Starter')
@@ -549,6 +681,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'expectedMonthlyEarnings' => $expectedMonthlyEarnings,
             'teamBonusRate' => $teamBonusRate,
             'profilePower' => $profilePower,
+            'publicRewardCapSummary' => $publicRewardCapSummary,
             'recentHallOfFameWins' => $recentHallOfFameWins,
             'hallOfFameWinCounts' => $hallOfFameWinCounts,
             'backTarget' => match (true) {
@@ -801,6 +934,43 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $investmentLivePerformance = $activeInvestments
             ->map(fn (UserInvestment $investment) => MiningPlatform::investmentLivePerformanceSummary($investment, 7))
             ->values();
+        $profilePower = MiningPlatform::profilePowerSummary($user);
+        $pointsToFullCap = max(100 - (int) $profilePower['score'], 0);
+        $rewardActionLabels = collect($profilePower['recommended_actions'] ?? [])
+            ->take(2)
+            ->pluck('title')
+            ->values()
+            ->all();
+        $rewardCapUnlocksByTier = $user->notifications()
+            ->where('type', \App\Notifications\ActivityFeedNotification::class)
+            ->latest()
+            ->get()
+            ->filter(fn ($notification) => ($notification->data['event_key'] ?? null) === 'profile_power_reward_cap')
+            ->keyBy(fn ($notification) => $notification->data['reward_cap_tier'] ?? '');
+        $investmentRewardSummaries = $user->investments
+            ->mapWithKeys(function (UserInvestment $investment) use ($pointsToFullCap, $rewardActionLabels, $rewardCapUnlocksByTier) {
+                $currentBoostRate = MiningPlatform::investmentProfilePowerRewardRate($investment);
+                $maxBoostRate = MiningPlatform::investmentProfilePowerRewardCap((float) $investment->amount);
+                $tierKey = (float) $investment->amount >= 1000
+                    ? 'scale'
+                    : ((float) $investment->amount >= 500 ? 'growth' : 'basic');
+                $capUnlockNotification = $rewardCapUnlocksByTier->get($tierKey);
+
+                return [
+                    $investment->id => [
+                        'current_boost_rate' => $currentBoostRate,
+                        'max_boost_rate' => $maxBoostRate,
+                        'total_reward_rate' => MiningPlatform::investmentTotalRewardRate($investment),
+                        'projected_reward_amount' => MiningPlatform::investmentProjectedRewardAmount($investment),
+                        'points_to_full_cap' => $pointsToFullCap,
+                        'next_actions' => $rewardActionLabels,
+                        'tier_key' => $tierKey,
+                        'cap_unlock_subject' => $capUnlockNotification->data['subject'] ?? null,
+                        'cap_unlock_date' => $capUnlockNotification?->created_at,
+                    ],
+                ];
+            })
+            ->all();
 
         return view('pages.general.investments', [
             'user' => $user,
@@ -817,6 +987,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'earningsSourceOptions' => $sourceMap,
             'activeSource' => $source,
             'investmentLivePerformance' => $investmentLivePerformance,
+            'investmentRewardSummaries' => $investmentRewardSummaries,
         ]);
     })->name('dashboard.investments');
 
@@ -869,6 +1040,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/dashboard/network', function () {
         MiningPlatform::ensureDefaults();
+
+        $rewardCapBadgesForUser = function (User $targetUser): array {
+            $rewardCapUnlocks = $targetUser->notifications()
+                ->where('type', ActivityFeedNotification::class)
+                ->latest()
+                ->get()
+                ->filter(fn ($notification) => ($notification->data['event_key'] ?? null) === 'profile_power_reward_cap')
+                ->pluck('data.reward_cap_tier')
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+
+            $badges = [];
+
+            if (in_array('basic', $rewardCapUnlocks, true)) {
+                $badges[] = ['label' => '4% cap', 'class' => 'bg-primary-subtle text-primary'];
+            }
+
+            if (in_array('growth', $rewardCapUnlocks, true)) {
+                $badges[] = ['label' => '6% cap', 'class' => 'bg-info-subtle text-info'];
+            }
+
+            if (in_array('scale', $rewardCapUnlocks, true)) {
+                $badges[] = ['label' => '7% cap', 'class' => 'bg-dark text-white'];
+            }
+
+            return $badges;
+        };
 
         $rewardFilter = request()->query('reward_filter', 'all');
         $rewardFilters = [
@@ -929,7 +1129,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->unique('id')
             ->values();
 
-        $directTeamBranches = $directTeam->map(function ($member) {
+        $directTeamBranches = $directTeam->map(function ($member) use ($rewardCapBadgesForUser) {
             $activeInvestments = $member->investments->where('status', 'active')->where('amount', '>', 0);
             $branchSecondLevel = $member->sponsoredUsers->values();
             $branchSecondLevelActive = $branchSecondLevel->filter(fn ($downline) => $downline->investments->where('status', 'active')->where('amount', '>', 0)->isNotEmpty());
@@ -946,9 +1146,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'downline_count' => $branchSecondLevel->count(),
                 'downline_active_count' => $branchSecondLevelActive->count(),
                 'downline_capital' => (float) $branchSecondLevel->sum(fn ($downline) => $downline->investments->where('status', 'active')->where('amount', '>', 0)->sum('amount')),
+                'reward_cap_badges' => $rewardCapBadgesForUser($member),
                 'downline_members' => $branchSecondLevel->map(fn ($downline) => [
                     'member' => $downline,
                     'profile_power' => MiningPlatform::profilePowerSummary($downline),
+                    'reward_cap_badges' => $rewardCapBadgesForUser($downline),
                 ])->values(),
             ];
         })->values();
@@ -1213,7 +1415,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/dashboard/analytics', function (Request $request) {
             MiningPlatform::ensureDefaults();
 
-            $users = User::with(['sponsor', 'userLevel', 'friendInvitations', 'sponsoredUsers.investments', 'investments', 'earnings'])->get();
+            $users = User::with(['sponsor', 'userLevel', 'friendInvitations', 'sponsoredUsers.investments', 'investments.package', 'earnings'])->get();
             $packages = InvestmentPackage::with('investments')->orderBy('display_order')->get();
             $miner = MiningPlatform::resolveMiner($request->query('miner'));
             $miner->load([
@@ -1259,6 +1461,42 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     'overall_total' => (float) Earning::where('source', $source)->sum('amount'),
                 ];
             })->values();
+            $rewardCapAnalyticsRows = $users
+                ->map(function (User $trackedUser) {
+                    $activeInvestments = $trackedUser->investments->where('status', 'active')->where('amount', '>', 0)->values();
+
+                    if ($activeInvestments->isEmpty()) {
+                        return null;
+                    }
+
+                    $profilePower = MiningPlatform::profilePowerSummary($trackedUser);
+                    $basicUnlocked = $profilePower['score'] >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount > 0 && (float) $investment->amount < 500);
+                    $growthUnlocked = $profilePower['score'] >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount >= 500 && (float) $investment->amount < 1000);
+                    $scaleUnlocked = $profilePower['score'] >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount >= 1000);
+                    $extraMonthlyLiability = round((float) $activeInvestments->sum(fn ($investment) => MiningPlatform::investmentProjectedRewardAmount($investment) - ((float) $investment->amount * ((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate + (float) $investment->team_bonus_rate))), 2);
+
+                    return [
+                        'user' => $trackedUser,
+                        'profile_power' => $profilePower,
+                        'active_investments' => $activeInvestments,
+                        'basic_unlocked' => $basicUnlocked,
+                        'growth_unlocked' => $growthUnlocked,
+                        'scale_unlocked' => $scaleUnlocked,
+                        'extra_monthly_liability' => $extraMonthlyLiability,
+                    ];
+                })
+                ->filter()
+                ->values();
+            $rewardCapAnalyticsSummary = [
+                'basic_unlocked_users' => $rewardCapAnalyticsRows->where('basic_unlocked', true)->count(),
+                'growth_unlocked_users' => $rewardCapAnalyticsRows->where('growth_unlocked', true)->count(),
+                'scale_unlocked_users' => $rewardCapAnalyticsRows->where('scale_unlocked', true)->count(),
+                'total_extra_monthly_liability' => round((float) $rewardCapAnalyticsRows->sum('extra_monthly_liability'), 2),
+            ];
+            $topRewardCapUsers = $rewardCapAnalyticsRows
+                ->sortByDesc('extra_monthly_liability')
+                ->take(5)
+                ->values();
 
             $selectedMinerPerformanceSummary = [
                 'total_revenue' => round((float) $selectedMinerPerformanceLogs->sum('revenue_usd'), 2),
@@ -1280,6 +1518,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'topInvestors' => $topInvestors,
                 'topReferrers' => $topReferrers,
                 'mlmRewardBreakdown' => $mlmRewardBreakdown,
+                'rewardCapAnalyticsSummary' => $rewardCapAnalyticsSummary,
+                'topRewardCapUsers' => $topRewardCapUsers,
                 'miner' => $miner,
                 'miners' => $miners,
                 'selectedMinerSlug' => $selectedMinerSlug,
@@ -1301,6 +1541,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $miner = MiningPlatform::resolveMiner(request()->query('miner'));
             $selectedMinerSlug = $miner->slug;
             $selectedMinerPerformanceLogs = $miner->performanceLogs()->orderBy('logged_on')->limit(7)->get();
+            $rewardCapAnalyticsRows = User::with(['userLevel', 'friendInvitations', 'sponsoredUsers.investments', 'investments.package'])
+                ->get()
+                ->map(function (User $trackedUser) {
+                    $activeInvestments = $trackedUser->investments->where('status', 'active')->where('amount', '>', 0)->values();
+
+                    if ($activeInvestments->isEmpty()) {
+                        return null;
+                    }
+
+                    $profilePower = MiningPlatform::profilePowerSummary($trackedUser);
+
+                    return [
+                        'user' => $trackedUser,
+                        'profile_power' => $profilePower,
+                        'basic_unlocked' => $profilePower['score'] >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount > 0 && (float) $investment->amount < 500),
+                        'growth_unlocked' => $profilePower['score'] >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount >= 500 && (float) $investment->amount < 1000),
+                        'scale_unlocked' => $profilePower['score'] >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount >= 1000),
+                        'extra_monthly_liability' => round((float) $activeInvestments->sum(fn ($investment) => MiningPlatform::investmentProjectedRewardAmount($investment) - ((float) $investment->amount * ((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate + (float) $investment->team_bonus_rate))), 2),
+                    ];
+                })
+                ->filter()
+                ->values();
+            $rewardCapAnalyticsSummary = [
+                'basic_unlocked_users' => $rewardCapAnalyticsRows->where('basic_unlocked', true)->count(),
+                'growth_unlocked_users' => $rewardCapAnalyticsRows->where('growth_unlocked', true)->count(),
+                'scale_unlocked_users' => $rewardCapAnalyticsRows->where('scale_unlocked', true)->count(),
+                'total_extra_monthly_liability' => round((float) $rewardCapAnalyticsRows->sum('extra_monthly_liability'), 2),
+            ];
+            $topRewardCapUsers = $rewardCapAnalyticsRows->sortByDesc('extra_monthly_liability')->take(5)->values();
             $mlmRewardBreakdown = collect([
                 1 => 'team_subscription_bonus',
                 2 => 'team_downline_bonus',
@@ -1320,7 +1589,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             $filename = 'analytics-report-'.now()->format('Ymd-His').'.csv';
 
-            return response()->streamDownload(function () use ($mlmRewardBreakdown, $miner, $selectedMinerSlug, $selectedMinerPerformanceLogs) {
+            return response()->streamDownload(function () use ($mlmRewardBreakdown, $miner, $selectedMinerSlug, $selectedMinerPerformanceLogs, $rewardCapAnalyticsSummary, $topRewardCapUsers) {
                 $handle = fopen('php://output', 'w');
                 fputcsv($handle, ['Section', 'Label', 'Value']);
                 fputcsv($handle, ['Summary', 'Selected miner slug', $selectedMinerSlug]);
@@ -1331,6 +1600,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 fputcsv($handle, ['Summary', 'Pending payouts', number_format((float) PayoutRequest::whereIn('status', ['pending', 'approved'])->sum('amount'), 2, '.', '')]);
                 fputcsv($handle, ['Summary', 'Paid out', number_format((float) Earning::where('status', 'paid')->sum('amount'), 2, '.', '')]);
                 fputcsv($handle, ['Summary', 'Active shareholders', (int) User::where('account_type', 'shareholder')->count()]);
+                fputcsv($handle, ['Profile power reward', 'Users unlocked 4% cap', $rewardCapAnalyticsSummary['basic_unlocked_users']]);
+                fputcsv($handle, ['Profile power reward', 'Users unlocked 6% cap', $rewardCapAnalyticsSummary['growth_unlocked_users']]);
+                fputcsv($handle, ['Profile power reward', 'Users unlocked 7% cap', $rewardCapAnalyticsSummary['scale_unlocked_users']]);
+                fputcsv($handle, ['Profile power reward', 'Estimated extra monthly liability', number_format($rewardCapAnalyticsSummary['total_extra_monthly_liability'], 2, '.', '')]);
+
+                foreach ($topRewardCapUsers as $rewardCapUser) {
+                    fputcsv($handle, ['Profile power reward leaders', $rewardCapUser['user']->email, number_format($rewardCapUser['extra_monthly_liability'], 2, '.', '')]);
+                }
 
                 foreach ($mlmRewardBreakdown as $rewardLevel) {
                     fputcsv($handle, ['MLM payout breakdown', 'Level '.$rewardLevel['level'].' source', $rewardLevel['source']]);
@@ -1881,6 +2158,80 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $status = $request->query('status');
             $packageSlug = $request->query('package');
             $search = trim((string) $request->query('search', ''));
+            $rewardCap = (string) $request->query('reward_cap', 'all');
+            $allowedRewardCaps = ['all', 'basic', 'growth', 'scale'];
+
+            if (! in_array($rewardCap, $allowedRewardCaps, true)) {
+                $rewardCap = 'all';
+            }
+
+            $rewardCapMeta = [
+                'basic' => ['label' => 'Basic 100', 'short' => '4% cap', 'max_rate' => 0.04],
+                'growth' => ['label' => 'Growth 500', 'short' => '6% cap', 'max_rate' => 0.06],
+                'scale' => ['label' => 'Scale 1000+', 'short' => '7% cap', 'max_rate' => 0.07],
+            ];
+            $rewardCapCache = [];
+            $resolveRewardCaps = function (?User $user) use (&$rewardCapCache, $rewardCapMeta) {
+                if (! $user) {
+                    return collect($rewardCapMeta)->map(fn (array $meta, string $key) => [
+                        'key' => $key,
+                        'label' => $meta['label'],
+                        'short' => $meta['short'],
+                        'max_rate' => $meta['max_rate'],
+                        'unlocked' => false,
+                    ])->all();
+                }
+
+                if (array_key_exists($user->id, $rewardCapCache)) {
+                    return $rewardCapCache[$user->id];
+                }
+
+                $user->loadMissing(['userLevel', 'friendInvitations', 'investments.package', 'sponsoredUsers.investments']);
+                $score = (int) (MiningPlatform::profilePowerSummary($user)['score'] ?? 0);
+                $activeInvestments = $user->investments->where('status', 'active');
+
+                return $rewardCapCache[$user->id] = [
+                    'basic' => [
+                        'key' => 'basic',
+                        'label' => $rewardCapMeta['basic']['label'],
+                        'short' => $rewardCapMeta['basic']['short'],
+                        'max_rate' => $rewardCapMeta['basic']['max_rate'],
+                        'unlocked' => $score >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount > 0 && (float) $investment->amount < 500),
+                    ],
+                    'growth' => [
+                        'key' => 'growth',
+                        'label' => $rewardCapMeta['growth']['label'],
+                        'short' => $rewardCapMeta['growth']['short'],
+                        'max_rate' => $rewardCapMeta['growth']['max_rate'],
+                        'unlocked' => $score >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount >= 500 && (float) $investment->amount < 1000),
+                    ],
+                    'scale' => [
+                        'key' => 'scale',
+                        'label' => $rewardCapMeta['scale']['label'],
+                        'short' => $rewardCapMeta['scale']['short'],
+                        'max_rate' => $rewardCapMeta['scale']['max_rate'],
+                        'unlocked' => $score >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount >= 1000),
+                    ],
+                ];
+            };
+            $investmentTier = function (UserInvestment $investment): ?string {
+                return match (true) {
+                    (float) $investment->amount >= 1000 => 'scale',
+                    (float) $investment->amount >= 500 => 'growth',
+                    (float) $investment->amount > 0 => 'basic',
+                    default => null,
+                };
+            };
+            $matchesRewardCap = function (UserInvestment $investment, string $selectedCap) use ($resolveRewardCaps, $investmentTier): bool {
+                if ($selectedCap === 'all') {
+                    return true;
+                }
+
+                $tier = $investmentTier($investment);
+
+                return $tier === $selectedCap
+                    && (($resolveRewardCaps($investment->user)[$selectedCap]['unlocked'] ?? false) === true);
+            };
 
             $investmentsQuery = UserInvestment::with(['user', 'miner', 'package'])
                 ->when($minerSlug, fn ($query) => $query->whereHas('miner', fn ($minerQuery) => $minerQuery->where('slug', $minerSlug)))
@@ -1896,9 +2247,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     });
                 });
 
-            $investments = $investmentsQuery->latest('subscribed_at')->get();
+            $baseInvestments = $investmentsQuery->latest('subscribed_at')->get();
+            $investments = $baseInvestments
+                ->filter(fn (UserInvestment $investment) => $matchesRewardCap($investment, $rewardCap))
+                ->values();
             $allInvestments = UserInvestment::with(['user', 'miner', 'package'])->get();
-            $statusBreakdown = collect(['active', 'pending', 'closed'])->mapWithKeys(function ($statusKey) use ($allInvestments, $minerSlug, $packageSlug, $search) {
+            $statusBreakdown = collect(['active', 'pending', 'closed'])->mapWithKeys(function ($statusKey) use ($allInvestments, $minerSlug, $packageSlug, $search, $rewardCap, $matchesRewardCap) {
                 $items = $allInvestments
                     ->when($minerSlug, fn ($collection) => $collection->filter(fn ($investment) => $investment->miner?->slug === $minerSlug))
                     ->when($packageSlug, fn ($collection) => $collection->filter(fn ($investment) => $investment->package?->slug === $packageSlug))
@@ -1910,6 +2264,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                                 || str_contains(strtolower((string) $investment->package?->name), strtolower($search));
                         });
                     })
+                    ->when($rewardCap !== 'all', fn ($collection) => $collection->filter(fn ($investment) => $matchesRewardCap($investment, $rewardCap)))
                     ->where('status', $statusKey);
 
                 return [$statusKey => $items->count()];
@@ -1925,11 +2280,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
                             || str_contains(strtolower((string) $investment->package?->name), strtolower($search));
                     });
                 })
+                ->when($rewardCap !== 'all', fn ($collection) => $collection->filter(fn ($investment) => $matchesRewardCap($investment, $rewardCap)))
                 ->groupBy(fn ($investment) => $investment->miner?->slug ?? 'unknown')
                 ->map(fn ($items) => [
                     'name' => $items->first()?->miner?->name ?? 'Unknown miner',
                     'count' => $items->count(),
                 ]);
+            $rewardCapBreakdown = collect($rewardCapMeta)->map(function (array $meta, string $key) use ($baseInvestments, $matchesRewardCap) {
+                return [
+                    'label' => $meta['label'],
+                    'short' => $meta['short'],
+                    'count' => $baseInvestments->filter(fn (UserInvestment $investment) => $matchesRewardCap($investment, $key))->count(),
+                ];
+            });
+            $investmentRewardCaps = $investments->mapWithKeys(function (UserInvestment $investment) use ($resolveRewardCaps) {
+                $badges = collect($resolveRewardCaps($investment->user))
+                    ->filter(fn (array $cap) => $cap['unlocked'])
+                    ->values()
+                    ->all();
+
+                return [$investment->id => $badges];
+            });
 
             return view('pages.general.shareholders', [
                 'miners' => Miner::orderBy('name')->get(),
@@ -1939,8 +2310,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'selectedStatus' => $status,
                 'selectedPackage' => $packageSlug,
                 'search' => $search,
+                'selectedRewardCap' => $rewardCap,
                 'statusBreakdown' => $statusBreakdown,
                 'minerBreakdown' => $minerBreakdown,
+                'rewardCapBreakdown' => $rewardCapBreakdown,
+                'investmentRewardCaps' => $investmentRewardCaps,
             ]);
         })->name('dashboard.shareholders');
 
@@ -1951,6 +2325,48 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $status = $request->query('status');
             $packageSlug = $request->query('package');
             $search = trim((string) $request->query('search', ''));
+            $rewardCap = (string) $request->query('reward_cap', 'all');
+            $allowedRewardCaps = ['all', 'basic', 'growth', 'scale'];
+
+            if (! in_array($rewardCap, $allowedRewardCaps, true)) {
+                $rewardCap = 'all';
+            }
+
+            $rewardCapCache = [];
+            $resolveRewardCaps = function (?User $user) use (&$rewardCapCache) {
+                if (! $user) {
+                    return ['basic' => false, 'growth' => false, 'scale' => false];
+                }
+
+                if (array_key_exists($user->id, $rewardCapCache)) {
+                    return $rewardCapCache[$user->id];
+                }
+
+                $user->loadMissing(['userLevel', 'friendInvitations', 'investments.package', 'sponsoredUsers.investments']);
+                $score = (int) (MiningPlatform::profilePowerSummary($user)['score'] ?? 0);
+                $activeInvestments = $user->investments->where('status', 'active');
+
+                return $rewardCapCache[$user->id] = [
+                    'basic' => $score >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount > 0 && (float) $investment->amount < 500),
+                    'growth' => $score >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount >= 500 && (float) $investment->amount < 1000),
+                    'scale' => $score >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount >= 1000),
+                ];
+            };
+            $matchesRewardCap = function (UserInvestment $investment, string $selectedCap) use ($resolveRewardCaps): bool {
+                if ($selectedCap === 'all') {
+                    return true;
+                }
+
+                $tier = match (true) {
+                    (float) $investment->amount >= 1000 => 'scale',
+                    (float) $investment->amount >= 500 => 'growth',
+                    (float) $investment->amount > 0 => 'basic',
+                    default => null,
+                };
+
+                return $tier === $selectedCap
+                    && (($resolveRewardCaps($investment->user)[$selectedCap] ?? false) === true);
+            };
 
             $investments = UserInvestment::with(['user', 'miner', 'package'])
                 ->when($minerSlug, fn ($query) => $query->whereHas('miner', fn ($minerQuery) => $minerQuery->where('slug', $minerSlug)))
@@ -1966,21 +2382,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     });
                 })
                 ->latest('subscribed_at')
-                ->get();
+                ->get()
+                ->filter(fn (UserInvestment $investment) => $matchesRewardCap($investment, $rewardCap))
+                ->values();
 
             $filename = 'shareholders-report-'.now()->format('Ymd-His').'.csv';
 
-            return response()->streamDownload(function () use ($investments, $minerSlug, $status, $packageSlug, $search) {
+            return response()->streamDownload(function () use ($investments, $minerSlug, $status, $packageSlug, $search, $rewardCap, $resolveRewardCaps) {
                 $handle = fopen('php://output', 'w');
                 fputcsv($handle, ['Filter', 'Value']);
                 fputcsv($handle, ['Miner', $minerSlug ?: 'all']);
                 fputcsv($handle, ['Status', $status ?: 'all']);
                 fputcsv($handle, ['Package', $packageSlug ?: 'all']);
+                fputcsv($handle, ['Reward cap', $rewardCap ?: 'all']);
                 fputcsv($handle, ['Search', $search !== '' ? $search : 'all']);
                 fputcsv($handle, []);
-                fputcsv($handle, ['Investor Name', 'Investor Email', 'Miner', 'Package', 'Amount', 'Shares', 'Return Rate', 'Status', 'Subscribed At']);
+                fputcsv($handle, ['Investor Name', 'Investor Email', 'Miner', 'Package', 'Amount', 'Shares', 'Return Rate', 'Reward Caps', 'Status', 'Subscribed At']);
 
                 foreach ($investments as $investment) {
+                    $caps = collect($resolveRewardCaps($investment->user))
+                        ->filter()
+                        ->keys()
+                        ->map(fn ($key) => match ($key) {
+                            'basic' => '4% cap',
+                            'growth' => '6% cap',
+                            'scale' => '7% cap',
+                            default => $key,
+                        })
+                        ->implode(', ');
+
                     fputcsv($handle, [
                         $investment->user?->name,
                         $investment->user?->email,
@@ -1989,6 +2419,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                         number_format((float) $investment->amount, 2, '.', ''),
                         (int) $investment->shares_owned,
                         number_format(((float) $investment->monthly_return_rate + (float) $investment->level_bonus_rate) * 100, 2, '.', '').'%',
+                        $caps !== '' ? $caps : '—',
                         $investment->status,
                         optional($investment->subscribed_at)->format('Y-m-d H:i:s'),
                     ]);
@@ -2004,8 +2435,51 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $role = $request->query('role');
             $accountType = $request->query('account_type');
             $verification = $request->query('verification');
+            $rewardCap = (string) $request->query('reward_cap', 'all');
+            $allowedRewardCaps = ['all', 'basic', 'growth', 'scale'];
 
-            $usersQuery = User::with(['userLevel', 'investments', 'earnings'])
+            if (! in_array($rewardCap, $allowedRewardCaps, true)) {
+                $rewardCap = 'all';
+            }
+
+            $rewardCapMeta = [
+                'basic' => ['label' => 'Basic 100', 'short' => '4% cap'],
+                'growth' => ['label' => 'Growth 500', 'short' => '6% cap'],
+                'scale' => ['label' => 'Scale 1000+', 'short' => '7% cap'],
+            ];
+            $rewardCapCache = [];
+            $resolveRewardCaps = function (User $user) use (&$rewardCapCache, $rewardCapMeta) {
+                if (array_key_exists($user->id, $rewardCapCache)) {
+                    return $rewardCapCache[$user->id];
+                }
+
+                $user->loadMissing(['userLevel', 'friendInvitations', 'investments.package', 'sponsoredUsers.investments']);
+                $score = (int) (MiningPlatform::profilePowerSummary($user)['score'] ?? 0);
+                $activeInvestments = $user->investments->where('status', 'active');
+
+                return $rewardCapCache[$user->id] = [
+                    'basic' => [
+                        'key' => 'basic',
+                        'label' => $rewardCapMeta['basic']['label'],
+                        'short' => $rewardCapMeta['basic']['short'],
+                        'unlocked' => $score >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount > 0 && (float) $investment->amount < 500),
+                    ],
+                    'growth' => [
+                        'key' => 'growth',
+                        'label' => $rewardCapMeta['growth']['label'],
+                        'short' => $rewardCapMeta['growth']['short'],
+                        'unlocked' => $score >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount >= 500 && (float) $investment->amount < 1000),
+                    ],
+                    'scale' => [
+                        'key' => 'scale',
+                        'label' => $rewardCapMeta['scale']['label'],
+                        'short' => $rewardCapMeta['scale']['short'],
+                        'unlocked' => $score >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount >= 1000),
+                    ],
+                ];
+            };
+
+            $usersQuery = User::with(['userLevel', 'investments.package', 'earnings', 'friendInvitations', 'sponsoredUsers.investments'])
                 ->when($search !== '', function ($query) use ($search) {
                     $query->where(function ($nested) use ($search) {
                         $nested->where('name', 'like', "%$search%")
@@ -2017,8 +2491,26 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->when($verification === 'verified', fn ($query) => $query->whereNotNull('email_verified_at'))
                 ->when($verification === 'unverified', fn ($query) => $query->whereNull('email_verified_at'));
 
-            $users = $usersQuery->orderBy('created_at')->get();
+            $baseUsers = $usersQuery->orderBy('created_at')->get();
+            $users = $baseUsers
+                ->filter(fn (User $user) => $rewardCap === 'all' || (($resolveRewardCaps($user)[$rewardCap]['unlocked'] ?? false) === true))
+                ->values();
             $allUsers = User::query()->get();
+            $rewardCapBreakdown = collect($rewardCapMeta)->map(function (array $meta, string $key) use ($baseUsers, $resolveRewardCaps) {
+                return [
+                    'label' => $meta['label'],
+                    'short' => $meta['short'],
+                    'count' => $baseUsers->filter(fn (User $user) => ($resolveRewardCaps($user)[$key]['unlocked'] ?? false) === true)->count(),
+                ];
+            });
+            $userRewardCaps = $users->mapWithKeys(function (User $user) use ($resolveRewardCaps) {
+                $badges = collect($resolveRewardCaps($user))
+                    ->filter(fn (array $cap) => $cap['unlocked'])
+                    ->values()
+                    ->all();
+
+                return [$user->id => $badges];
+            });
 
             return view('pages.general.users', [
                 'users' => $users,
@@ -2026,12 +2518,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'selectedRole' => $role,
                 'selectedAccountType' => $accountType,
                 'selectedVerification' => $verification,
+                'selectedRewardCap' => $rewardCap,
                 'userBreakdown' => [
                     'admins' => $allUsers->where('role', 'admin')->count(),
                     'users' => $allUsers->where('role', 'user')->count(),
                     'verified' => $allUsers->whereNotNull('email_verified_at')->count(),
                     'shareholders' => $allUsers->where('account_type', 'shareholder')->count(),
                 ],
+                'rewardCapBreakdown' => $rewardCapBreakdown,
+                'userRewardCaps' => $userRewardCaps,
             ]);
         })->name('dashboard.users');
 
@@ -2042,8 +2537,31 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $role = $request->query('role');
             $accountType = $request->query('account_type');
             $verification = $request->query('verification');
+            $rewardCap = (string) $request->query('reward_cap', 'all');
+            $allowedRewardCaps = ['all', 'basic', 'growth', 'scale'];
 
-            $users = User::with(['userLevel', 'investments', 'earnings'])
+            if (! in_array($rewardCap, $allowedRewardCaps, true)) {
+                $rewardCap = 'all';
+            }
+
+            $rewardCapCache = [];
+            $resolveRewardCaps = function (User $user) use (&$rewardCapCache) {
+                if (array_key_exists($user->id, $rewardCapCache)) {
+                    return $rewardCapCache[$user->id];
+                }
+
+                $user->loadMissing(['userLevel', 'friendInvitations', 'investments.package', 'sponsoredUsers.investments']);
+                $score = (int) (MiningPlatform::profilePowerSummary($user)['score'] ?? 0);
+                $activeInvestments = $user->investments->where('status', 'active');
+
+                return $rewardCapCache[$user->id] = [
+                    'basic' => $score >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount > 0 && (float) $investment->amount < 500),
+                    'growth' => $score >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount >= 500 && (float) $investment->amount < 1000),
+                    'scale' => $score >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount >= 1000),
+                ];
+            };
+
+            $users = User::with(['userLevel', 'investments.package', 'earnings', 'friendInvitations', 'sponsoredUsers.investments'])
                 ->when($search !== '', function ($query) use ($search) {
                     $query->where(function ($nested) use ($search) {
                         $nested->where('name', 'like', "%$search%")
@@ -2055,21 +2573,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->when($verification === 'verified', fn ($query) => $query->whereNotNull('email_verified_at'))
                 ->when($verification === 'unverified', fn ($query) => $query->whereNull('email_verified_at'))
                 ->orderBy('created_at')
-                ->get();
+                ->get()
+                ->filter(fn (User $user) => $rewardCap === 'all' || (($resolveRewardCaps($user)[$rewardCap] ?? false) === true))
+                ->values();
 
             $filename = 'users-report-'.now()->format('Ymd-His').'.csv';
 
-            return response()->streamDownload(function () use ($users, $search, $role, $accountType, $verification) {
+            return response()->streamDownload(function () use ($users, $search, $role, $accountType, $verification, $rewardCap, $resolveRewardCaps) {
                 $handle = fopen('php://output', 'w');
                 fputcsv($handle, ['Filter', 'Value']);
                 fputcsv($handle, ['Search', $search !== '' ? $search : 'all']);
                 fputcsv($handle, ['Role', $role ?: 'all']);
                 fputcsv($handle, ['Account type', $accountType ?: 'all']);
                 fputcsv($handle, ['Verification', $verification ?: 'all']);
+                fputcsv($handle, ['Reward cap', $rewardCap ?: 'all']);
                 fputcsv($handle, []);
-                fputcsv($handle, ['Name', 'Email', 'Role', 'Verification', 'Level', 'Account Type', 'Total Invested', 'Available Earnings', 'Joined']);
+                fputcsv($handle, ['Name', 'Email', 'Role', 'Verification', 'Level', 'Account Type', 'Reward Caps', 'Total Invested', 'Available Earnings', 'Joined']);
 
                 foreach ($users as $listedUser) {
+                    $caps = collect($resolveRewardCaps($listedUser))
+                        ->filter()
+                        ->keys()
+                        ->map(fn ($key) => match ($key) {
+                            'basic' => '4% cap',
+                            'growth' => '6% cap',
+                            'scale' => '7% cap',
+                            default => $key,
+                        })
+                        ->implode(', ');
+
                     fputcsv($handle, [
                         $listedUser->name,
                         $listedUser->email,
@@ -2077,6 +2609,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                         $listedUser->email_verified_at ? 'verified' : 'pending',
                         $listedUser->userLevel?->name ?? 'Starter',
                         $listedUser->account_type,
+                        $caps !== '' ? $caps : '—',
                         number_format((float) $listedUser->investments->where('status', 'active')->sum('amount'), 2, '.', ''),
                         number_format((float) $listedUser->earnings->where('status', 'available')->sum('amount'), 2, '.', ''),
                         optional($listedUser->created_at)->format('Y-m-d H:i:s'),
@@ -2131,6 +2664,52 @@ Route::middleware(['auth', 'verified'])->group(function () {
             if (! in_array($riskFocus, $allowedRiskFocuses, true)) {
                 $riskFocus = 'all';
             }
+
+            $rewardCapMeta = [
+                'basic' => ['label' => 'Basic 100', 'short' => '4% cap'],
+                'growth' => ['label' => 'Growth 500', 'short' => '6% cap'],
+                'scale' => ['label' => 'Scale 1000+', 'short' => '7% cap'],
+            ];
+            $rewardCapCache = [];
+            $resolveRewardCaps = function (?User $user) use (&$rewardCapCache, $rewardCapMeta) {
+                if (! $user) {
+                    return collect($rewardCapMeta)->map(fn (array $meta, string $key) => [
+                        'key' => $key,
+                        'label' => $meta['label'],
+                        'short' => $meta['short'],
+                        'unlocked' => false,
+                    ])->all();
+                }
+
+                if (array_key_exists($user->id, $rewardCapCache)) {
+                    return $rewardCapCache[$user->id];
+                }
+
+                $user->loadMissing(['userLevel', 'friendInvitations', 'investments.package', 'sponsoredUsers.investments']);
+                $score = (int) (MiningPlatform::profilePowerSummary($user)['score'] ?? 0);
+                $activeInvestments = $user->investments->where('status', 'active');
+
+                return $rewardCapCache[$user->id] = [
+                    'basic' => [
+                        'key' => 'basic',
+                        'label' => $rewardCapMeta['basic']['label'],
+                        'short' => $rewardCapMeta['basic']['short'],
+                        'unlocked' => $score >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount > 0 && (float) $investment->amount < 500),
+                    ],
+                    'growth' => [
+                        'key' => 'growth',
+                        'label' => $rewardCapMeta['growth']['label'],
+                        'short' => $rewardCapMeta['growth']['short'],
+                        'unlocked' => $score >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount >= 500 && (float) $investment->amount < 1000),
+                    ],
+                    'scale' => [
+                        'key' => 'scale',
+                        'label' => $rewardCapMeta['scale']['label'],
+                        'short' => $rewardCapMeta['scale']['short'],
+                        'unlocked' => $score >= 100 && $activeInvestments->contains(fn ($investment) => (float) $investment->amount >= 1000),
+                    ],
+                ];
+            };
 
             $investmentOrdersQuery = InvestmentOrder::with(['user', 'package', 'miner', 'approver'])->latest('submitted_at');
 
@@ -2242,6 +2821,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             $allInvestmentStatuses = InvestmentOrder::query()->pluck('status');
             $investmentOrders = $investmentOrdersQuery->get();
+            $investmentOrderRewardCaps = $investmentOrders->mapWithKeys(function (InvestmentOrder $order) use ($resolveRewardCaps) {
+                $badges = collect($resolveRewardCaps($order->user))
+                    ->filter(fn (array $cap) => $cap['unlocked'])
+                    ->values()
+                    ->all();
+
+                return [$order->id => $badges];
+            });
+            $investmentRewardCapSummary = collect($rewardCapMeta)->map(function (array $meta, string $key) use ($investmentOrders, $resolveRewardCaps) {
+                return [
+                    'label' => $meta['label'],
+                    'short' => $meta['short'],
+                    'count' => $investmentOrders->filter(fn (InvestmentOrder $order) => ($resolveRewardCaps($order->user)[$key]['unlocked'] ?? false) === true)->count(),
+                ];
+            });
             $investmentPaymentMethodSummaries = $investmentOrders
                 ->groupBy('payment_method')
                 ->map(function ($orders, $method) {
@@ -2286,6 +2880,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
                     'usdt_transfer' => MiningPlatform::platformSetting('payment_usdt_transfer_admin_review_note'),
                     'bank_transfer' => MiningPlatform::platformSetting('payment_bank_transfer_admin_review_note'),
                 ]),
+                'investmentOrderRewardCaps' => $investmentOrderRewardCaps,
+                'investmentRewardCapSummary' => $investmentRewardCapSummary,
             ]);
         })->name('dashboard.operations');
 
@@ -2593,6 +3189,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'team_level_3_subscription_reward_rate' => ['required', 'numeric', 'min:0', 'max:1'],
                 'team_level_4_subscription_reward_rate' => ['required', 'numeric', 'min:0', 'max:1'],
                 'team_level_5_subscription_reward_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'profile_power_basic_max_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'profile_power_growth_max_rate' => ['required', 'numeric', 'min:0', 'max:1'],
+                'profile_power_scale_max_rate' => ['required', 'numeric', 'min:0', 'max:1'],
             ]);
 
             MiningPlatform::updateRewardSettings($validated);

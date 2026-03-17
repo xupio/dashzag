@@ -33,6 +33,7 @@
     data-descendants="{{ $node['visible_descendants'] }}"
     data-branch-investors="{{ $node['branch_active_investors'] }}"
     data-invites="{{ $node['verified_invites'] }}"
+    data-reward-caps="{{ collect($node['reward_caps'] ?? [])->pluck('short')->implode('|') }}"
     data-profile="{{ route('dashboard.investors.show', ['user' => $node['user'], 'from' => request()->routeIs('dashboard.network-admin') ? 'network-admin' : 'network']) }}"
     data-users-link="{{ route('dashboard.users', ['search' => $node['user']->email]) }}"
     data-shareholders-link="{{ route('dashboard.shareholders', ['search' => $node['user']->email]) }}"
@@ -44,6 +45,13 @@
     <div class="network-org-mini">
       <span><strong>{{ $node['power_summary']['score'] }}/100</strong> power - {{ $node['direct_team'] }} team</span>
     </div>
+    @if (! empty($node['reward_caps']))
+      <div class="mt-2 d-flex flex-wrap justify-content-center gap-1">
+        @foreach ($node['reward_caps'] as $cap)
+          <span class="badge bg-light text-dark border">{{ $cap['short'] }}</span>
+        @endforeach
+      </div>
+    @endif
   </button>
 
   @if ($node['children']->isNotEmpty())

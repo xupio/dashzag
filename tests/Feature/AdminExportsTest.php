@@ -107,6 +107,8 @@ test('admin can export analytics report as csv', function () {
     expect($csv)->toContain('Selected miner slug');
     expect($csv)->toContain('alpha-one');
     expect($csv)->toContain('Total invested');
+    expect($csv)->toContain('Profile power reward');
+    expect($csv)->toContain('Estimated extra monthly liability');
     expect($csv)->toContain('MLM payout breakdown');
     expect($csv)->toContain('Selected miner daily performance');
 });
