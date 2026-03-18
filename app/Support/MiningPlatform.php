@@ -25,6 +25,8 @@ use RuntimeException;
 
 class MiningPlatform
 {
+    protected static bool $defaultsEnsuredForRequest = false;
+
     public const FREE_STARTER_PACKAGE_SLUG = 'starter-free';
     public const BASIC_UPGRADE_PACKAGE_SLUG = 'starter-100';
     public const FREE_STARTER_VERIFIED_INVITES_REQUIRED = 20;
@@ -464,8 +466,19 @@ class MiningPlatform
             return 0.0000;
         }
 
-        $maxRate = self::investmentProfilePowerRewardCap((float) $investment->amount);
-        $powerScore = (float) (self::profilePowerSummary($investment->user)['score'] ?? 0);
+        return self::investmentProfilePowerRewardRateForScore(
+            (float) $investment->amount,
+            (float) (self::profilePowerSummary($investment->user)['score'] ?? 0),
+        );
+    }
+
+    public static function investmentProfilePowerRewardRateForScore(float $amount, float $powerScore): float
+    {
+        if ($amount <= 0) {
+            return 0.0000;
+        }
+
+        $maxRate = self::investmentProfilePowerRewardCap($amount);
 
         return round($maxRate * min(max($powerScore, 0), 100) / 100, 4);
     }
@@ -484,6 +497,19 @@ class MiningPlatform
     public static function investmentProjectedRewardAmount(UserInvestment $investment): float
     {
         return round((float) $investment->amount * self::investmentTotalRewardRate($investment), 2);
+    }
+
+    public static function investmentProjectedRewardAmountForScore(UserInvestment $investment, float $powerScore): float
+    {
+        return round(
+            (float) $investment->amount * (
+                (float) $investment->monthly_return_rate
+                + (float) $investment->level_bonus_rate
+                + (float) $investment->team_bonus_rate
+                + self::investmentProfilePowerRewardRateForScore((float) $investment->amount, $powerScore)
+            ),
+            2
+        );
     }
 
     public static function unlockedRewardCapBadges(User $user): array
@@ -527,6 +553,10 @@ class MiningPlatform
 
     public static function ensureDefaults(): void
     {
+        if (! app()->runningUnitTests() && self::$defaultsEnsuredForRequest) {
+            return;
+        }
+
         $levels = [
             ['name' => 'Starter', 'slug' => 'starter', 'rank' => 1, 'bonus_rate' => 0.0000, 'minimum_referrals' => 0, 'minimum_investment' => 0, 'description' => 'Default level for every new mining user.'],
             ['name' => 'Silver', 'slug' => 'silver', 'rank' => 2, 'bonus_rate' => 0.0100, 'minimum_referrals' => 2, 'minimum_investment' => 500, 'description' => 'Unlocked after the first real growth milestones.'],
@@ -592,6 +622,7 @@ class MiningPlatform
 
         self::seedPerformanceLogs($alphaOne, 1325, 37, 485, 4, 97.40, 0.22);
         self::seedPerformanceLogs($betaFlux, 980, 29, 430, 3, 98.10, 0.14);
+        self::$defaultsEnsuredForRequest = true;
     }
 
     public static function activeMiners(): Collection
@@ -2027,22 +2058,31 @@ class MiningPlatform
 
     public static function expectedMonthlyEarnings(User $user): float
     {
-        return (float) $user->investments()->where('status', 'active')->get()->sum(function (UserInvestment $investment) {
-            return self::investmentProjectedRewardAmount($investment);
+        $user->loadMissing(['userLevel', 'friendInvitations', 'investments.package', 'sponsoredUsers.investments']);
+        $powerScore = (float) (self::profilePowerSummary($user)['score'] ?? 0);
+
+        $activeInvestments = $user->relationLoaded('investments')
+            ? $user->investments->where('status', 'active')
+            : $user->investments()->with('package')->where('status', 'active')->get();
+
+        return (float) $activeInvestments->sum(function (UserInvestment $investment) use ($powerScore) {
+            return self::investmentProjectedRewardAmountForScore($investment, $powerScore);
         });
     }
 
     public static function generateMonthlyEarnings(User $user, ?Carbon $month = null): Collection
     {
         $period = ($month ?? now())->copy()->startOfMonth();
+        $user->loadMissing(['userLevel', 'friendInvitations', 'sponsoredUsers.investments']);
+        $powerScore = (float) (self::profilePowerSummary($user)['score'] ?? 0);
 
         return $user->investments()
             ->with('package')
             ->where('status', 'active')
             ->where('amount', '>', 0)
             ->get()
-            ->map(function (UserInvestment $investment) use ($user, $period) {
-                $amount = self::investmentProjectedRewardAmount($investment);
+            ->map(function (UserInvestment $investment) use ($user, $period, $powerScore) {
+                $amount = self::investmentProjectedRewardAmountForScore($investment, $powerScore);
 
                 return Earning::firstOrCreate(
                     ['user_id' => $user->id, 'investment_id' => $investment->id, 'earned_on' => $period->toDateString(), 'source' => 'mining_return'],
