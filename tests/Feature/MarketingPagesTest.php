@@ -9,23 +9,21 @@ beforeEach(function () {
 test('public marketing pages render successfully', function () {
     $this->get(route('landing'))
         ->assertOk()
-        ->assertSee('Cloud mining subscriptions')
-        ->assertSee('Alpha One');
+        ->assertSee('We build mining growth')
+        ->assertDontSee('ZagChain system');
 
     $this->get(route('marketing.about'))
         ->assertOk()
-        ->assertSee('About the business');
+        ->assertSee('How It Works')
+        ->assertSee('ZagChain system')
+        ->assertSee('A simple client journey');
 
-    $this->get(route('marketing.packages'))
+    $this->get(route('marketing.how-it-works'))
         ->assertOk()
-        ->assertSee('Subscription products');
+        ->assertSee('Reward structure');
 
-    $this->get(route('marketing.media'))
-        ->assertOk()
-        ->assertSee('Media library');
-
-    $this->get(route('marketing.references'))
-        ->assertOk()
-        ->assertSee('Trust anchors for the public website');
+    $this->get('/packages')->assertRedirect('/');
+    $this->get('/media')->assertRedirect('/');
+    $this->get('/references')->assertRedirect('/');
 });
 

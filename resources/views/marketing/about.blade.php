@@ -1,76 +1,219 @@
-@extends('marketing.layout')
-
-@php($pageTitle = 'About')
+@extends('marketing.legacy-dark-layout', ['pageTitle' => 'ZagChain | How It Works'])
 
 @section('content')
-<section class="section">
-    <div class="shell page-grid">
-        <div class="hero-card page-copy">
-            <div class="section-kicker">About the business</div>
-            <h1 style="font-size:clamp(2.2rem, 4vw, 4rem);">A mining platform built around clarity, structure, and growth.</h1>
-            <p>The public side of the platform is designed to explain a simple story: the miner exists, shares are visible, packages are structured clearly, and the investor journey is understandable from the first visit to the first approved subscription.</p>
-            <p>The business narrative combines three things into one operating model: transparent miner performance, share-based subscriptions, and network growth through referrals and team-building incentives.</p>
-            <div class="metric-list">
-                <div class="metric-row"><span>Featured miner</span><strong>{{ $featuredMiner->name }}</strong></div>
-                <div class="metric-row"><span>Total shares</span><strong>{{ number_format($featuredMiner->total_shares) }}</strong></div>
-                <div class="metric-row"><span>Share price</span><strong>${{ number_format((float) $featuredMiner->share_price, 2) }}</strong></div>
-            </div>
-        </div>
-        <div class="panel page-copy">
-            <h3>What the visitor should understand</h3>
-            <div class="timeline">
-                <div class="timeline-step">A package is a number of shares inside the miner</div>
-                <div class="timeline-step">Returns follow the miner base rate and package uplift</div>
-                <div class="timeline-step">Referral activity improves both rewards and growth</div>
-                <div class="timeline-step">Operations review creates a safer investment flow</div>
+<main>
+    <div class="slider-area">
+        <div class="single-slider slider-height2 d-flex align-items-center legacy-page-hero" style="background-image: url('{{ asset('legacy-start/assets/img/hero/about.jpg') }}');">
+            <div class="container">
+                <div class="row">
+                    <div class="col-xl-12">
+                        <div class="hero-cap">
+                            <h2>How It Works</h2>
+                            <nav aria-label="breadcrumb">
+                                <ol class="breadcrumb">
+                                    <li class="breadcrumb-item"><a href="{{ route('landing') }}">Home</a></li>
+                                    <li class="breadcrumb-item"><a href="{{ route('marketing.how-it-works') }}">How It Works</a></li>
+                                </ol>
+                            </nav>
+                            <p class="legacy-page-intro">ZagChain is designed as one connected client journey. The user registers, chooses a subscription package, grows profile power, builds a referral structure, follows miner visibility, and understands profits from one dashboard experience instead of separate disconnected systems.</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-</section>
 
-<section class="section">
-    <div class="shell">
-        <div class="section-head">
-            <div>
-                <div class="section-kicker">What makes the model different</div>
-                <h2>A public story that matches the real platform flow.</h2>
+    <section class="about-low-area section-padding30">
+        <div class="container">
+            <div class="row align-items-center mb-80">
+                <div class="col-lg-6 col-md-12">
+                    <div class="about-caption mb-50">
+                        <div class="section-tittle mb-35">
+                            <span>ZagChain system</span>
+                            <h2>One connected platform that explains the full client journey from registration to tracked profits.</h2>
+                        </div>
+                        <p>The client journey starts with registration and continues into a complete dashboard experience. After joining, the client can choose a mining package, activate an account position, and begin following rewards through a clear user flow.</p>
+                        <p>Instead of using separate tools, ZagChain keeps everything inside one platform: package subscriptions, profile-power progress, team growth, wallet tracking, daily miner reporting, network strength, and milestone visibility.</p>
+                        <p>This makes the system easier to understand for both new users and serious investors, because the client can see what to do next, what affects rewards, and where each earning source comes from.</p>
+                        <a href="{{ route('register') }}" class="btn">Start the journey</a>
+                    </div>
+                </div>
+                <div class="col-lg-6 col-md-12">
+                    <div class="about-img legacy-system-visual">
+                        <div class="about-font-img">
+                            <img src="{{ asset('legacy-start/assets/img/gallery/about21.png') }}" alt="ZagChain system overview">
+                        </div>
+                        <div class="about-back-img d-none d-lg-block">
+                            <img src="{{ asset('legacy-start/assets/img/about/about_right.png') }}" alt="ZagChain supporting visual">
+                        </div>
+                    </div>
+                </div>
             </div>
-            <p class="section-copy">Instead of showing only package cards, the site explains the business logic behind the product: how the miner works, how the shares are sold, how trust is built, and how network incentives support growth.</p>
+            <div class="row g-4 mb-80">
+                <div class="col-lg-3 col-md-6">
+                    <div class="legacy-system-card">
+                        <div class="legacy-system-icon">1</div>
+                        <h3>Join the platform</h3>
+                        <p>The client creates an account, verifies email, and enters the dashboard where all actions begin.</p>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="legacy-system-card">
+                        <div class="legacy-system-icon">2</div>
+                        <h3>Activate a package</h3>
+                        <p>The user subscribes to a package and receives a clear package position tied to rewards and growth potential.</p>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="legacy-system-card">
+                        <div class="legacy-system-icon">3</div>
+                        <h3>Grow account power</h3>
+                        <p>Invites, referrals, direct investors, and stronger commitment increase profile power and unlock stronger caps.</p>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-md-6">
+                    <div class="legacy-system-card">
+                        <div class="legacy-system-icon">4</div>
+                        <h3>Track every result</h3>
+                        <p>The client can see wallet history, network strength, miner reporting, and personal reward progress in one place.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="row justify-content-center">
+                <div class="col-xl-8 col-lg-8">
+                    <div class="section-tittle text-center mb-70">
+                        <span>ZagChain flow</span>
+                        <h2>A simple client journey from registration to tracked profits</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="row g-4">
+                <div class="col-lg-6 col-md-6">
+                    <div class="legacy-step-card">
+                        <div class="legacy-step-number">1</div>
+                        <h3>Register and verify</h3>
+                        <p>The client creates an account, verifies email, and enters the dashboard. From there, they can access packages, profile tools, wallet tracking, and network growth pages.</p>
+                    </div>
+                </div>
+                <div class="col-lg-6 col-md-6">
+                    <div class="legacy-step-card">
+                        <div class="legacy-step-number">2</div>
+                        <h3>Choose a package</h3>
+                        <p>The client selects a mining subscription package such as Basic 100, Growth 500, or Scale 1000+, each with its own share position and return structure.</p>
+                    </div>
+                </div>
+                <div class="col-lg-6 col-md-6">
+                    <div class="legacy-step-card">
+                        <div class="legacy-step-number">3</div>
+                        <h3>Grow profile power</h3>
+                        <p>Verified invites, registered referrals, active direct investors, and stronger capital commitment all increase profile power and unlock stronger reward caps.</p>
+                    </div>
+                </div>
+                <div class="col-lg-6 col-md-6">
+                    <div class="legacy-step-card">
+                        <div class="legacy-step-number">4</div>
+                        <h3>Build network rewards</h3>
+                        <p>As the team grows, the client can earn direct referral rewards and multi-level team rewards, while also becoming more visible through ranks, milestones, and leaderboard progress.</p>
+                    </div>
+                </div>
+                <div class="col-lg-6 col-md-6">
+                    <div class="legacy-step-card">
+                        <div class="legacy-step-number">5</div>
+                        <h3>Track the miner story</h3>
+                        <p>The platform also shows daily miner performance through hashrate, revenue, costs, net profit, and per-share reporting, creating a stronger and more transparent operational picture.</p>
+                    </div>
+                </div>
+                <div class="col-lg-6 col-md-6">
+                    <div class="legacy-step-card">
+                        <div class="legacy-step-number">6</div>
+                        <h3>Understand profits clearly</h3>
+                        <p>The wallet and investments pages help the client see exactly where earnings come from, including miner share income, package return, referral rewards, and team bonuses.</p>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="section-grid">
-            <div class="panel">
-                <h3>Visible performance</h3>
-                <p class="section-copy">The miner is not hidden behind generic marketing language. Visitors can see production, share price, capacity, and the return structure that drives packages.</p>
-            </div>
-            <div class="panel">
-                <h3>Clear commercial path</h3>
-                <p class="section-copy">Free Starter lowers entry resistance, paid packages create ownership, and the operations review process makes activation feel managed instead of automatic.</p>
-            </div>
-            <div class="panel">
-                <h3>Built-in network expansion</h3>
-                <p class="section-copy">The referral engine is not an extra feature. It is part of the business model, helping users unlock upgrades, earn rewards, and grow long-term value.</p>
-            </div>
-        </div>
-    </div>
-</section>
+    </section>
 
-<section class="section">
-    <div class="shell page-grid">
-        <div class="panel page-copy">
-            <div class="section-kicker">Website purpose</div>
-            <h3 style="font-size:1.6rem; margin-bottom:12px;">What the landing experience should achieve</h3>
-            <div class="metric-list">
-                <div class="metric-row"><span>Explain the miner</span><strong>Reduce confusion</strong></div>
-                <div class="metric-row"><span>Explain shares</span><strong>Make packages concrete</strong></div>
-                <div class="metric-row"><span>Explain referrals</span><strong>Show long-term upside</strong></div>
-                <div class="metric-row"><span>Explain payment review</span><strong>Increase trust</strong></div>
+    <section class="contact-form-area section-bg pt-115 pb-120 fix" style="background-image: url('{{ asset('legacy-start/assets/img/gallery/section_bg04.jpg') }}'); background-size: cover;">
+        <div class="container">
+            <div class="row justify-content-end mb-80">
+                <div class="col-xl-8 col-lg-9">
+                    <div class="contact-form-wrapper">
+                        <div class="row">
+                            <div class="col-lg-12">
+                                <div class="section-tittle mb-50">
+                                    <span>Why clients choose ZagChain</span>
+                                    <h2>Clear rewards, visible growth, and a stronger investor story</h2>
+                                    <p>Instead of leaving the client with hidden calculations, ZagChain shows package returns, profile-power progression, reward caps, network growth, and miner reporting in one clean flow.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="legacy-dark-panel">
+                            <ul class="legacy-mini-list list-unstyled mb-0">
+                                <li>Basic 100 can grow toward a 4% profile-power cap</li>
+                                <li>Growth 500 can grow toward a 6% profile-power cap</li>
+                                <li>Scale 1000+ can grow toward a 7% profile-power cap</li>
+                                <li>Wallet pages separate miner income, monthly return, referral income, and MLM rewards</li>
+                                <li>Daily miner reporting gives clients a more transparent performance picture</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="legacy-highlight-grid mb-80">
+                <div class="legacy-highlight-item">
+                    <h4>What makes the system clear</h4>
+                    <p>The client can see package information, profile power, team activity, and miner data without leaving the platform or guessing how rewards are formed.</p>
+                </div>
+                <div class="legacy-highlight-item">
+                    <h4>What makes the system stronger</h4>
+                    <p>Growth is visible. More verified invites, more active investors, and stronger commitment increase both account strength and benefit potential.</p>
+                </div>
+                <div class="legacy-highlight-item">
+                    <h4>What the wallet explains</h4>
+                    <p>The wallet separates miner income, package return, direct referral rewards, and team rewards, so the client understands every earning source.</p>
+                </div>
+                <div class="legacy-highlight-item">
+                    <h4>What the miner page proves</h4>
+                    <p>Daily miner visibility through hashrate, revenue, costs, net profit, and share reporting helps give the platform a more transparent operational story.</p>
+                </div>
+            </div>
+            <div class="row justify-content-between align-items-center">
+                <div class="col-xl-7 col-lg-7">
+                    <div class="section-tittle section-tittle2 mb-25">
+                        <span>Reward structure</span>
+                        <h2>How the monthly benefit becomes stronger</h2>
+                    </div>
+                    <div class="legacy-dark-panel">
+                        <ul class="legacy-mini-list list-unstyled mb-0">
+                            <li>Base package return starts the monthly reward structure</li>
+                            <li>Investor level bonus adds strength as the account matures</li>
+                            <li>Invite and team bonus reward real network activity</li>
+                            <li>Profile power adds an extra cap-based reward layer</li>
+                            <li>Basic 100 can grow toward 4%</li>
+                            <li>Growth 500 can grow toward 6%</li>
+                            <li>Scale 1000+ can grow toward 7%</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="col-xl-4 col-lg-5 col-md-8 mt-4 mt-lg-0">
+                    <div class="legacy-explain-card">
+                        <h3>What the client understands at the end</h3>
+                        <p class="mb-3">By the end of this page, the visitor should understand the full ZagChain model:</p>
+                        <ul class="legacy-mini-list list-unstyled mb-4">
+                            <li>How to join the system</li>
+                            <li>How packages create account positions</li>
+                            <li>How profile power affects reward potential</li>
+                            <li>How network growth adds new reward layers</li>
+                            <li>How miner performance supports visibility and reporting</li>
+                        </ul>
+                        <a href="{{ route('register') }}" class="submit-btn">Create Account</a>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="panel page-copy">
-            <div class="section-kicker">Growth vision</div>
-            <p>This first public website is designed to start with a single featured miner and then scale toward a broader portfolio. The structure already supports more miners, more packages, deeper network incentives, and richer media proof as the business grows.</p>
-            <p>That means the public experience is not just promotional. It is meant to become the front door for a larger cloud-mining and shareholder platform.</p>
-        </div>
-    </div>
-</section>
+    </section>
+
+    {{-- Core experience section temporarily hidden --}}
+</main>
 @endsection

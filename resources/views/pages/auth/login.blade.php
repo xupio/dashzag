@@ -12,7 +12,9 @@
         </div>
         <div class="col-md-8 ps-md-0">
           <div class="auth-form-wrapper px-4 py-5">
-            <a href="#" class="nobleui-logo d-block mb-2">Noble<span>UI</span></a>
+              <a href="{{ route('landing') }}" class="d-block mb-2">
+                <img src="{{ asset('branding/zagchain-logo-auth.png') }}" alt="ZagChain" style="max-width: 220px; width: 100%; height: auto;">
+              </a>
             <h5 class="text-secondary fw-normal mb-4">Welcome back! Log in to your account.</h5>
             <form class="forms-sample">
               <div class="mb-3">

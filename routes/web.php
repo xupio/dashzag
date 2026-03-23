@@ -10,6 +10,7 @@ use App\Models\InvestmentOrder;
 use App\Models\InvestmentPackage;
 use App\Models\Miner;
 use App\Models\MinerPerformanceLog;
+use App\Models\MockManagerScenario;
 use App\Models\PayoutRequest;
 use App\Models\ReferralEvent;
 use App\Models\Shareholder;
@@ -107,17 +108,13 @@ Route::get('/about', function () use ($marketingPageData) {
     return view('marketing.about', $marketingPageData());
 })->name('marketing.about');
 
-Route::get('/packages', function () use ($marketingPageData) {
-    return view('marketing.packages', $marketingPageData());
-})->name('marketing.packages');
+Route::get('/how-it-works', function () use ($marketingPageData) {
+    return view('marketing.about', $marketingPageData());
+})->name('marketing.how-it-works');
 
-Route::get('/media', function () use ($marketingPageData) {
-    return view('marketing.media', $marketingPageData());
-})->name('marketing.media');
-
-Route::get('/references', function () use ($marketingPageData) {
-    return view('marketing.references', $marketingPageData());
-})->name('marketing.references');
+Route::redirect('/packages', '/');
+Route::redirect('/media', '/');
+Route::redirect('/references', '/');
 
 Route::get('/friend-invitations/{friendInvitation}/verify', function (FriendInvitation $friendInvitation) {
     if (! $friendInvitation->verified_at) {
@@ -3708,6 +3705,185 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->to(route('dashboard.miner').'?miner='.$miner->slug)
                 ->with('log_success', 'Automatic snapshot generated for '.$miner->name.' on '.$log->logged_on->format('M d, Y').'.');
         })->name('dashboard.miner.logs.generate');
+
+        Route::get('/dashboard/mock-manager', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $miners = MiningPlatform::activeMiners();
+            $miner = MiningPlatform::resolveMiner($request->query('miner'));
+            $miner->load([
+                'packages' => fn ($query) => $query->where('is_active', true)->where('price', '>', 0)->orderBy('display_order'),
+            ]);
+
+            $packages = $miner->packages->values();
+            abort_if($packages->isEmpty(), 404, 'This miner has no active paid packages available for simulation.');
+
+            $savedScenario = $request->filled('scenario')
+                ? $request->user()->mockManagerScenarios()->with(['miner', 'package'])->find($request->integer('scenario'))
+                : null;
+
+            $selectedPackage = $packages->firstWhere('id', (int) ($savedScenario?->package_id ?? $request->query('package_id'))) ?? $packages->first();
+            $automaticSnapshot = MiningPlatform::performanceSnapshotForDate($miner);
+            $activeShares = max(MiningPlatform::totalSharesSold($miner), (int) $selectedPackage->shares_count);
+
+            $defaultInputs = [
+                'package_id' => $selectedPackage->id,
+                'monthly_hashrate_th' => number_format((float) $automaticSnapshot['hashrate_th'], 2, '.', ''),
+                'monthly_revenue_usd' => number_format((float) $miner->monthly_output_usd, 2, '.', ''),
+                'monthly_electricity_cost_usd' => number_format((float) $miner->monthly_output_usd * 0.18, 2, '.', ''),
+                'monthly_maintenance_cost_usd' => number_format((float) $miner->monthly_output_usd * 0.06, 2, '.', ''),
+                'active_shares' => $activeShares,
+                'verified_invites' => 20,
+                'registered_referrals' => 5,
+                'level_1_basic_subscribers' => $selectedPackage->price <= 100 ? 2 : 1,
+                'level_1_growth_subscribers' => 1,
+                'level_1_scale_subscribers' => 0,
+                'level_2_basic_subscribers' => 1,
+                'level_2_growth_subscribers' => 0,
+                'level_2_scale_subscribers' => 0,
+                'level_3_basic_subscribers' => 0,
+                'level_3_growth_subscribers' => 0,
+                'level_3_scale_subscribers' => 0,
+                'level_4_basic_subscribers' => 0,
+                'level_4_growth_subscribers' => 0,
+                'level_4_scale_subscribers' => 0,
+                'level_5_basic_subscribers' => 0,
+                'level_5_growth_subscribers' => 0,
+                'level_5_scale_subscribers' => 0,
+            ];
+
+            $inputs = array_replace($defaultInputs, $savedScenario?->inputs ?? []);
+            $inputs['package_id'] = $selectedPackage->id;
+
+            return view('pages.general.mock-manager', [
+                'miners' => $miners,
+                'miner' => $miner,
+                'packages' => $packages,
+                'selectedPackage' => $selectedPackage,
+                'inputs' => $inputs,
+                'scenario' => MiningPlatform::mockManagerScenario($miner, $selectedPackage, $inputs),
+                'automaticSnapshot' => $automaticSnapshot,
+                'savedScenarios' => $request->user()->mockManagerScenarios()->with(['miner', 'package'])->get(),
+                'savedScenario' => $savedScenario,
+            ]);
+        })->name('dashboard.mock-manager');
+
+        Route::post('/dashboard/mock-manager', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $validated = $request->validate([
+                'miner_slug' => ['required', 'string', 'exists:miners,slug'],
+                'package_id' => ['required', 'integer', 'exists:investment_packages,id'],
+                'monthly_hashrate_th' => ['required', 'numeric', 'min:0'],
+                'monthly_revenue_usd' => ['required', 'numeric', 'min:0'],
+                'monthly_electricity_cost_usd' => ['required', 'numeric', 'min:0'],
+                'monthly_maintenance_cost_usd' => ['required', 'numeric', 'min:0'],
+                'active_shares' => ['required', 'integer', 'min:1'],
+                'verified_invites' => ['required', 'integer', 'min:0'],
+                'registered_referrals' => ['required', 'integer', 'min:0'],
+                'level_1_basic_subscribers' => ['required', 'integer', 'min:0'],
+                'level_1_growth_subscribers' => ['required', 'integer', 'min:0'],
+                'level_1_scale_subscribers' => ['required', 'integer', 'min:0'],
+                'level_2_basic_subscribers' => ['required', 'integer', 'min:0'],
+                'level_2_growth_subscribers' => ['required', 'integer', 'min:0'],
+                'level_2_scale_subscribers' => ['required', 'integer', 'min:0'],
+                'level_3_basic_subscribers' => ['required', 'integer', 'min:0'],
+                'level_3_growth_subscribers' => ['required', 'integer', 'min:0'],
+                'level_3_scale_subscribers' => ['required', 'integer', 'min:0'],
+                'level_4_basic_subscribers' => ['required', 'integer', 'min:0'],
+                'level_4_growth_subscribers' => ['required', 'integer', 'min:0'],
+                'level_4_scale_subscribers' => ['required', 'integer', 'min:0'],
+                'level_5_basic_subscribers' => ['required', 'integer', 'min:0'],
+                'level_5_growth_subscribers' => ['required', 'integer', 'min:0'],
+                'level_5_scale_subscribers' => ['required', 'integer', 'min:0'],
+            ]);
+
+            $miners = MiningPlatform::activeMiners();
+            $miner = MiningPlatform::resolveMiner($validated['miner_slug']);
+            $miner->load([
+                'packages' => fn ($query) => $query->where('is_active', true)->where('price', '>', 0)->orderBy('display_order'),
+            ]);
+
+            $packages = $miner->packages->values();
+            $selectedPackage = $packages->firstWhere('id', (int) $validated['package_id']);
+
+            abort_if(! $selectedPackage, 404, 'The selected package does not belong to this miner.');
+
+            return view('pages.general.mock-manager', [
+                'miners' => $miners,
+                'miner' => $miner,
+                'packages' => $packages,
+                'selectedPackage' => $selectedPackage,
+                'inputs' => $validated,
+                'scenario' => MiningPlatform::mockManagerScenario($miner, $selectedPackage, $validated),
+                'automaticSnapshot' => MiningPlatform::performanceSnapshotForDate($miner),
+                'savedScenarios' => $request->user()->mockManagerScenarios()->with(['miner', 'package'])->get(),
+                'savedScenario' => null,
+            ]);
+        })->name('dashboard.mock-manager.calculate');
+
+        Route::post('/dashboard/mock-manager/save', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $validated = $request->validate([
+                'scenario_name' => ['required', 'string', 'max:255'],
+                'miner_slug' => ['required', 'string', 'exists:miners,slug'],
+                'package_id' => ['required', 'integer', 'exists:investment_packages,id'],
+                'monthly_hashrate_th' => ['required', 'numeric', 'min:0'],
+                'monthly_revenue_usd' => ['required', 'numeric', 'min:0'],
+                'monthly_electricity_cost_usd' => ['required', 'numeric', 'min:0'],
+                'monthly_maintenance_cost_usd' => ['required', 'numeric', 'min:0'],
+                'active_shares' => ['required', 'integer', 'min:1'],
+                'verified_invites' => ['required', 'integer', 'min:0'],
+                'registered_referrals' => ['required', 'integer', 'min:0'],
+                'level_1_basic_subscribers' => ['required', 'integer', 'min:0'],
+                'level_1_growth_subscribers' => ['required', 'integer', 'min:0'],
+                'level_1_scale_subscribers' => ['required', 'integer', 'min:0'],
+                'level_2_basic_subscribers' => ['required', 'integer', 'min:0'],
+                'level_2_growth_subscribers' => ['required', 'integer', 'min:0'],
+                'level_2_scale_subscribers' => ['required', 'integer', 'min:0'],
+                'level_3_basic_subscribers' => ['required', 'integer', 'min:0'],
+                'level_3_growth_subscribers' => ['required', 'integer', 'min:0'],
+                'level_3_scale_subscribers' => ['required', 'integer', 'min:0'],
+                'level_4_basic_subscribers' => ['required', 'integer', 'min:0'],
+                'level_4_growth_subscribers' => ['required', 'integer', 'min:0'],
+                'level_4_scale_subscribers' => ['required', 'integer', 'min:0'],
+                'level_5_basic_subscribers' => ['required', 'integer', 'min:0'],
+                'level_5_growth_subscribers' => ['required', 'integer', 'min:0'],
+                'level_5_scale_subscribers' => ['required', 'integer', 'min:0'],
+            ]);
+
+            $miner = Miner::where('slug', $validated['miner_slug'])->firstOrFail();
+            abort_unless(
+                $miner->packages()->whereKey($validated['package_id'])->exists(),
+                404,
+                'The selected package does not belong to this miner.'
+            );
+
+            $scenario = MockManagerScenario::create([
+                'user_id' => $request->user()->id,
+                'miner_id' => $miner->id,
+                'package_id' => $validated['package_id'],
+                'name' => $validated['scenario_name'],
+                'inputs' => collect($validated)->except('scenario_name', 'miner_slug')->all(),
+            ]);
+
+            return redirect()
+                ->route('dashboard.mock-manager', ['miner' => $miner->slug, 'scenario' => $scenario->id])
+                ->with('mock_manager_success', 'Scenario "'.$scenario->name.'" was saved.');
+        })->name('dashboard.mock-manager.save');
+
+        Route::post('/dashboard/mock-manager/{mockManagerScenario}/delete', function (Request $request, MockManagerScenario $mockManagerScenario) {
+            abort_unless($mockManagerScenario->user_id === $request->user()->id, 403);
+
+            $minerSlug = $mockManagerScenario->miner?->slug;
+            $scenarioName = $mockManagerScenario->name;
+            $mockManagerScenario->delete();
+
+            return redirect()
+                ->route('dashboard.mock-manager', $minerSlug ? ['miner' => $minerSlug] : [])
+                ->with('mock_manager_success', 'Scenario "'.$scenarioName.'" was deleted.');
+        })->name('dashboard.mock-manager.delete');
     });
 
     Route::get('/dashboard/friends', function () {

@@ -36,7 +36,7 @@ License: You must have a valid license to legally use this template for your pro
   <!-- CSRF Token -->
   <meta name="_token" content="{{ csrf_token() }}">
   
-  <link rel="shortcut icon" href="{{ asset('/favicon.ico') }}">
+  <link rel="icon" type="image/png" href="{{ asset('branding/zagchain-logo.png') }}">
 
   <!-- Splash Screen -->
   <link href="{{ asset('splash-screen.css') }}" rel="stylesheet" />

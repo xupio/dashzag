@@ -483,6 +483,242 @@ class MiningPlatform
         return round($maxRate * min(max($powerScore, 0), 100) / 100, 4);
     }
 
+    public static function invitationBonusRateForCount(int $verifiedInvites): float
+    {
+        return match (true) {
+            $verifiedInvites >= 50 => (float) self::rewardSetting('invitation_bonus_after_50_rate'),
+            $verifiedInvites >= 20 => (float) self::rewardSetting('invitation_bonus_after_20_rate'),
+            $verifiedInvites >= 10 => (float) self::rewardSetting('invitation_bonus_after_10_rate'),
+            default => 0.0000,
+        };
+    }
+
+    public static function teamInvestorBonusRateForCount(int $activeDirectInvestors): float
+    {
+        return match (true) {
+            $activeDirectInvestors >= 5 => (float) self::rewardSetting('team_bonus_after_5_investor_rate'),
+            $activeDirectInvestors >= 3 => (float) self::rewardSetting('team_bonus_after_3_investor_rate'),
+            $activeDirectInvestors >= 1 => (float) self::rewardSetting('team_bonus_after_1_investor_rate'),
+            default => 0.0000,
+        };
+    }
+
+    public static function teamBonusRateForCounts(int $verifiedInvites, int $activeDirectInvestors): float
+    {
+        return round(
+            self::invitationBonusRateForCount($verifiedInvites) + self::teamInvestorBonusRateForCount($activeDirectInvestors),
+            4
+        );
+    }
+
+    public static function resolveUserLevelForMetrics(int $registeredReferrals, float $totalInvestment): UserLevel
+    {
+        self::ensureDefaults();
+
+        return UserLevel::query()
+            ->orderByDesc('rank')
+            ->get()
+            ->first(function (UserLevel $candidate) use ($registeredReferrals, $totalInvestment) {
+                return $registeredReferrals >= $candidate->minimum_referrals
+                    && $totalInvestment >= (float) $candidate->minimum_investment;
+            }) ?? UserLevel::query()->orderBy('rank')->firstOrFail();
+    }
+
+    public static function profilePowerSummaryForMetrics(array $metrics): array
+    {
+        $level = self::resolveUserLevelForMetrics(
+            (int) ($metrics['registered_referrals'] ?? 0),
+            (float) ($metrics['total_invested'] ?? 0)
+        );
+
+        $verifiedInvites = max((int) ($metrics['verified_invites'] ?? 0), 0);
+        $registeredReferrals = max((int) ($metrics['registered_referrals'] ?? 0), 0);
+        $activeDirectInvestors = max((int) ($metrics['active_direct_investors'] ?? 0), 0);
+        $totalInvested = max((float) ($metrics['total_invested'] ?? 0), 0);
+
+        $components = [
+            [
+                'label' => 'Level strength',
+                'value' => min(((int) $level->rank) * 18, 30),
+                'display' => $level->name,
+            ],
+            [
+                'label' => 'Verified invites',
+                'value' => min($verifiedInvites * 2, 20),
+                'display' => (string) $verifiedInvites,
+            ],
+            [
+                'label' => 'Registered referrals',
+                'value' => min($registeredReferrals * 2, 20),
+                'display' => (string) $registeredReferrals,
+            ],
+            [
+                'label' => 'Active team investors',
+                'value' => min($activeDirectInvestors * 8, 20),
+                'display' => (string) $activeDirectInvestors,
+            ],
+            [
+                'label' => 'Investment commitment',
+                'value' => min((int) floor($totalInvested / 250), 10),
+                'display' => '$'.number_format($totalInvested, 0),
+            ],
+        ];
+
+        $score = min((int) round(collect($components)->sum('value')), 100);
+
+        $ranks = [
+            ['min' => 0, 'max' => 24, 'label' => 'Starter Signal', 'accent' => 'secondary'],
+            ['min' => 25, 'max' => 44, 'label' => 'Builder Rank', 'accent' => 'info'],
+            ['min' => 45, 'max' => 64, 'label' => 'Connector Rank', 'accent' => 'primary'],
+            ['min' => 65, 'max' => 84, 'label' => 'Influencer Rank', 'accent' => 'warning'],
+            ['min' => 85, 'max' => 100, 'label' => 'Powerhouse Rank', 'accent' => 'success'],
+        ];
+
+        $currentRank = collect($ranks)->first(fn (array $rank) => $score >= $rank['min'] && $score <= $rank['max']) ?? $ranks[0];
+
+        return [
+            'score' => $score,
+            'rank_label' => $currentRank['label'],
+            'rank_accent' => $currentRank['accent'],
+            'level' => $level,
+            'components' => $components,
+        ];
+    }
+
+    public static function mockManagerScenario(Miner $miner, InvestmentPackage $package, array $inputs): array
+    {
+        self::ensureDefaults();
+
+        $verifiedInvites = max((int) ($inputs['verified_invites'] ?? 0), 0);
+        $registeredReferrals = max((int) ($inputs['registered_referrals'] ?? 0), 0);
+        $monthlyHashrate = max((float) ($inputs['monthly_hashrate_th'] ?? 0), 0);
+        $monthlyRevenue = max((float) ($inputs['monthly_revenue_usd'] ?? 0), 0);
+        $electricityCost = max((float) ($inputs['monthly_electricity_cost_usd'] ?? 0), 0);
+        $maintenanceCost = max((float) ($inputs['monthly_maintenance_cost_usd'] ?? 0), 0);
+        $activeShares = max((int) ($inputs['active_shares'] ?? 0), 0);
+
+        $networkInputs = [
+            'level_1_basic_subscribers' => max((int) ($inputs['level_1_basic_subscribers'] ?? 0), 0),
+            'level_1_growth_subscribers' => max((int) ($inputs['level_1_growth_subscribers'] ?? 0), 0),
+            'level_1_scale_subscribers' => max((int) ($inputs['level_1_scale_subscribers'] ?? 0), 0),
+            'level_2_basic_subscribers' => max((int) ($inputs['level_2_basic_subscribers'] ?? 0), 0),
+            'level_2_growth_subscribers' => max((int) ($inputs['level_2_growth_subscribers'] ?? 0), 0),
+            'level_2_scale_subscribers' => max((int) ($inputs['level_2_scale_subscribers'] ?? 0), 0),
+            'level_3_basic_subscribers' => max((int) ($inputs['level_3_basic_subscribers'] ?? 0), 0),
+            'level_3_growth_subscribers' => max((int) ($inputs['level_3_growth_subscribers'] ?? 0), 0),
+            'level_3_scale_subscribers' => max((int) ($inputs['level_3_scale_subscribers'] ?? 0), 0),
+            'level_4_basic_subscribers' => max((int) ($inputs['level_4_basic_subscribers'] ?? 0), 0),
+            'level_4_growth_subscribers' => max((int) ($inputs['level_4_growth_subscribers'] ?? 0), 0),
+            'level_4_scale_subscribers' => max((int) ($inputs['level_4_scale_subscribers'] ?? 0), 0),
+            'level_5_basic_subscribers' => max((int) ($inputs['level_5_basic_subscribers'] ?? 0), 0),
+            'level_5_growth_subscribers' => max((int) ($inputs['level_5_growth_subscribers'] ?? 0), 0),
+            'level_5_scale_subscribers' => max((int) ($inputs['level_5_scale_subscribers'] ?? 0), 0),
+        ];
+
+        $activeDirectInvestors = $networkInputs['level_1_basic_subscribers']
+            + $networkInputs['level_1_growth_subscribers']
+            + $networkInputs['level_1_scale_subscribers'];
+
+        $profilePower = self::profilePowerSummaryForMetrics([
+            'verified_invites' => $verifiedInvites,
+            'registered_referrals' => $registeredReferrals,
+            'active_direct_investors' => $activeDirectInvestors,
+            'total_invested' => (float) $package->price,
+        ]);
+
+        $level = $profilePower['level'];
+        $invitationBonusRate = self::invitationBonusRateForCount($verifiedInvites);
+        $teamInvestorBonusRate = self::teamInvestorBonusRateForCount($activeDirectInvestors);
+        $teamBonusRate = self::teamBonusRateForCounts($verifiedInvites, $activeDirectInvestors);
+        $profilePowerRewardRate = self::investmentProfilePowerRewardRateForScore((float) $package->price, (float) $profilePower['score']);
+        $baseRate = (float) $package->monthly_return_rate;
+        $totalRewardRate = round($baseRate + (float) $level->bonus_rate + $teamBonusRate + $profilePowerRewardRate, 4);
+        $projectedPackageProfit = round((float) $package->price * $totalRewardRate, 2);
+
+        $monthlyNetProfit = round(max($monthlyRevenue - $electricityCost - $maintenanceCost, 0), 2);
+        $monthlyRevenuePerShare = $activeShares > 0 ? round($monthlyNetProfit / $activeShares, 4) : 0.0;
+        $personalMinerIncome = round($monthlyRevenuePerShare * (float) $package->shares_count, 2);
+
+        $tierAmounts = [
+            'basic' => 100.0,
+            'growth' => 500.0,
+            'scale' => 1000.0,
+        ];
+
+        $levelVolumes = collect(range(1, 5))
+            ->mapWithKeys(function (int $depth) use ($networkInputs, $tierAmounts) {
+                return [
+                    $depth => round(
+                        ($networkInputs['level_'.$depth.'_basic_subscribers'] * $tierAmounts['basic'])
+                        + ($networkInputs['level_'.$depth.'_growth_subscribers'] * $tierAmounts['growth'])
+                        + ($networkInputs['level_'.$depth.'_scale_subscribers'] * $tierAmounts['scale']),
+                        2
+                    ),
+                ];
+            });
+
+        $referralRegistrationReward = round($registeredReferrals * (float) self::rewardSetting('referral_registration_reward'), 2);
+        $directSubscriptionReward = round((float) $levelVolumes->get(1, 0) * (float) self::rewardSetting('referral_subscription_reward_rate'), 2);
+        $teamRewardsByLevel = collect(range(1, 5))
+            ->mapWithKeys(fn (int $depth) => [
+                $depth => round((float) $levelVolumes->get($depth, 0) * self::networkLevelRewardRate($depth), 2),
+            ]);
+        $networkRewardTotal = round(
+            $referralRegistrationReward + $directSubscriptionReward + (float) $teamRewardsByLevel->sum(),
+            2
+        );
+        $rewardEngineProfit = round($projectedPackageProfit + $networkRewardTotal, 2);
+        $finalProjectedProfit = round($rewardEngineProfit + $personalMinerIncome, 2);
+
+        $capRate = self::investmentProfilePowerRewardCap((float) $package->price);
+        $remainingPower = max(100 - (int) $profilePower['score'], 0);
+
+        return [
+            'package' => $package,
+            'miner' => $miner,
+            'profile_power' => $profilePower,
+            'reward_rates' => [
+                'base_rate' => $baseRate,
+                'level_bonus_rate' => (float) $level->bonus_rate,
+                'invitation_bonus_rate' => $invitationBonusRate,
+                'team_investor_bonus_rate' => $teamInvestorBonusRate,
+                'team_bonus_rate' => $teamBonusRate,
+                'profile_power_reward_rate' => $profilePowerRewardRate,
+                'cap_rate' => $capRate,
+                'total_rate' => $totalRewardRate,
+            ],
+            'network' => [
+                'active_direct_investors' => $activeDirectInvestors,
+                'volumes' => $levelVolumes->all(),
+                'inputs' => $networkInputs,
+            ],
+            'miner_metrics' => [
+                'monthly_hashrate_th' => $monthlyHashrate,
+                'monthly_revenue_usd' => $monthlyRevenue,
+                'monthly_electricity_cost_usd' => $electricityCost,
+                'monthly_maintenance_cost_usd' => $maintenanceCost,
+                'monthly_net_profit_usd' => $monthlyNetProfit,
+                'active_shares' => $activeShares,
+                'monthly_revenue_per_share_usd' => $monthlyRevenuePerShare,
+                'personal_miner_income_usd' => $personalMinerIncome,
+                'efficiency_per_th_usd' => $monthlyHashrate > 0 ? round($monthlyRevenue / $monthlyHashrate, 2) : 0.0,
+            ],
+            'profits' => [
+                'projected_package_profit' => $projectedPackageProfit,
+                'referral_registration_reward' => $referralRegistrationReward,
+                'direct_subscription_reward' => $directSubscriptionReward,
+                'team_rewards_by_level' => $teamRewardsByLevel->all(),
+                'network_reward_total' => $networkRewardTotal,
+                'reward_engine_profit' => $rewardEngineProfit,
+                'final_projected_profit' => $finalProjectedProfit,
+            ],
+            'guidance' => [
+                'remaining_power_points' => $remainingPower,
+                'full_cap_unlocked' => (int) $profilePower['score'] >= 100,
+            ],
+        ];
+    }
+
     public static function investmentTotalRewardRate(UserInvestment $investment): float
     {
         return round(
@@ -764,26 +1000,17 @@ class MiningPlatform
     {
         $verifiedInvites = $user->friendInvitations()->whereNotNull('verified_at')->count();
 
-        return match (true) {
-            $verifiedInvites >= 50 => (float) self::rewardSetting('invitation_bonus_after_50_rate'),
-            $verifiedInvites >= 20 => (float) self::rewardSetting('invitation_bonus_after_20_rate'),
-            $verifiedInvites >= 10 => (float) self::rewardSetting('invitation_bonus_after_10_rate'),
-            default => 0.0000,
-        };
+        return self::invitationBonusRateForCount($verifiedInvites);
     }
 
     public static function teamBonusRate(User $user): float
     {
         $activeDirectInvestors = self::activeDirectInvestorCount($user);
 
-        $teamInvestorBonus = match (true) {
-            $activeDirectInvestors >= 5 => 0.0100,
-            $activeDirectInvestors >= 3 => 0.0050,
-            $activeDirectInvestors >= 1 => 0.0025,
-            default => 0.0000,
-        };
-
-        return round(self::invitationBonusRate($user) + $teamInvestorBonus, 4);
+        return self::teamBonusRateForCounts(
+            $user->friendInvitations()->whereNotNull('verified_at')->count(),
+            $activeDirectInvestors
+        );
     }
 
     public static function activeDirectInvestorCount(User $user): int

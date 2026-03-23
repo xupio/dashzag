@@ -14,8 +14,10 @@
       <div class="card-body">
         <div class="container-fluid d-flex justify-content-between">
           <div class="col-lg-3 ps-0">
-            <a href="#" class="nobleui-logo d-block mt-3">Noble<span>UI</span></a>                 
-            <p class="mt-1 mb-1"><b>NobleUI Themes</b></p>
+                  <a href="{{ route('landing') }}" class="d-block mt-3">
+                    <img src="{{ asset('branding/zagchain-logo.png') }}" alt="ZagChain" style="max-width: 220px; width: 100%; height: auto;">
+                  </a>
+                  <p class="mt-1 mb-1"><b>ZagChain</b></p>
             <p>108,<br> Great Russell St,<br>London, WC1B 3NA.</p>
             <h5 class="mt-5 mb-2 text-secondary">Invoice to :</h5>
             <p>Joseph E Carr,<br> 102, 102  Crown Street,<br> London, W3 3PR.</p>

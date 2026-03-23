@@ -146,6 +146,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(ReferralEvent::class, 'sponsor_user_id')->latest();
     }
 
+    public function mockManagerScenarios(): HasMany
+    {
+        return $this->hasMany(MockManagerScenario::class)->latest();
+    }
+
     public function sendEmailVerificationNotification(): void
     {
         $friendInvitations = FriendInvitation::with('user:id,name')

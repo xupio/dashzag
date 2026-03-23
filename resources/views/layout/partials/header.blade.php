@@ -2,8 +2,8 @@
   <div class="navbar-content">
 
     <div class="logo-mini-wrapper">
-      <img src="{{ url('build/images/logo-mini-light.png') }}" class="logo-mini logo-mini-light" alt="logo">
-      <img src="{{ url('build/images/logo-mini-dark.png') }}" class="logo-mini logo-mini-dark" alt="logo">
+      <img src="{{ asset('branding/zagchain-logo.png') }}" class="logo-mini logo-mini-light" alt="ZagChain" style="width: 42px; height: 42px; object-fit: contain;">
+      <img src="{{ asset('branding/zagchain-logo.png') }}" class="logo-mini logo-mini-dark" alt="ZagChain" style="width: 42px; height: 42px; object-fit: contain;">
     </div>
 
     <form class="search-form">
