@@ -1,17 +1,232 @@
 {
-  "resources/css/app.css": {
-    "file": "assets/app-BfxtSIpf.css",
-    "src": "resources/css/app.css",
+  "resources/css/custom.css": {
+    "file": "assets/custom-tn0RQdqM.css",
+    "src": "resources/css/custom.css",
+    "isEntry": true,
+    "name": "custom-rtl",
+    "names": [
+      "custom.css",
+      "custom-rtl.css"
+    ]
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-BuG9aa18.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true
+  },
+  "resources/js/pages/ace.js": {
+    "file": "assets/ace-BSiLZnw0.js",
+    "name": "ace",
+    "src": "resources/js/pages/ace.js",
+    "isEntry": true
+  },
+  "resources/js/pages/apexcharts.js": {
+    "file": "assets/apexcharts-N9wAlSvA.js",
+    "name": "apexcharts",
+    "src": "resources/js/pages/apexcharts.js",
+    "isEntry": true
+  },
+  "resources/js/pages/bootstrap-maxlength.js": {
+    "file": "assets/bootstrap-maxlength-CpLTJAzH.js",
+    "name": "bootstrap-maxlength",
+    "src": "resources/js/pages/bootstrap-maxlength.js",
+    "isEntry": true
+  },
+  "resources/js/pages/chartjs.js": {
+    "file": "assets/chartjs-D4ed9RRj.js",
+    "name": "chartjs",
+    "src": "resources/js/pages/chartjs.js",
+    "isEntry": true
+  },
+  "resources/js/pages/chat.js": {
+    "file": "assets/chat-Dpraoj2f.js",
+    "name": "chat",
+    "src": "resources/js/pages/chat.js",
+    "isEntry": true
+  },
+  "resources/js/pages/color-modes.js": {
+    "file": "assets/color-modes-CkunOepb.js",
+    "name": "color-modes",
+    "src": "resources/js/pages/color-modes.js",
+    "isEntry": true
+  },
+  "resources/js/pages/cropper.js": {
+    "file": "assets/cropper-Dv1G1grO.js",
+    "name": "cropper",
+    "src": "resources/js/pages/cropper.js",
+    "isEntry": true
+  },
+  "resources/js/pages/dashboard.js": {
+    "file": "assets/dashboard-BZTY38fO.js",
+    "name": "dashboard",
+    "src": "resources/js/pages/dashboard.js",
+    "isEntry": true
+  },
+  "resources/js/pages/data-table.js": {
+    "file": "assets/data-table-CmuvSycJ.js",
+    "name": "data-table",
+    "src": "resources/js/pages/data-table.js",
+    "isEntry": true
+  },
+  "resources/js/pages/demo.js": {
+    "file": "assets/demo-BG1EwRNP.js",
+    "name": "demo",
+    "src": "resources/js/pages/demo.js",
+    "isEntry": true
+  },
+  "resources/js/pages/dropify.js": {
+    "file": "assets/dropify-DXoFLZ5g.js",
+    "name": "dropify",
+    "src": "resources/js/pages/dropify.js",
+    "isEntry": true
+  },
+  "resources/js/pages/dropzone.js": {
+    "file": "assets/dropzone-BWaORfQZ.js",
+    "name": "dropzone",
+    "src": "resources/js/pages/dropzone.js",
+    "isEntry": true
+  },
+  "resources/js/pages/easymde.js": {
+    "file": "assets/easymde-C9JCvZL8.js",
+    "name": "easymde",
+    "src": "resources/js/pages/easymde.js",
+    "isEntry": true
+  },
+  "resources/js/pages/email.js": {
+    "file": "assets/email-CGOzH2XC.js",
+    "name": "email",
+    "src": "resources/js/pages/email.js",
+    "isEntry": true
+  },
+  "resources/js/pages/flatpickr.js": {
+    "file": "assets/flatpickr-Da-BVptV.js",
+    "name": "flatpickr",
+    "src": "resources/js/pages/flatpickr.js",
+    "isEntry": true
+  },
+  "resources/js/pages/form-validation.js": {
+    "file": "assets/form-validation-DmnBjH_8.js",
+    "name": "form-validation",
+    "src": "resources/js/pages/form-validation.js",
+    "isEntry": true
+  },
+  "resources/js/pages/fullcalendar.js": {
+    "file": "assets/fullcalendar-C3vZhAcP.js",
+    "name": "fullcalendar",
+    "src": "resources/js/pages/fullcalendar.js",
+    "isEntry": true
+  },
+  "resources/js/pages/inputmask.js": {
+    "file": "assets/inputmask-BxljHLGE.js",
+    "name": "inputmask",
+    "src": "resources/js/pages/inputmask.js",
+    "isEntry": true
+  },
+  "resources/js/pages/jquery-steps.js": {
+    "file": "assets/jquery-steps-Ca3zfo9Z.js",
+    "name": "jquery-steps",
+    "src": "resources/js/pages/jquery-steps.js",
+    "isEntry": true
+  },
+  "resources/js/pages/jquery.flot.js": {
+    "file": "assets/jquery.flot-B2dl1RnB.js",
+    "name": "jquery.flot",
+    "src": "resources/js/pages/jquery.flot.js",
+    "isEntry": true
+  },
+  "resources/js/pages/owl-carousel.js": {
+    "file": "assets/owl-carousel-BsZ8q_H2.js",
+    "name": "owl-carousel",
+    "src": "resources/js/pages/owl-carousel.js",
+    "isEntry": true
+  },
+  "resources/js/pages/peity.js": {
+    "file": "assets/peity-BGDn0qVj.js",
+    "name": "peity",
+    "src": "resources/js/pages/peity.js",
+    "isEntry": true
+  },
+  "resources/js/pages/pickr.js": {
+    "file": "assets/pickr-C_ZVFCXN.js",
+    "name": "pickr",
+    "src": "resources/js/pages/pickr.js",
+    "isEntry": true
+  },
+  "resources/js/pages/select2.js": {
+    "file": "assets/select2-Ck9N6V5Z.js",
+    "name": "select2",
+    "src": "resources/js/pages/select2.js",
+    "isEntry": true
+  },
+  "resources/js/pages/sortablejs.js": {
+    "file": "assets/sortablejs-DX1VhsoB.js",
+    "name": "sortablejs",
+    "src": "resources/js/pages/sortablejs.js",
+    "isEntry": true
+  },
+  "resources/js/pages/sparkline.js": {
+    "file": "assets/sparkline-BOx7x7gl.js",
+    "name": "sparkline",
+    "src": "resources/js/pages/sparkline.js",
+    "isEntry": true
+  },
+  "resources/js/pages/sweet-alert.js": {
+    "file": "assets/sweet-alert-CMFBsl9h.js",
+    "name": "sweet-alert",
+    "src": "resources/js/pages/sweet-alert.js",
+    "isEntry": true
+  },
+  "resources/js/pages/tags-input.js": {
+    "file": "assets/tags-input-ConULRuM.js",
+    "name": "tags-input",
+    "src": "resources/js/pages/tags-input.js",
+    "isEntry": true
+  },
+  "resources/js/pages/template.js": {
+    "file": "assets/template-B7IAR9tB.js",
+    "name": "template",
+    "src": "resources/js/pages/template.js",
+    "isEntry": true
+  },
+  "resources/js/pages/tinymce.js": {
+    "file": "assets/tinymce-CDfvGnrm.js",
+    "name": "tinymce",
+    "src": "resources/js/pages/tinymce.js",
+    "isEntry": true
+  },
+  "resources/js/pages/typeahead.js": {
+    "file": "assets/typeahead--T3x3_ze.js",
+    "name": "typeahead",
+    "src": "resources/js/pages/typeahead.js",
+    "isEntry": true
+  },
+  "resources/rtl-css/app-rtl.css": {
+    "file": "assets/app-rtl-OxLy1kin.css",
+    "src": "resources/rtl-css/app-rtl.css",
+    "isEntry": true,
+    "name": "app-rtl",
+    "names": [
+      "app-rtl.css"
+    ]
+  },
+  "resources/rtl-css/custom-rtl.css": {
+    "file": "assets/custom-tn0RQdqM.css",
+    "src": "resources/css/custom.css",
+    "isEntry": true,
+    "name": "custom-rtl",
+    "names": [
+      "custom.css",
+      "custom-rtl.css"
+    ]
+  },
+  "resources/sass/app.scss": {
+    "file": "assets/app-B-efjZPS.css",
+    "src": "resources/sass/app.scss",
     "isEntry": true,
     "name": "app",
     "names": [
       "app.css"
     ]
-  },
-  "resources/js/app.js": {
-    "file": "assets/app-BIJoUbyE.js",
-    "name": "app",
-    "src": "resources/js/app.js",
-    "isEntry": true
   }
 }

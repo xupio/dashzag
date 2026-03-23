@@ -1,0 +1,1 @@
+(function(){$("#myDropify").dropify()})();

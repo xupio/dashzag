@@ -1,0 +1,1 @@
+(function(){$("#dataTableExample").DataTable({layout:{topEnd:{search:{placeholder:"Search here"}}},aLengthMenu:[[5,10,30,50,-1],[5,10,30,50,"All"]],iDisplayLength:10,language:{search:""},paginationType:"simple_numbers"})})();

@@ -1,0 +1,1 @@
+(function(){document.querySelector("#flatpickr-date")&&flatpickr("#flatpickr-date",{wrap:!0,dateFormat:"Y-m-d"}),document.querySelector("#flatpickr-time")&&flatpickr("#flatpickr-time",{wrap:!0,enableTime:!0,noCalendar:!0,dateFormat:"H:i"})})();
