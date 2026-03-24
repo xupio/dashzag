@@ -7,7 +7,7 @@
 
     <title>{{ config('app.name', 'Laravel') }}</title>
 
-    <link rel="icon" type="image/png" href="{{ asset('branding/zagchain-logo.png') }}">
+    <link rel="icon" type="image/png" href="{{ asset('branding/zag-smal.png') }}">
     @include('layout.partials.vite-app-assets')
     <link rel="stylesheet" href="{{ asset('nobleui/css/nobleui.css') }}">
     @stack('styles')

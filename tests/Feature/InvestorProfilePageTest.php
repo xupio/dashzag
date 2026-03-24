@@ -15,6 +15,7 @@ test('user can view investor power on investor profile page', function () {
 
     $investor = User::factory()->create([
         'email_verified_at' => now(),
+        'is_email_visible' => false,
     ]);
 
     $response = $this->actingAs($viewer)->get(route('dashboard.investors.show', $investor));
@@ -27,6 +28,8 @@ test('user can view investor power on investor profile page', function () {
     $response->assertSee('Milestone unlocks');
     $response->assertSee('Champion wins');
     $response->assertSee('Reward cap status');
+    $response->assertSee('Email hidden');
+    $response->assertDontSee($investor->email, false);
 });
 
 test('investor profile shows unlocked reward cap milestones', function () {

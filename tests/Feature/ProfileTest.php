@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 
 test('profile page is displayed', function () {
     $user = User::factory()->create();
@@ -12,14 +14,14 @@ test('profile page is displayed', function () {
     $response->assertOk();
 });
 
-test('profile information can be updated', function () {
+test('profile photo can be updated', function () {
     $user = User::factory()->create();
+    Storage::fake('public');
 
     $response = $this
         ->actingAs($user)
         ->patch('/profile', [
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+            'profile_photo' => UploadedFile::fake()->create('avatar.png', 128, 'image/png'),
         ]);
 
     $response
@@ -28,26 +30,15 @@ test('profile information can be updated', function () {
 
     $user->refresh();
 
-    $this->assertSame('Test User', $user->name);
-    $this->assertSame('test@example.com', $user->email);
-    $this->assertNull($user->email_verified_at);
+    expect($user->profile_photo_path)->not->toBeNull();
+    Storage::disk('public')->assertExists($user->profile_photo_path);
 });
 
-test('email verification status is unchanged when the email address is unchanged', function () {
+test('users keep email hidden by default', function () {
     $user = User::factory()->create();
 
-    $response = $this
-        ->actingAs($user)
-        ->patch('/profile', [
-            'name' => 'Test User',
-            'email' => $user->email,
-        ]);
-
-    $response
-        ->assertSessionHasNoErrors()
-        ->assertRedirect('/profile');
-
-    $this->assertNotNull($user->refresh()->email_verified_at);
+    expect($user->is_email_visible)->toBeFalse();
+    expect($user->displayEmail())->toBe('Email hidden');
 });
 
 test('user can delete their account', function () {

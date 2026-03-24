@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -19,6 +20,8 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $fillable = [
         'name',
         'email',
+        'is_email_visible',
+        'profile_photo_path',
         'password',
         'account_type',
         'role',
@@ -32,6 +35,10 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $hidden = [
         'password',
         'remember_token',
+    ];
+
+    protected $attributes = [
+        'is_email_visible' => false,
     ];
 
     public function isAdmin(): bool
@@ -160,10 +167,29 @@ class User extends Authenticatable implements MustVerifyEmail
         $this->notify(new InvitationAwareVerifyEmail($friendInvitations));
     }
 
+    public function displayEmail(): string
+    {
+        if (! $this->is_email_visible) {
+            return 'Email hidden';
+        }
+
+        return strtolower((string) $this->email);
+    }
+
+    public function profilePhotoUrl(): string
+    {
+        if ($this->profile_photo_path) {
+            return route('profile.photo', $this);
+        }
+
+        return asset('branding/zag-smal.png');
+    }
+
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
+            'is_email_visible' => 'boolean',
             'password' => 'hashed',
             'notification_preferences' => 'array',
             'last_daily_digest_sent_at' => 'datetime',

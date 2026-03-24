@@ -364,7 +364,7 @@
     </div>
 
     <div class="network-tree-title fw-semibold">{{ $node['user']->name }}</div>
-    <div class="text-secondary network-tree-subline">{{ $node['user']->email }}</div>
+    <div class="text-secondary network-tree-subline">{{ $node['user']->displayEmail() }}</div>
 
     <div class="network-tree-role">
       {{ $node['situation']['label'] }}

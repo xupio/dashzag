@@ -86,7 +86,7 @@
               <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
                 <div>
                   <div class="fw-semibold">{{ $leader['user']->name }}</div>
-                  <div class="text-secondary small">{{ $leader['user']->email }}</div>
+                  <div class="text-secondary small">{{ $leader['user']->displayEmail() }}</div>
                 </div>
                 <div class="rounded-circle d-flex align-items-center justify-content-center fw-semibold bg-light" style="width: 38px; height: 38px;">{{ $loop->iteration }}</div>
               </div>
@@ -121,7 +121,7 @@
               <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
                 <div>
                   <div class="fw-semibold">{{ $leader['user']->name }}</div>
-                  <div class="text-secondary small">{{ $leader['user']->email }}</div>
+                  <div class="text-secondary small">{{ $leader['user']->displayEmail() }}</div>
                 </div>
                 <div class="rounded-circle d-flex align-items-center justify-content-center fw-semibold bg-light" style="width: 38px; height: 38px;">{{ $loop->iteration }}</div>
               </div>
@@ -156,7 +156,7 @@
               <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
                 <div>
                   <div class="fw-semibold">{{ $leader['user']->name }}</div>
-                  <div class="text-secondary small">{{ $leader['user']->email }}</div>
+                  <div class="text-secondary small">{{ $leader['user']->displayEmail() }}</div>
                 </div>
                 <div class="rounded-circle d-flex align-items-center justify-content-center fw-semibold bg-light" style="width: 38px; height: 38px;">{{ $loop->iteration }}</div>
               </div>

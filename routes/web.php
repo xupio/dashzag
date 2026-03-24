@@ -3952,6 +3952,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->with('invite_success', 'Invitation email resent to '.$friendInvitation->email.'.');
     })->name('dashboard.friends.resend');
 
+    Route::get('/profile/photo/{user}', function (User $user) {
+        abort_unless($user->profile_photo_path, 404);
+        abort_unless(Storage::disk('public')->exists($user->profile_photo_path), 404);
+
+        return Storage::disk('public')->response($user->profile_photo_path);
+    })->name('profile.photo');
+
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');

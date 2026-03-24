@@ -2,8 +2,8 @@
   <div class="navbar-content">
 
     <div class="logo-mini-wrapper">
-      <img src="{{ asset('branding/zagchain-logo.png') }}" class="logo-mini logo-mini-light" alt="ZagChain" style="width: 42px; height: 42px; object-fit: contain;">
-      <img src="{{ asset('branding/zagchain-logo.png') }}" class="logo-mini logo-mini-dark" alt="ZagChain" style="width: 42px; height: 42px; object-fit: contain;">
+      <img src="{{ asset('branding/zag-smal.png') }}" class="logo-mini logo-mini-light" alt="ZagChain" style="width: 42px; height: 42px; object-fit: contain;">
+      <img src="{{ asset('branding/zag-smal.png') }}" class="logo-mini logo-mini-dark" alt="ZagChain" style="width: 42px; height: 42px; object-fit: contain;">
     </div>
 
     <form class="search-form">
@@ -47,25 +47,15 @@
         </a>
         <div class="dropdown-menu p-0" aria-labelledby="appsDropdown">
           <div class="px-3 py-2 d-flex align-items-center justify-content-between border-bottom">
-            <p class="mb-0 fw-bold">Web Apps</p>
-            <a href="javascript:;" class="text-secondary">Edit</a>
+            <p class="mb-0 fw-bold">Quick Access</p>
           </div>
           <div class="row g-0 p-1">
-            <div class="col-3 text-center">
-              <a href="{{ url('/apps/chat') }}" class="dropdown-item d-flex flex-column align-items-center justify-content-center w-70px h-70px"><i data-lucide="message-square" class="icon-lg mb-1"></i><p class="fs-12px">Chat</p></a>
-            </div>
-            <div class="col-3 text-center">
-              <a href="{{ url('/apps/calendar') }}" class="dropdown-item d-flex flex-column align-items-center justify-content-center w-70px h-70px"><i data-lucide="calendar" class="icon-lg mb-1"></i><p class="fs-12px">Calendar</p></a>
-            </div>
-            <div class="col-3 text-center">
+            <div class="col-6 text-center">
               <a href="{{ url('/email/inbox') }}" class="dropdown-item d-flex flex-column align-items-center justify-content-center w-70px h-70px"><i data-lucide="mail" class="icon-lg mb-1"></i><p class="fs-12px">Email</p></a>
             </div>
-            <div class="col-3 text-center">
+            <div class="col-6 text-center">
               <a href="{{ route('dashboard.profile') }}" class="dropdown-item d-flex flex-column align-items-center justify-content-center w-70px h-70px"><i data-lucide="instagram" class="icon-lg mb-1"></i><p class="fs-12px">Profile</p></a>
             </div>
-          </div>
-          <div class="px-3 py-2 d-flex align-items-center justify-content-center border-top">
-            <a href="javascript:;">View all</a>
           </div>
         </div>
       </li>
@@ -194,16 +184,16 @@
       </li>
       <li class="nav-item dropdown">
         <a class="nav-link dropdown-toggle" href="#" id="profileDropdown" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-          <img class="w-30px h-30px ms-1 rounded-circle" src="{{ url('https://placehold.co/30x30') }}" alt="profile">
+          <img class="w-30px h-30px ms-1 rounded-circle" src="{{ Auth::user()->profilePhotoUrl() }}" alt="{{ Auth::user()->name }}" style="object-fit: cover;">
         </a>
         <div class="dropdown-menu p-0" aria-labelledby="profileDropdown">
           <div class="d-flex flex-column align-items-center border-bottom px-5 py-3">
             <div class="mb-3">
-              <img class="w-80px h-80px rounded-circle" src="{{ url('https://placehold.co/80x80') }}" alt="">
+              <img class="w-80px h-80px rounded-circle" src="{{ Auth::user()->profilePhotoUrl() }}" alt="{{ Auth::user()->name }}" style="object-fit: cover;">
             </div>
             <div class="text-center">
               <p class="fs-16px fw-bolder">{{ Auth::user()->name }}</p>
-              <p class="fs-12px text-secondary">{{ Auth::user()->email }}</p>
+              <p class="fs-12px text-secondary">{{ Auth::user()->displayEmail() }}</p>
             </div>
           </div>
           <ul class="list-unstyled p-1">
@@ -215,14 +205,8 @@
             </li>
             <li>
               <a href="{{ route('profile.edit') }}" class="dropdown-item py-2 text-body ms-0">
-                <i class="me-2 icon-md" data-lucide="edit"></i>
-                <span>Edit Profile</span>
-              </a>
-            </li>
-            <li>
-              <a href="javascript:;" class="dropdown-item py-2 text-body ms-0">
-                <i class="me-2 icon-md" data-lucide="repeat"></i>
-                <span>Switch User</span>
+                <i class="me-2 icon-md" data-lucide="settings"></i>
+                <span>Account Settings</span>
               </a>
             </li>
             <li>

@@ -342,7 +342,7 @@
                     <td>
                       <div class="border rounded p-2 {{ !empty($pipelinePower) ? ($powerFrameClasses[$pipelinePower['rank_accent']] ?? 'border-primary-subtle') : '' }}">
                         <div class="fw-semibold">{{ $pipelineInvestor['user']->name }}</div>
-                        <div class="text-secondary small">{{ $pipelineInvestor['user']->email }}</div>
+                        <div class="text-secondary small">{{ $pipelineInvestor['user']->displayEmail() }}</div>
                         @if (!empty($pipelinePower))
                           <div class="mt-2 d-flex gap-2 flex-wrap">
                             <span class="badge bg-light text-dark">Power {{ $pipelinePower['score'] }}/100</span>

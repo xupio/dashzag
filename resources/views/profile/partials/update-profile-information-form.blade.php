@@ -32,6 +32,17 @@
             @endif
         </div>
 
+        <div class="form-group">
+            <label class="label d-block" for="is_email_visible">Email visibility</label>
+            <input type="hidden" name="is_email_visible" value="0">
+            <div class="form-check">
+                <input id="is_email_visible" name="is_email_visible" type="checkbox" class="form-check-input" value="1" @checked(old('is_email_visible', $user->is_email_visible))>
+                <label class="form-check-label" for="is_email_visible">Show my email across profile and dashboard pages</label>
+            </div>
+            <div class="muted" style="margin-top:.35rem;">Default is hidden. When hidden, other pages show "Email hidden" instead of your real address.</div>
+            @error('is_email_visible')<div class="error-text">{{ $message }}</div>@enderror
+        </div>
+
         <div style="display:flex; align-items:center; gap:.65rem;">
             <button class="btn btn-primary" type="submit">Save</button>
             @if (session('status') === 'profile-updated')

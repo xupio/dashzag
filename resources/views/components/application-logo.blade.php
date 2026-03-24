@@ -1,1 +1,1 @@
-<img src="{{ asset('branding/zagchain-logo.png') }}" alt="ZagChain" {{ $attributes }}>
+<img src="{{ asset('branding/zag-smal.png') }}" alt="ZagChain" {{ $attributes }}>

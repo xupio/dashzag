@@ -42,7 +42,7 @@
                 <div class="col-md-10">
                   <select class="compose-multiple-select form-select @error('to') is-invalid @enderror" name="to[]" multiple="multiple">
                     @foreach ($users as $recipient)
-                      <option value="{{ $recipient->id }}" @selected(collect(old('to', $prefillTo ?? []))->contains($recipient->id))>{{ $recipient->name }} ({{ $recipient->email }})</option>
+                      <option value="{{ $recipient->id }}" @selected(collect(old('to', $prefillTo ?? []))->contains($recipient->id))>{{ $recipient->name }} ({{ $recipient->displayEmail() }})</option>
                     @endforeach
                   </select>
                   @error('to')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
@@ -53,7 +53,7 @@
                 <div class="col-md-10">
                   <select class="compose-multiple-select form-select @error('cc') is-invalid @enderror" name="cc[]" multiple="multiple">
                     @foreach ($users as $recipient)
-                      <option value="{{ $recipient->id }}" @selected(collect(old('cc', $prefillCc ?? []))->contains($recipient->id))>{{ $recipient->name }} ({{ $recipient->email }})</option>
+                      <option value="{{ $recipient->id }}" @selected(collect(old('cc', $prefillCc ?? []))->contains($recipient->id))>{{ $recipient->name }} ({{ $recipient->displayEmail() }})</option>
                     @endforeach
                   </select>
                   @error('cc')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror

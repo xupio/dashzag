@@ -18,7 +18,7 @@
             <div>
               <div class="text-uppercase text-secondary small mb-2">Investor Profile</div>
               <h2 class="mb-1 text-dark">{{ $user->name }}</h2>
-              <div class="text-secondary">{{ $user->email }}</div>
+              <div class="text-secondary">{{ $user->displayEmail() }}</div>
               <div class="d-flex gap-3 flex-wrap mt-3 text-secondary small">
                 <span><i data-lucide="badge-dollar-sign" class="icon-sm me-1"></i>{{ $displayTierName }}</span>
                 <span><i data-lucide="calendar-days" class="icon-sm me-1"></i>Member since {{ optional($user->created_at)->format('M d, Y') }}</span>
