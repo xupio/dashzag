@@ -51,7 +51,7 @@
           </div>
           <div class="row g-0 p-1">
             <div class="col-6 text-center">
-              <a href="{{ url('/email/inbox') }}" class="dropdown-item d-flex flex-column align-items-center justify-content-center w-70px h-70px"><i data-lucide="mail" class="icon-lg mb-1"></i><p class="fs-12px">Email</p></a>
+              <a href="{{ route('email.inbox') }}" class="dropdown-item d-flex flex-column align-items-center justify-content-center w-70px h-70px"><i data-lucide="mail" class="icon-lg mb-1"></i><p class="fs-12px">Email</p></a>
             </div>
             <div class="col-6 text-center">
               <a href="{{ route('dashboard.profile') }}" class="dropdown-item d-flex flex-column align-items-center justify-content-center w-70px h-70px"><i data-lucide="instagram" class="icon-lg mb-1"></i><p class="fs-12px">Profile</p></a>
@@ -59,79 +59,76 @@
           </div>
         </div>
       </li>
+      @php
+        $headerMailbox = auth()->check()
+            ? auth()->user()->receivedMessageRecords()
+                ->with(['message.sender'])
+                ->whereNull('deleted_at')
+                ->whereNull('trashed_at')
+                ->latest('created_at')
+                ->take(5)
+                ->get()
+            : collect();
+        $headerUnreadMailboxCount = auth()->check()
+            ? auth()->user()->receivedMessageRecords()
+                ->whereNull('deleted_at')
+                ->whereNull('trashed_at')
+                ->whereNull('read_at')
+                ->count()
+            : 0;
+      @endphp
       <li class="nav-item dropdown">
         <a class="nav-link dropdown-toggle" href="#" id="messageDropdown" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
           <i data-lucide="mail"></i>
+          @if ($headerUnreadMailboxCount > 0)
+            <div class="indicator">
+              <div class="circle"></div>
+            </div>
+          @endif
         </a>
         <div class="dropdown-menu p-0" aria-labelledby="messageDropdown">
           <div class="px-3 py-2 d-flex align-items-center justify-content-between border-bottom">
-            <p>9 New Messages</p>
-            <a href="javascript:;" class="text-secondary">Clear all</a>
+            <p>{{ $headerUnreadMailboxCount }} New Message{{ $headerUnreadMailboxCount === 1 ? '' : 's' }}</p>
+            <a href="{{ route('email.inbox') }}" class="text-secondary">Open inbox</a>
           </div>
           <div class="p-1">
-            <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
-              <div class="me-3">
-                <img class="w-30px h-30px rounded-circle" src="{{ url('https://placehold.co/30x30') }}" alt="userr">
-              </div>
-              <div class="d-flex justify-content-between flex-grow-1">
-                <div class="me-4">
-                  <p>Leonardo Payne</p>
-                  <p class="fs-12px text-secondary">Project status</p>
+            @forelse ($headerMailbox as $mailRecord)
+              @php
+                $mailMessage = $mailRecord->message;
+                $mailSender = $mailMessage?->sender;
+                $mailSenderName = $mailSender?->name ?? 'System';
+                $mailSenderPhoto = $mailSender ? $mailSender->profilePhotoUrl() : asset('branding/zag-smal.png');
+                $mailPreview = $mailMessage && $mailMessage->label
+                    ? ucfirst($mailMessage->label).' message'
+                    : 'Internal message';
+                $mailCreatedAt = $mailMessage?->created_at?->diffForHumans();
+              @endphp
+              <a href="{{ route('email.read', $mailRecord) }}" class="dropdown-item d-flex align-items-center py-2">
+                <div class="me-3">
+                  <img class="w-30px h-30px rounded-circle" src="{{ $mailSenderPhoto }}" alt="{{ $mailSenderName }}" style="object-fit: cover;">
                 </div>
-                <p class="fs-12px text-secondary">2 min ago</p>
-              </div>
-            </a>
-            <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
-              <div class="me-3">
-                <img class="w-30px h-30px rounded-circle" src="{{ url('https://placehold.co/30x30') }}" alt="userr">
-              </div>
-              <div class="d-flex justify-content-between flex-grow-1">
-                <div class="me-4">
-                  <p>Carl Henson</p>
-                  <p class="fs-12px text-secondary">Client meeting</p>
+                <div class="d-flex justify-content-between flex-grow-1 align-items-start gap-2">
+                  <div class="me-2">
+                    <p>{{ $mailSenderName }}</p>
+                    <p class="fs-12px text-secondary">{{ $mailPreview }}</p>
+                  </div>
+                  <div class="text-end">
+                    <p class="fs-12px text-secondary mb-1">{{ $mailCreatedAt }}</p>
+                    @if (! $mailRecord->read_at)
+                      <span class="badge bg-danger">New</span>
+                    @endif
+                  </div>
                 </div>
-                <p class="fs-12px text-secondary">30 min ago</p>
+              </a>
+            @empty
+              <div class="px-3 py-4 text-center">
+                <p class="mb-1">No messages yet</p>
+                <p class="fs-12px text-secondary mb-0">Your internal mailbox messages will appear here.</p>
               </div>
-            </a>
-            <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
-              <div class="me-3">
-                <img class="w-30px h-30px rounded-circle" src="{{ url('https://placehold.co/30x30') }}" alt="userr">
-              </div>
-              <div class="d-flex justify-content-between flex-grow-1">
-                <div class="me-4">
-                  <p>Jensen Combs</p>
-                  <p class="fs-12px text-secondary">Project updates</p>
-                </div>
-                <p class="fs-12px text-secondary">1 hrs ago</p>
-              </div>
-            </a>
-            <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
-              <div class="me-3">
-                <img class="w-30px h-30px rounded-circle" src="{{ url('https://placehold.co/30x30') }}" alt="userr">
-              </div>
-              <div class="d-flex justify-content-between flex-grow-1">
-                <div class="me-4">
-                  <p>Amiah Burton</p>
-                  <p class="fs-12px text-secondary">Project deadline</p>
-                </div>
-                <p class="fs-12px text-secondary">2 hrs ago</p>
-              </div>
-            </a>
-            <a href="javascript:;" class="dropdown-item d-flex align-items-center py-2">
-              <div class="me-3">
-                <img class="w-30px h-30px rounded-circle" src="{{ url('https://placehold.co/30x30') }}" alt="userr">
-              </div>
-              <div class="d-flex justify-content-between flex-grow-1">
-                <div class="me-4">
-                  <p>Yaretzi Mayo</p>
-                  <p class="fs-12px text-secondary">New record</p>
-                </div>
-                <p class="fs-12px text-secondary">5 hrs ago</p>
-              </div>
-            </a>
+            @endforelse
           </div>
           <div class="px-3 py-2 d-flex align-items-center justify-content-center border-top">
-            <a href="javascript:;">View all</a>
+            <a href="{{ route('email.inbox') }}">View all</a>
           </div>
         </div>
       </li>
