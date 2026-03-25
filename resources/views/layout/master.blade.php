@@ -16,7 +16,7 @@ License: You must have a valid license to legally use this template for your pro
 	<meta name="author" content="NobleUI">
 	<meta name="keywords" content="nobleui, bootstrap, bootstrap 5, bootstrap5, admin, dashboard, template, responsive, css, sass, html, laravel, theme, front-end, ui kit, web">
 
-  <title>NobleUI - Laravel Admin Dashboard Template</title>
+  <title>{{ config('app.name', 'ZagChain') }}</title>
 
   <!-- color-modes:js -->
   <script src="{{ asset('build/assets/color-modes-CkunOepb.js') }}"></script>

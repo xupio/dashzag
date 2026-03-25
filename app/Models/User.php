@@ -22,6 +22,9 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'is_email_visible',
         'profile_photo_path',
+        'btc_wallet_address',
+        'usdt_wallet_address',
+        'bank_transfer_details',
         'password',
         'account_type',
         'role',
@@ -183,6 +186,16 @@ class User extends Authenticatable implements MustVerifyEmail
         }
 
         return asset('branding/zag-smal.png');
+    }
+
+    public function payoutDestinationFor(string $method): ?string
+    {
+        return match ($method) {
+            'btc_wallet' => $this->btc_wallet_address,
+            'usdt_wallet' => $this->usdt_wallet_address,
+            'bank_transfer' => $this->bank_transfer_details,
+            default => null,
+        };
     }
 
     protected function casts(): array

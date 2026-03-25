@@ -174,10 +174,17 @@
             <div class="border rounded p-3 mb-4 bg-white">
               <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
                 <div>
-                  <h6 class="mb-1">Incoming payment methods</h6>
-                  <p class="text-secondary mb-0">Define the wallet or bank details investors should use when submitting share payments.</p>
+                  <h6 class="mb-1">Treasury wallets and incoming payment methods</h6>
+                  <p class="text-secondary mb-0">These are the live destination details shown on Buy Shares. The QR code and Copy button use these exact values.</p>
                 </div>
-                <span class="badge bg-warning text-dark">Buy Shares instructions</span>
+                <span class="badge bg-warning text-dark">Buy Shares QR + Copy source</span>
+              </div>
+
+              <div class="alert alert-warning border mb-3">
+                <div class="fw-semibold mb-1">Important</div>
+                <div class="small">
+                  If the buy-shares panel still says “Set your BTC receiving wallet in admin settings”, update the destination field below and save this page.
+                </div>
               </div>
 
               @foreach ([
@@ -198,8 +205,9 @@
                       @error('payment_'.$prefix.'_label')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
                     <div class="col-md-8">
-                      <label class="form-label">Destination details</label>
+                      <label class="form-label">Live destination used by clients</label>
                       <input type="text" name="payment_{{ $prefix }}_destination" class="form-control @error('payment_'.$prefix.'_destination') is-invalid @enderror" value="{{ old('payment_'.$prefix.'_destination', $settings['payment_'.$prefix.'_destination']) }}" required>
+                      <div class="form-text">This exact value is used by the Buy Shares page QR code and Copy button.</div>
                       @error('payment_'.$prefix.'_destination')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
                     <div class="col-md-6">
@@ -208,8 +216,9 @@
                       @error('payment_'.$prefix.'_reference_hint')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
                     <div class="col-md-6">
-                      <label class="form-label">Instruction text</label>
+                      <label class="form-label">Client instruction text</label>
                       <input type="text" name="payment_{{ $prefix }}_instruction" class="form-control @error('payment_'.$prefix.'_instruction') is-invalid @enderror" value="{{ old('payment_'.$prefix.'_instruction', $settings['payment_'.$prefix.'_instruction']) }}" required>
+                      <div class="form-text">Example: Send USDT only on TRC20.</div>
                       @error('payment_'.$prefix.'_instruction')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     <div class="col-12">
                       <label class="form-label">Admin review note</label>

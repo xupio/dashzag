@@ -19,7 +19,9 @@ test('admin can view platform settings page', function () {
         ->get(route('dashboard.settings'))
         ->assertOk()
         ->assertSee('Platform Settings')
-        ->assertSee('New miner defaults');
+        ->assertSee('New miner defaults')
+        ->assertSee('Treasury wallets and incoming payment methods')
+        ->assertSee('Buy Shares QR + Copy source');
 });
 
 test('admin can update platform settings and miner creation uses them', function () {

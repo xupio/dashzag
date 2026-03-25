@@ -15,6 +15,9 @@ class ProfileUpdateRequest extends FormRequest
     {
         return [
             'profile_photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'btc_wallet_address' => ['nullable', 'string', 'max:255'],
+            'usdt_wallet_address' => ['nullable', 'string', 'max:255'],
+            'bank_transfer_details' => ['nullable', 'string', 'max:2000'],
         ];
     }
 }

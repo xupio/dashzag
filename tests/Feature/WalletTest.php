@@ -253,6 +253,19 @@ test('wallet page reflects admin managed payout methods', function () {
     $response->assertDontSee('Bank Transfer');
 });
 
+test('wallet page prefills saved payout destinations from account settings', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'btc_wallet_address' => 'bc1qsavedwalletdestination',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.wallet'));
+
+    $response->assertOk();
+    $response->assertSee('bc1qsavedwalletdestination', false);
+    $response->assertSee('Saved payout destination loaded. You can still change it for this request.');
+});
+
 test('disabled payout methods cannot be requested', function () {
     $admin = User::factory()->admin()->create([
         'email_verified_at' => now(),

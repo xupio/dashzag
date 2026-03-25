@@ -28,16 +28,29 @@ class ProfileController extends Controller
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
         $user = $request->user();
+        $validated = $request->validated();
+
+        $user->forceFill([
+            'btc_wallet_address' => filled($validated['btc_wallet_address'] ?? null)
+                ? trim((string) $validated['btc_wallet_address'])
+                : null,
+            'usdt_wallet_address' => filled($validated['usdt_wallet_address'] ?? null)
+                ? trim((string) $validated['usdt_wallet_address'])
+                : null,
+            'bank_transfer_details' => filled($validated['bank_transfer_details'] ?? null)
+                ? trim((string) $validated['bank_transfer_details'])
+                : null,
+        ]);
 
         if ($request->hasFile('profile_photo')) {
             if ($user->profile_photo_path) {
                 Storage::disk('public')->delete($user->profile_photo_path);
             }
 
-            $user->forceFill([
-                'profile_photo_path' => $request->file('profile_photo')->store('profile-photos', 'public'),
-            ])->save();
+            $user->profile_photo_path = $request->file('profile_photo')->store('profile-photos', 'public');
         }
+
+        $user->save();
 
         return Redirect::route('profile.edit')->with('status', 'profile-updated');
     }

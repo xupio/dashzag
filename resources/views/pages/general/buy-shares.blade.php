@@ -67,7 +67,7 @@
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-start mb-3">
           <div>
-            <p class="text-secondary mb-1">Starter path</p>
+            <p class="text-secondary mb-1">Starter onboarding</p>
             <h5 class="mb-1">{{ $starterPackage?->name ?? 'Free Starter' }}</h5>
           </div>
           <span class="badge bg-success">Free</span>
@@ -79,6 +79,42 @@
         <div class="progress mb-3" style="height: 8px;"><div class="progress-bar bg-success" style="width: {{ min(($starterProgress['direct_basic_subscribers'] / max($starterProgress['required_direct_basic_subscribers'], 1)) * 100, 100) }}%"></div></div>
         <div class="alert {{ $starterProgress['has_unlocked_basic'] ? 'alert-success' : 'alert-light border' }} mb-0 small">
           {{ $starterProgress['has_unlocked_basic'] ? 'Basic 100 is already unlocked on your account.' : 'Keep building your network to unlock the first paid package for free.' }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card border-0 bg-light">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+          <div>
+            <h5 class="mb-1">Client payment flow</h5>
+            <p class="text-secondary mb-0">Choose one method, copy the details exactly, send the payment once, then submit the reference and proof for review.</p>
+          </div>
+          <span class="badge bg-warning text-dark">Manual review enabled</span>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100 bg-white">
+              <div class="fw-semibold mb-1">1. Select the method</div>
+              <div class="text-secondary small">Use only one payment method for each package order.</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100 bg-white">
+              <div class="fw-semibold mb-1">2. Copy and confirm</div>
+              <div class="text-secondary small">Use the copy button or QR and verify the destination before sending.</div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100 bg-white">
+              <div class="fw-semibold mb-1">3. Submit the proof</div>
+              <div class="text-secondary small">Keep the transfer hash or receipt ready for the admin review step.</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -269,6 +305,21 @@
       $isCurrent = $activeInvestment?->package_id === $package->id;
       $isPending = $pendingInvestmentOrder?->package_id === $package->id;
       $isUnlockTarget = $package->slug === \App\Support\MiningPlatform::BASIC_UPGRADE_PACKAGE_SLUG;
+      $isFreeStarterPackage = $package->slug === \App\Support\MiningPlatform::FREE_STARTER_PACKAGE_SLUG
+        || ((float) $package->price <= 0 && (int) $package->shares_count <= 0);
+      $monthlyReturnText = number_format((float) $package->monthly_return_rate * 100, 2).'%';
+
+      if ($package->slug === \App\Support\MiningPlatform::BASIC_UPGRADE_PACKAGE_SLUG) {
+        $monthlyReturnText .= ' up to 6.00%';
+      }
+
+      if ($package->slug === 'growth-500') {
+        $monthlyReturnText .= ' up to 8.00%';
+      }
+
+      if ($package->slug === 'scale-1000') {
+        $monthlyReturnText .= ' up to 10.00%';
+      }
     @endphp
     <div class="col-md-4 grid-margin stretch-card">
       <div class="card h-100 {{ $isCurrent ? 'border border-' . $accent : '' }}">
@@ -293,7 +344,7 @@
           <div class="border rounded p-3 bg-light mb-4">
             <div class="d-flex justify-content-between mb-2">
               <span class="text-secondary">Monthly return</span>
-              <span class="fw-semibold">{{ number_format((float) $package->monthly_return_rate * 100, 2) }}%</span>
+              <span class="fw-semibold">{{ $monthlyReturnText }}</span>
             </div>
             <div class="d-flex justify-content-between mb-2">
               <span class="text-secondary">Equivalent units</span>
@@ -305,42 +356,66 @@
             </div>
           </div>
 
-          <form method="POST" action="{{ route('dashboard.buy-shares.subscribe') }}" class="d-grid gap-2 mt-auto">
-            @csrf
-            <input type="hidden" name="package" value="{{ $package->slug }}">
-            <select name="payment_method" class="form-select form-select-sm" data-payment-method-select required>
-              <option value="">Select payment method</option>
-              @foreach ($paymentMethods as $paymentMethod)
-                <option value="{{ $paymentMethod['key'] }}">{{ $paymentMethod['label'] }}</option>
-              @endforeach
-            </select>
-            <div class="border rounded p-2 bg-light small" data-payment-method-panel>
-              <div class="text-secondary">Select a payment method to see the destination details and transfer instructions.</div>
-              <div class="small text-success mt-2 d-none" data-payment-copy-feedback>Copied to clipboard.</div>
-            </div>
-            <div class="border rounded p-3 bg-white small">
-              <div class="fw-semibold mb-2">Payment completed checklist</div>
-              <div class="text-secondary d-flex align-items-start gap-2 mb-2">
-                <span class="badge bg-primary-subtle text-primary mt-1">1</span>
-                <span>Select a payment method and review the destination details carefully.</span>
+          @if ($isFreeStarterPackage)
+              <div class="d-grid gap-3 mt-auto">
+                <div class="alert alert-success mb-0">
+                Your free starter access is already active from registration. No payment method is needed for this step.
+                </div>
+                <div class="border rounded p-3 bg-white small">
+                <div class="fw-semibold mb-2">Starter journey</div>
+                  <div class="text-secondary d-flex align-items-start gap-2 mb-2">
+                    <span class="badge bg-success-subtle text-success mt-1">1</span>
+                    <span>Your account already includes the free starter entry point.</span>
+                  </div>
+                  <div class="text-secondary d-flex align-items-start gap-2 mb-2">
+                    <span class="badge bg-primary-subtle text-primary mt-1">2</span>
+                    <span>Use the mission card above to track invites and unlock the next paid package.</span>
+                  </div>
+                  <div class="text-secondary d-flex align-items-start gap-2">
+                    <span class="badge bg-primary-subtle text-primary mt-1">3</span>
+                    <span>Choose a paid package below only when you are ready to move beyond the free starter path.</span>
+                  </div>
+                </div>
+              <a href="{{ route('dashboard.profile') }}" class="btn btn-outline-{{ $accent }}">View my starter progress</a>
               </div>
-              <div class="text-secondary d-flex align-items-start gap-2 mb-2">
-                <span class="badge bg-primary-subtle text-primary mt-1">2</span>
-                <span>Send the transfer and keep the transaction hash or bank reference.</span>
+          @else
+            <form method="POST" action="{{ route('dashboard.buy-shares.subscribe') }}" class="d-grid gap-2 mt-auto">
+              @csrf
+              <input type="hidden" name="package" value="{{ $package->slug }}">
+              <select name="payment_method" class="form-select form-select-sm" data-payment-method-select required>
+                <option value="">Select payment method</option>
+                @foreach ($paymentMethods as $paymentMethod)
+                  <option value="{{ $paymentMethod['key'] }}">{{ $paymentMethod['label'] }}</option>
+                @endforeach
+              </select>
+              <div class="border rounded p-2 bg-light small" data-payment-method-panel>
+                <div class="text-secondary">Select a payment method to see the destination details and transfer instructions.</div>
+                <div class="small text-success mt-2 d-none" data-payment-copy-feedback>Copied to clipboard.</div>
               </div>
-              <div class="text-secondary d-flex align-items-start gap-2 mb-2">
-                <span class="badge bg-primary-subtle text-primary mt-1">3</span>
-                <span>Submit the payment reference here, then upload payment proof after the transfer.</span>
+              <div class="border rounded p-3 bg-white small">
+                <div class="fw-semibold mb-2">Payment completed checklist</div>
+                <div class="text-secondary d-flex align-items-start gap-2 mb-2">
+                  <span class="badge bg-primary-subtle text-primary mt-1">1</span>
+                  <span>Select a payment method and review the destination details carefully.</span>
+                </div>
+                <div class="text-secondary d-flex align-items-start gap-2 mb-2">
+                  <span class="badge bg-primary-subtle text-primary mt-1">2</span>
+                  <span>Send the transfer and keep the transaction hash or bank reference.</span>
+                </div>
+                <div class="text-secondary d-flex align-items-start gap-2 mb-2">
+                  <span class="badge bg-primary-subtle text-primary mt-1">3</span>
+                  <span>Submit the payment reference here, then upload payment proof after the transfer.</span>
+                </div>
+                <div class="text-secondary d-flex align-items-start gap-2">
+                  <span class="badge bg-primary-subtle text-primary mt-1">4</span>
+                  <span>Wait for admin review. You will be notified once the order is approved or rejected.</span>
+                </div>
               </div>
-              <div class="text-secondary d-flex align-items-start gap-2">
-                <span class="badge bg-primary-subtle text-primary mt-1">4</span>
-                <span>Wait for admin review. You will be notified once the order is approved or rejected.</span>
-              </div>
-            </div>
-            <input type="text" name="payment_reference" class="form-control form-control-sm" data-payment-reference-input placeholder="Transaction hash or payment reference" required>
-            <textarea name="notes" rows="2" class="form-control form-control-sm" placeholder="Optional payment notes"></textarea>
-            <button class="btn btn-{{ $accent }}" type="submit" {{ $isPending ? 'disabled' : '' }}>{{ $isPending ? 'Pending approval' : ($isCurrent ? 'Buy again' : 'Submit payment') }}</button>
-          </form>
+              <input type="text" name="payment_reference" class="form-control form-control-sm" data-payment-reference-input placeholder="Transaction hash or payment reference" required>
+              <textarea name="notes" rows="2" class="form-control form-control-sm" placeholder="Optional payment notes"></textarea>
+              <button class="btn btn-{{ $accent }}" type="submit" {{ $isPending ? 'disabled' : '' }}>{{ $isPending ? 'Pending approval' : ($isCurrent ? 'Buy again' : 'Submit payment') }}</button>
+            </form>
+          @endif
         </div>
       </div>
     </div>
@@ -375,6 +450,23 @@
         const paymentMethods = @json($paymentMethods->values());
         const paymentMethodByKey = Object.fromEntries(paymentMethods.map((method) => [method.key, method]));
         const cryptoMethods = ['btc_transfer', 'usdt_transfer'];
+        const methodMeta = {
+            btc_transfer: {
+                networkLabel: 'Bitcoin network',
+                warning: 'Send BTC only. Do not send any other coin or token to this address.',
+                referenceLabel: 'Submit the BTC transaction hash after sending.',
+            },
+            usdt_transfer: {
+                networkLabel: 'USDT selected network',
+                warning: 'Send USDT only on the exact network shown by the admin team. Sending on the wrong network can permanently lose funds.',
+                referenceLabel: 'Submit the USDT transaction hash after sending.',
+            },
+            bank_transfer: {
+                networkLabel: 'Bank transfer',
+                warning: 'Use the exact beneficiary details and keep the transfer receipt for review.',
+                referenceLabel: 'Submit the bank reference, receipt number, or SWIFT trace.',
+            },
+        };
 
         const renderMethod = (select) => {
             const wrapper = select.closest('form');
@@ -396,33 +488,61 @@
             const destination = method.destination || 'Destination details will be shared by the team.';
             const instructions = method.instruction || 'Follow the payment instructions from the admin team.';
             const isCrypto = cryptoMethods.includes(method.key);
+            const meta = methodMeta[method.key] ?? methodMeta.bank_transfer;
             const qrUrl = isCrypto
                 ? `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(destination)}`
                 : null;
 
             panel.innerHTML = `
                 <div class="d-flex flex-column gap-3">
-                    <div>
-                        <div class="fw-semibold text-dark">${method.label}</div>
-                        <div class="text-muted small">Use these details to complete your transfer.</div>
+                    <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                        <div>
+                            <div class="fw-semibold text-dark">${method.label}</div>
+                            <div class="text-muted small">Use these details to complete your transfer.</div>
+                        </div>
+                        <span class="badge ${isCrypto ? 'bg-warning text-dark' : 'bg-primary-subtle text-primary'}">${meta.networkLabel}</span>
                     </div>
                     <div class="d-flex flex-column flex-md-row gap-3 align-items-start">
                         <div class="flex-grow-1">
                             <div class="text-muted text-uppercase small mb-1">Send payment to</div>
-                            <div class="fw-semibold text-dark mb-2" data-payment-destination>${destination}</div>
-                            <button type="button" class="btn btn-sm btn-outline-primary mb-3" data-copy-payment-destination>
-                                Copy details
-                            </button>
-                            <div class="text-success small d-none" data-payment-copy-feedback>Copied to clipboard.</div>
+                            <div class="fw-semibold text-dark mb-2 text-break" data-payment-destination>${destination}</div>
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-copy-payment-destination>
+                                    Copy details
+                                </button>
+                                ${isCrypto ? '<span class="badge bg-success-subtle text-success align-self-center">QR ready</span>' : ''}
+                            </div>
+                            <div class="alert ${isCrypto ? 'alert-warning' : 'alert-info'} py-2 px-3 small mb-3">
+                                ${meta.warning}
+                            </div>
                             <div class="text-muted text-uppercase small mb-1">Instructions</div>
-                            <div class="text-muted">${instructions}</div>
+                            <div class="text-muted mb-3">${instructions}</div>
+                            <div class="text-muted text-uppercase small mb-1">What to submit after payment</div>
+                            <div class="text-muted">${meta.referenceLabel}</div>
+                            <div class="text-success small d-none mt-2" data-payment-copy-feedback>Copied to clipboard.</div>
                         </div>
                         ${qrUrl ? `
                             <div class="text-center border rounded p-2 bg-white">
                                 <div class="text-muted text-uppercase small mb-2">Scan QR</div>
                                 <img src="${qrUrl}" alt="${method.label} QR code" class="img-fluid" style="max-width: 160px;">
+                                <div class="text-muted small mt-2">Confirm the destination text matches before sending.</div>
                             </div>
                         ` : ''}
+                    </div>
+                    <div class="border rounded p-3 bg-white">
+                        <div class="fw-semibold mb-2">Before you submit</div>
+                        <div class="text-secondary small d-flex align-items-start gap-2 mb-2">
+                            <span class="badge bg-primary-subtle text-primary mt-1">1</span>
+                            <span>Double-check the destination and network before sending.</span>
+                        </div>
+                        <div class="text-secondary small d-flex align-items-start gap-2 mb-2">
+                            <span class="badge bg-primary-subtle text-primary mt-1">2</span>
+                            <span>Send the exact package amount in one payment.</span>
+                        </div>
+                        <div class="text-secondary small d-flex align-items-start gap-2">
+                            <span class="badge bg-primary-subtle text-primary mt-1">3</span>
+                            <span>Keep the transaction hash or receipt ready for the next step.</span>
+                        </div>
                     </div>
                 </div>
             `;

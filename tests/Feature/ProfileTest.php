@@ -34,6 +34,28 @@ test('profile photo can be updated', function () {
     Storage::disk('public')->assertExists($user->profile_photo_path);
 });
 
+test('payout destinations can be saved from account settings', function () {
+    $user = User::factory()->create();
+
+    $response = $this
+        ->actingAs($user)
+        ->patch('/profile', [
+            'btc_wallet_address' => 'bc1qzagchaintestwallet',
+            'usdt_wallet_address' => 'TXYZzagchaintestwallet',
+            'bank_transfer_details' => 'Beneficiary: ZagChain Treasury | IBAN: AE001234567890',
+        ]);
+
+    $response
+        ->assertSessionHasNoErrors()
+        ->assertRedirect('/profile');
+
+    $user->refresh();
+
+    expect($user->btc_wallet_address)->toBe('bc1qzagchaintestwallet');
+    expect($user->usdt_wallet_address)->toBe('TXYZzagchaintestwallet');
+    expect($user->bank_transfer_details)->toBe('Beneficiary: ZagChain Treasury | IBAN: AE001234567890');
+});
+
 test('users keep email hidden by default', function () {
     $user = User::factory()->create();
 

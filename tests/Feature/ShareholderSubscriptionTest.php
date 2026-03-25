@@ -11,6 +11,56 @@ beforeEach(function () {
     MiningPlatform::ensureDefaults();
 });
 
+test('free starter package does not show payment method checkout controls', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'starter',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+
+    $response->assertOk();
+    $response->assertSee('Your free starter access is already active from registration.');
+    $response->assertSee('No payment method is needed for this step.');
+    $response->assertSee('View my starter progress');
+});
+
+test('basic 100 package shows monthly return with up to note', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'starter',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+
+    $response->assertOk();
+    $response->assertSee('8.00% up to 6.00%');
+});
+
+test('growth 500 package shows monthly return with up to note', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'starter',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+
+    $response->assertOk();
+    $response->assertSee('8.50% up to 8.00%');
+});
+
+test('scale 1000 package shows monthly return with up to note', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'starter',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+
+    $response->assertOk();
+    $response->assertSee('9.00% up to 10.00%');
+});
+
 test('verified user submits a package payment for admin approval', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),
@@ -331,6 +381,8 @@ test('user sees configured payment destination details on buy shares page', func
         ->assertOk()
         ->assertSee('Bitcoin Deposit')
         ->assertSee('bc1qexamplecompanywallet')
-        ->assertSee('Send the exact package amount to the BTC wallet');
+        ->assertSee('Send the exact package amount to the BTC wallet')
+        ->assertSee('Send BTC only. Do not send any other coin or token to this address.')
+        ->assertSee('Submit the BTC transaction hash after sending.');
 });
 
