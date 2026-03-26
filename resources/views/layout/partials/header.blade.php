@@ -1,5 +1,56 @@
 <nav class="navbar">
   <div class="navbar-content">
+    @php
+      $headerPendingProofOrder = auth()->check()
+          ? auth()->user()->investmentOrders()
+              ->with(['miner', 'package'])
+              ->whereIn('status', ['pending', 'rejected'])
+              ->whereNull('payment_proof_path')
+              ->latest('submitted_at')
+              ->first()
+          : null;
+    @endphp
+    @once
+      <style>
+        .toolbar-payment-indicator {
+          position: relative;
+        }
+
+        .toolbar-payment-indicator .toolbar-payment-badge {
+          position: absolute;
+          top: -4px;
+          right: -8px;
+          min-width: 18px;
+          height: 18px;
+          padding: 0 5px;
+          border-radius: 999px;
+          background: #f59e0b;
+          color: #111827;
+          font-size: 10px;
+          font-weight: 700;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          animation: toolbarPaymentPulse 1.1s ease-in-out infinite;
+          box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45);
+        }
+
+        @keyframes toolbarPaymentPulse {
+          0% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45);
+          }
+          50% {
+            transform: scale(1.08);
+            box-shadow: 0 0 0 10px rgba(245, 158, 11, 0);
+          }
+          100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+          }
+        }
+      </style>
+    @endonce
 
     <div class="logo-mini-wrapper">
       <img src="{{ asset('branding/zag-smal.png') }}" class="logo-mini logo-mini-light" alt="ZagChain" style="width: 42px; height: 42px; object-fit: contain;">
@@ -59,6 +110,19 @@
           </div>
         </div>
       </li>
+      @if ($headerPendingProofOrder)
+        <li class="nav-item">
+          <a
+            class="nav-link toolbar-payment-indicator"
+            href="{{ route('dashboard.buy-shares', ['miner' => $headerPendingProofOrder->miner?->slug]) }}"
+            title="Finish your pending payment for {{ $headerPendingProofOrder->package?->name }}"
+          >
+            <i data-lucide="badge-dollar-sign"></i>
+            <span class="toolbar-payment-badge">1</span>
+            <span class="visually-hidden">Finish your pending payment</span>
+          </a>
+        </li>
+      @endif
       @php
         $headerMailbox = auth()->check()
             ? auth()->user()->receivedMessageRecords()

@@ -62,6 +62,21 @@ test('scale 1000 package shows monthly return with up to note', function () {
     $response->assertSee('9.00% up to 10.00%');
 });
 
+test('paid package flow uses popup payment instructions', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+
+    $response->assertOk();
+    $response->assertSee('Choose method and pay');
+    $response->assertSee('Complete package payment');
+    $response->assertSee('Upload payment proof');
+    $response->assertSee('Choose a payment method, copy the destination, then submit your proof in the same popup.');
+});
+
 test('verified user submits a package payment for admin approval', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),
@@ -95,6 +110,26 @@ test('verified user submits a package payment for admin approval', function () {
     Storage::disk('public')->assertDirectoryEmpty('investment-proofs');
 });
 
+test('pending order page keeps the payment popup flow available', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+    ]);
+
+    $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
+        'package' => 'growth-500',
+        'payment_method' => 'btc_transfer',
+        'payment_reference' => 'TX-POPUP-001',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+
+    $response->assertOk();
+    $response->assertSee('Continue payment in the popup');
+    $response->assertSee('Existing payment order');
+    $response->assertSee('Finish your pending payment');
+});
+
 test('user can upload payment proof after submitting the investment order', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),
@@ -122,6 +157,31 @@ test('user can upload payment proof after submitting the investment order', func
     expect($order->proof_uploaded_at)->not->toBeNull();
     expect($user->fresh()->notifications->pluck('data.subject'))->toContain('Payment proof uploaded');
     Storage::disk('public')->assertExists($order->payment_proof_path);
+});
+
+test('payment popup reminder disappears after proof upload is completed', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+    ]);
+
+    $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
+        'package' => 'growth-500',
+        'payment_method' => 'btc_transfer',
+        'payment_reference' => 'TX-DONE-001',
+    ]);
+
+    $order = InvestmentOrder::query()->firstOrFail();
+
+    $this->actingAs($user)->post(route('dashboard.buy-shares.proof', $order), [
+        'payment_proof' => UploadedFile::fake()->create('done-proof.pdf', 120, 'application/pdf'),
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+
+    $response->assertOk();
+    $response->assertDontSee('Continue payment in the popup');
+    $response->assertDontSee('Finish your pending payment');
 });
 
 test('payment proof upload rejects disguised files with invalid content signature', function () {
