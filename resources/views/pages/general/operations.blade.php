@@ -450,5 +450,98 @@
     </div>
   </div>
 </div>
+
+<div class="row mt-4">
+  <div class="col-12 stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
+            <h5 class="mb-1">Admin security activity</h5>
+            <p class="text-secondary mb-0">Recent admin payout and investment decisions are logged here with action details and timing.</p>
+          </div>
+          <span class="badge bg-dark">{{ ($adminActivityLogs ?? collect())->count() }} recent actions</span>
+        </div>
+
+        <form method="GET" action="{{ route('dashboard.operations') }}" class="row g-2 mb-3">
+          <input type="hidden" name="investment_search" value="{{ $investmentFilters['search'] ?? '' }}">
+          <input type="hidden" name="investment_status" value="{{ $investmentFilters['status'] ?? 'all' }}">
+          <input type="hidden" name="investment_payment_method" value="{{ $investmentFilters['payment_method'] ?? 'all' }}">
+          <input type="hidden" name="investment_proof_state" value="{{ $investmentFilters['proof_state'] ?? 'all' }}">
+          <input type="hidden" name="investment_risk_state" value="{{ $investmentFilters['risk_state'] ?? 'all' }}">
+          <div class="col-md-4">
+            <select name="activity_action" class="form-select">
+              <option value="all" @selected(($activityFilters['action'] ?? 'all') === 'all')>All admin actions</option>
+              <option value="investment.approve" @selected(($activityFilters['action'] ?? '') === 'investment.approve')>Investment approved</option>
+              <option value="investment.approve_without_proof" @selected(($activityFilters['action'] ?? '') === 'investment.approve_without_proof')>Investment override approved</option>
+              <option value="investment.reject" @selected(($activityFilters['action'] ?? '') === 'investment.reject')>Investment rejected</option>
+              <option value="payout.approve" @selected(($activityFilters['action'] ?? '') === 'payout.approve')>Payout approved</option>
+              <option value="payout.pay" @selected(($activityFilters['action'] ?? '') === 'payout.pay')>Payout paid</option>
+            </select>
+          </div>
+          <div class="col-md-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Filter log</button>
+            <a href="{{ route('dashboard.operations') }}" class="btn btn-outline-secondary">Reset</a>
+          </div>
+        </form>
+
+        @if (($adminActivityLogs ?? collect())->isEmpty())
+          <p class="text-secondary mb-0">No admin activity has been logged yet.</p>
+        @else
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th>Summary</th>
+                  <th>Admin</th>
+                  <th>Details</th>
+                  <th>When</th>
+                </tr>
+              </thead>
+              <tbody>
+                @foreach ($adminActivityLogs as $log)
+                  @php
+                    $details = collect($log->details ?? []);
+                  @endphp
+                  <tr>
+                    <td>
+                      <span class="badge bg-light text-dark border">{{ str($log->action)->replace('.', ' ')->title() }}</span>
+                    </td>
+                    <td>
+                      <div class="fw-semibold">{{ $log->summary }}</div>
+                      <div class="text-secondary small">Subject: {{ class_basename((string) $log->subject_type) ?: 'N/A' }} {{ $log->subject_id ? '#'.$log->subject_id : '' }}</div>
+                    </td>
+                    <td>
+                      <div class="fw-semibold">{{ $log->admin?->name ?? 'Unknown admin' }}</div>
+                      <div class="text-secondary small">{{ $log->admin?->email ?? 'No email recorded' }}</div>
+                    </td>
+                    <td style="min-width: 280px;">
+                      <div class="text-secondary small">IP: {{ $log->ip_address ?: '-' }}</div>
+                      @if ($details->isNotEmpty())
+                        @foreach ($details as $key => $value)
+                          <div class="text-secondary small">
+                            <span class="fw-semibold text-dark">{{ str($key)->replace('_', ' ')->title() }}:</span>
+                            {{ is_bool($value) ? ($value ? 'Yes' : 'No') : ($value === null || $value === '' ? '-' : $value) }}
+                          </div>
+                        @endforeach
+                      @else
+                        <div class="text-secondary small">No extra details</div>
+                      @endif
+                    </td>
+                    <td>
+                      <div class="fw-semibold">{{ $log->created_at?->format('M d, Y h:i A') }}</div>
+                      <div class="text-secondary small">{{ \Illuminate\Support\Str::limit((string) $log->user_agent, 70) ?: 'No user agent recorded' }}</div>
+                    </td>
+                  </tr>
+                @endforeach
+              </tbody>
+            </table>
+          </div>
+        @endif
+      </div>
+    </div>
+  </div>
+</div>
 @endsection
 

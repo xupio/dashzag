@@ -3,6 +3,7 @@
 use App\Http\Controllers\InternalMailController;
 use App\Http\Controllers\ProfileController;
 use App\Mail\FriendInvitationMail;
+use App\Models\AdminActivityLog;
 use App\Models\Earning;
 use App\Models\FriendInvitation;
 use App\Models\HallOfFameSnapshot;
@@ -2644,6 +2645,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             $allowedRiskStates = ['all', 'high_risk'];
             $riskFocus = (string) $request->query('investment_risk_focus', 'all');
             $allowedRiskFocuses = ['all', 'missing_proof', 'bank_without_notes', 'resubmitted', 'override_history'];
+            $activityAction = (string) $request->query('activity_action', 'all');
+            $allowedActivityActions = ['all', 'investment.approve', 'investment.approve_without_proof', 'investment.reject', 'payout.approve', 'payout.pay'];
 
             if (! in_array($status, $allowedStatuses, true)) {
                 $status = 'all';
@@ -2663,6 +2666,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
             if (! in_array($riskFocus, $allowedRiskFocuses, true)) {
                 $riskFocus = 'all';
+            }
+
+            if (! in_array($activityAction, $allowedActivityActions, true)) {
+                $activityAction = 'all';
             }
 
             $rewardCapMeta = [
@@ -2848,6 +2855,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 })
                 ->sortByDesc('count')
                 ->values();
+            $adminActivityLogsQuery = AdminActivityLog::query()
+                ->with('admin')
+                ->latest();
+
+            if ($activityAction !== 'all') {
+                $adminActivityLogsQuery->where('action', $activityAction);
+            }
+
+            $adminActivityLogs = $adminActivityLogsQuery->limit(20)->get();
 
             return view('pages.general.operations', [
                 'payoutRequests' => PayoutRequest::with(['user', 'earnings'])->latest('requested_at')->get(),
@@ -2882,6 +2898,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ]),
                 'investmentOrderRewardCaps' => $investmentOrderRewardCaps,
                 'investmentRewardCapSummary' => $investmentRewardCapSummary,
+                'adminActivityLogs' => $adminActivityLogs,
+                'activityFilters' => [
+                    'action' => $activityAction,
+                ],
             ]);
         })->name('dashboard.operations');
 

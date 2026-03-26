@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AdminActivityLog;
 use App\Models\FriendInvitation;
 use App\Models\InvestmentOrder;
 use App\Models\InvestmentPackage;
@@ -360,4 +361,64 @@ test('operations queue shows unlocked reward cap badges for strong investors', f
         ->assertSee('Growth 500')
         ->assertSee('6% cap')
         ->assertSee('7% cap');
+});
+
+test('admin operations page shows recent admin activity logs', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'admin',
+    ]);
+
+    AdminActivityLog::create([
+        'admin_user_id' => $admin->id,
+        'action' => 'investment.approve',
+        'summary' => 'Approved investment order #501',
+        'subject_type' => InvestmentOrder::class,
+        'subject_id' => 501,
+        'details' => [
+            'user_id' => 99,
+            'package' => 'growth-500',
+            'amount' => 500,
+        ],
+        'ip_address' => '127.0.0.1',
+        'user_agent' => 'Pest test browser',
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('dashboard.operations'))
+        ->assertOk()
+        ->assertViewHas('adminActivityLogs', function ($logs) {
+            return $logs->contains(fn ($log) => $log->summary === 'Approved investment order #501'
+                && $log->action === 'investment.approve'
+                && $log->ip_address === '127.0.0.1');
+        });
+});
+
+test('admin operations page can filter admin activity logs by action', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'admin',
+    ]);
+
+    AdminActivityLog::create([
+        'admin_user_id' => $admin->id,
+        'action' => 'investment.reject',
+        'summary' => 'Rejected investment order #700',
+    ]);
+
+    AdminActivityLog::create([
+        'admin_user_id' => $admin->id,
+        'action' => 'payout.pay',
+        'summary' => 'Marked payout request #901 as paid',
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('dashboard.operations', ['activity_action' => 'payout.pay']))
+        ->assertOk()
+        ->assertViewHas('activityFilters', fn ($filters) => ($filters['action'] ?? null) === 'payout.pay')
+        ->assertViewHas('adminActivityLogs', function ($logs) {
+            return $logs->count() === 1
+                && $logs->first()->summary === 'Marked payout request #901 as paid'
+                && $logs->first()->action === 'payout.pay';
+        });
 });
