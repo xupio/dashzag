@@ -2493,7 +2493,7 @@ class MiningPlatform
             $availableBalance = (float) $availableEarnings->sum('amount');
 
             if ($amount > $availableBalance) {
-                throw new RuntimeException('Requested payout exceeds available balance.');
+                throw new RuntimeException('You can only withdraw from available earnings. Invested capital and share amounts are not withdrawable.');
             }
 
             $quote = self::payoutQuote($method, $amount);

@@ -84,7 +84,7 @@
         <div class="border rounded p-3 mb-3 bg-light"><div class="text-secondary small">Expected monthly earnings</div><div class="fw-semibold">${{ number_format($expectedMonthlyEarnings, 2) }}</div></div>
         <div class="border rounded p-3 mb-3 bg-light"><div class="text-secondary small">Payout requests</div><div class="fw-semibold">{{ $payoutRequests->count() }}</div></div>
         <div class="alert alert-light border mb-0">
-          Use the generate button once per month to create mining returns, then submit a payout request from your available balance.{{ count($payoutMethods) === 0 ? ' Payout requests are currently disabled by the admin team.' : '' }}
+          Only your available earnings can be withdrawn from this wallet. Your asset value, share amount, and invested capital stay locked in your packages and are not part of payout requests.{{ count($payoutMethods) === 0 ? ' Payout requests are currently disabled by the admin team.' : '' }}
         </div>
       </div>
     </div>
@@ -212,17 +212,18 @@
       <form method="POST" action="{{ route('dashboard.wallet.request') }}">
         @csrf
         <div class="modal-header">
-          <h5 class="modal-title">Request payout</h5>
+          <h5 class="modal-title">Request payout to your wallet</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label">Amount</label>
             <input type="number" step="0.01" min="1" max="{{ number_format($wallet['available'], 2, '.', '') }}" name="amount" class="form-control @error('amount') is-invalid @enderror" value="{{ old('amount') }}" required>
+            <div class="form-text">Maximum withdrawable amount: ${{ number_format($wallet['available'], 2) }} from available earnings only.</div>
             @error('amount')<div class="invalid-feedback">{{ $message }}</div>@enderror
           </div>
           <div class="mb-3">
-            <label class="form-label">Method</label>
+            <label class="form-label">Withdrawal method</label>
             <select name="method" id="payoutMethodSelect" class="form-select @error('method') is-invalid @enderror" required>
               @forelse ($payoutMethods as $method)
                 <option value="{{ $method['key'] }}" data-placeholder="{{ $method['placeholder'] }}" data-destination="{{ $user->payoutDestinationFor($method['key']) }}" data-instruction="{{ $method['instruction'] }}" data-processing="{{ $method['processing_time'] }}" data-minimum="{{ $method['minimum_amount'] }}" data-fixed-fee="{{ $method['fixed_fee'] }}" data-rate="{{ $method['percentage_fee_rate'] }}" @selected(old('method', $loop->first ? $method['key'] : null) === $method['key'])>{{ $method['label'] }}</option>
@@ -233,9 +234,9 @@
             @error('method')<div class="invalid-feedback">{{ $message }}</div>@enderror
           </div>
           <div class="mb-3">
-            <label class="form-label">Destination</label>
+            <label class="form-label">Your selected wallet</label>
             <input type="text" id="payoutDestinationInput" name="destination" class="form-control @error('destination') is-invalid @enderror" value="{{ old('destination', $defaultPayoutDestination) }}" placeholder="{{ $defaultPayoutMethod['placeholder'] ?? 'Enter payout destination' }}" required>
-            <div class="form-text" id="payoutDestinationHelp">{{ $defaultPayoutDestination ? 'Saved payout destination loaded. You can still change it for this request.' : ($defaultPayoutMethod['placeholder'] ?? 'No payout method is currently available.') }}</div>
+            <div class="form-text" id="payoutDestinationHelp">{{ $defaultPayoutDestination ? 'Your saved withdrawal wallet was loaded from your profile. You can still change it for this payout request.' : ($defaultPayoutMethod['placeholder'] ?? 'No payout method is currently available.') }}</div>
             @error('destination')<div class="invalid-feedback">{{ $message }}</div>@enderror
           </div>
           <div class="border rounded p-3 bg-light mb-3">
@@ -245,6 +246,9 @@
             <div class="text-secondary small mt-1" id="payoutMinimumText">Minimum: ${{ number_format((float) ($defaultPayoutMethod['minimum_amount'] ?? 0), 2) }}</div>
             <div class="text-secondary small mt-1" id="payoutFeeText">Fees: ${{ number_format((float) ($defaultPayoutMethod['fixed_fee'] ?? 0), 2) }} fixed + {{ number_format((float) (($defaultPayoutMethod['percentage_fee_rate'] ?? 0) * 100), 2) }}%</div>
             <div class="fw-semibold mt-3" id="payoutNetEstimateText">Estimated net: $0.00</div>
+            <div class="alert alert-warning mt-3 mb-0 py-2 px-3 small">
+              Payout requests use earnings only. Package capital, miner assets, and purchased shares cannot be withdrawn here.
+            </div>
           </div>
           <div class="mb-0">
             <label class="form-label">Notes</label>
@@ -254,7 +258,7 @@
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-success">Submit request</button>
+          <button type="submit" class="btn btn-success">Send payout request</button>
         </div>
       </form>
     </div>
@@ -291,7 +295,7 @@
 
           destinationInput.placeholder = placeholder || 'Enter payout destination';
           destinationInput.value = savedDestination || '';
-          destinationHelp.textContent = savedDestination ? 'Saved payout destination loaded. You can still change it for this request.' : (placeholder || 'Enter payout destination');
+          destinationHelp.textContent = savedDestination ? 'Your saved withdrawal wallet was loaded from your profile. You can still change it for this payout request.' : (placeholder || 'Enter payout destination');
           if (instructionText) instructionText.textContent = instruction || 'No payout method is currently available.';
           if (processingText) processingText.textContent = 'Processing time: ' + (processing || '—');
           if (minimumText) minimumText.textContent = 'Minimum: $' + minimum.toFixed(2);

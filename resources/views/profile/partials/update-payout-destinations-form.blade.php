@@ -3,7 +3,7 @@
     @method('patch')
 
     <p class="text-secondary mb-4">
-        Save the payout destinations you want ZagChain to use when you request withdrawals. You can still adjust the destination again before you submit a payout.
+        Save your own withdrawal wallets here. These are your personal payout destinations for withdrawals only, and they are separate from the admin treasury wallets used to receive client payments.
     </p>
 
     <div class="mb-3">
@@ -29,7 +29,7 @@
             value="{{ old('usdt_wallet_address', $user->usdt_wallet_address) }}"
             placeholder="T... or 0x..."
         >
-        <div class="form-text">Use the exact address and network you expect to receive payouts on.</div>
+        <div class="form-text">Use the exact address and network where you want to receive your USDT withdrawals.</div>
         @error('usdt_wallet_address')<div class="invalid-feedback">{{ $message }}</div>@enderror
     </div>
 
@@ -42,10 +42,11 @@
             class="form-control @error('bank_transfer_details') is-invalid @enderror"
             placeholder="Beneficiary name, bank name, IBAN/account number, SWIFT"
         >{{ old('bank_transfer_details', $user->bank_transfer_details) }}</textarea>
+        <div class="form-text">Add the bank account details where you want ZagChain to send your payout.</div>
         @error('bank_transfer_details')<div class="invalid-feedback">{{ $message }}</div>@enderror
     </div>
 
     <div class="d-flex justify-content-end">
-        <button type="submit" class="btn btn-primary">Save payout destinations</button>
+        <button type="submit" class="btn btn-primary">Save my withdrawal wallets</button>
     </div>
 </form>

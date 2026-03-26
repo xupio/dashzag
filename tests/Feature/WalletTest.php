@@ -264,7 +264,20 @@ test('wallet page prefills saved payout destinations from account settings', fun
 
     $response->assertOk();
     $response->assertSee('bc1qsavedwalletdestination', false);
-    $response->assertSee('Saved payout destination loaded. You can still change it for this request.');
+    $response->assertSee('Your saved withdrawal wallet was loaded from your profile. You can still change it for this payout request.');
+    $response->assertSee('Your selected wallet');
+});
+
+test('wallet page explains that only available earnings are withdrawable', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.wallet'));
+
+    $response->assertOk();
+    $response->assertSee('Only your available earnings can be withdrawn from this wallet.');
+    $response->assertSee('Package capital, miner assets, and purchased shares cannot be withdrawn here.');
 });
 
 test('disabled payout methods cannot be requested', function () {

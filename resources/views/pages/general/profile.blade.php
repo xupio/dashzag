@@ -611,6 +611,61 @@
   </div>
 
   <div class="col-12 grid-margin stretch-card">
+    <div class="card rounded w-100">
+      <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+          <div>
+            <h6 class="card-title mb-1">Your withdrawal wallets</h6>
+            <p class="text-secondary mb-0">Save the wallets and bank details where you want to receive payouts. These are your personal withdrawal destinations, not the admin payment wallets.</p>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <a href="{{ route('profile.edit') }}" class="btn btn-outline-primary btn-sm">Update withdrawal wallets</a>
+            <a href="{{ route('dashboard.wallet') }}" class="btn btn-primary btn-sm">Request payout</a>
+          </div>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100 {{ filled($user->btc_wallet_address) ? 'bg-light' : 'bg-warning-subtle border-warning-subtle' }}">
+              <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                <div class="fw-semibold">BTC wallet</div>
+                <span class="badge {{ filled($user->btc_wallet_address) ? 'bg-success' : 'bg-warning text-dark' }}">{{ filled($user->btc_wallet_address) ? 'Saved' : 'Missing' }}</span>
+              </div>
+              <div class="text-secondary small">
+                {{ filled($user->btc_wallet_address) ? $user->btc_wallet_address : 'Add your BTC withdrawal wallet in Account Settings before requesting a BTC payout.' }}
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100 {{ filled($user->usdt_wallet_address) ? 'bg-light' : 'bg-warning-subtle border-warning-subtle' }}">
+              <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                <div class="fw-semibold">USDT wallet</div>
+                <span class="badge {{ filled($user->usdt_wallet_address) ? 'bg-success' : 'bg-warning text-dark' }}">{{ filled($user->usdt_wallet_address) ? 'Saved' : 'Missing' }}</span>
+              </div>
+              <div class="text-secondary small">
+                {{ filled($user->usdt_wallet_address) ? $user->usdt_wallet_address : 'Add your USDT withdrawal wallet and network details in Account Settings before requesting a USDT payout.' }}
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="border rounded p-3 h-100 {{ filled($user->bank_transfer_details) ? 'bg-light' : 'bg-warning-subtle border-warning-subtle' }}">
+              <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+                <div class="fw-semibold">Bank transfer details</div>
+                <span class="badge {{ filled($user->bank_transfer_details) ? 'bg-success' : 'bg-warning text-dark' }}">{{ filled($user->bank_transfer_details) ? 'Saved' : 'Missing' }}</span>
+              </div>
+              <div class="text-secondary small">
+                {{ filled($user->bank_transfer_details) ? $user->bank_transfer_details : 'Add your beneficiary and bank details in Account Settings before requesting a bank payout.' }}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="alert alert-light border mt-3 mb-0">
+          When you submit a payout request, you can choose which of these saved wallets or bank details should receive your withdrawal.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 grid-margin stretch-card">
     <div class="card rounded w-100 {{ $starterProgress['has_unlocked_basic'] ? 'border border-success' : 'border border-warning' }}">
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">

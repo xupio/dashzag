@@ -55,3 +55,21 @@ test('profile page shows reward cap unlock celebrations', function () {
     $response->assertSee('Growth 500 full reward cap unlocked');
     $response->assertSee('6.00% monthly boost');
 });
+
+test('profile page shows saved withdrawal wallets and payout guidance', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'btc_wallet_address' => 'bc1qprofilewallettest',
+        'usdt_wallet_address' => 'TXYZprofilewallettest',
+        'bank_transfer_details' => 'Beneficiary: Mohammad | IBAN: AE001234567890',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.profile'));
+
+    $response->assertOk();
+    $response->assertSee('Your withdrawal wallets');
+    $response->assertSee('bc1qprofilewallettest', false);
+    $response->assertSee('TXYZprofilewallettest', false);
+    $response->assertSee('Beneficiary: Mohammad | IBAN: AE001234567890');
+    $response->assertSee('Request payout');
+});

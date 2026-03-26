@@ -1349,7 +1349,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
         ]);
 
         if ((float) $validated['amount'] > $wallet['available']) {
-            return back()->withErrors(['amount' => 'Requested amount exceeds available wallet balance.'])->withInput();
+            return back()->withErrors(['amount' => 'You can only withdraw from your available earnings. Your invested capital and share amount cannot be withdrawn.'])->withInput();
         }
 
         $quote = MiningPlatform::payoutQuote($validated['method'], (float) $validated['amount']);
