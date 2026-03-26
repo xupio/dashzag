@@ -131,7 +131,8 @@
 
           <div class="mb-3">
             <label for="friend_phone" class="form-label">Telephone number</label>
-            <input type="text" class="form-control @error('phone') is-invalid @enderror" id="friend_phone" name="phone" value="{{ old('phone') }}">
+            <input type="text" class="form-control @error('phone') is-invalid @enderror" id="friend_phone" name="phone" value="{{ old('phone') }}" placeholder="Not required">
+            <div class="form-text">Optional field.</div>
             @error('phone')
               <div class="invalid-feedback">{{ $message }}</div>
             @enderror
@@ -139,7 +140,12 @@
 
           <div class="mb-0">
             <label for="friend_country" class="form-label">Country</label>
-            <input type="text" class="form-control @error('country') is-invalid @enderror" id="friend_country" name="country" value="{{ old('country') }}">
+            <select class="form-select @error('country') is-invalid @enderror" id="friend_country" name="country" required>
+              <option value="" disabled {{ old('country') ? '' : 'selected' }}>Select country</option>
+              @foreach ($friendInvitationCountries as $friendInvitationCountry)
+                <option value="{{ $friendInvitationCountry }}" @selected(old('country') === $friendInvitationCountry)>{{ $friendInvitationCountry }}</option>
+              @endforeach
+            </select>
             @error('country')
               <div class="invalid-feedback">{{ $message }}</div>
             @enderror
@@ -170,5 +176,6 @@
     </script>
   @endif
 @endpush
+
 
 
