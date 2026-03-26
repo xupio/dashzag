@@ -6,7 +6,8 @@ use App\Models\User;
 use Endroid\QrCode\Builder\Builder;
 use Endroid\QrCode\Encoding\Encoding;
 use Endroid\QrCode\ErrorCorrectionLevel;
-use Endroid\QrCode\Label\Label;
+use Endroid\QrCode\Label\Font\OpenSans;
+use Endroid\QrCode\Label\LabelAlignment;
 use Endroid\QrCode\RoundBlockSizeMode;
 use Endroid\QrCode\Writer\PngWriter;
 use Illuminate\Support\Facades\Crypt;
@@ -72,19 +73,19 @@ class AdminTwoFactor
             return null;
         }
 
-        $result = Builder::create()
-            ->writer(new PngWriter())
-            ->writerOptions([])
-            ->data($uri)
-            ->encoding(new Encoding('UTF-8'))
-            ->errorCorrectionLevel(ErrorCorrectionLevel::Medium)
-            ->size(240)
-            ->margin(8)
-            ->roundBlockSizeMode(RoundBlockSizeMode::Margin)
-            ->labelText('Scan with Google Authenticator, 1Password, or similar')
-            ->labelFont(new \Endroid\QrCode\Label\Font\OpenSans(12))
-            ->labelAlignment(\Endroid\QrCode\Label\Alignment\LabelAlignment::Center)
-            ->build();
+        $result = (new Builder())->build(
+            writer: new PngWriter(),
+            writerOptions: [],
+            data: $uri,
+            encoding: new Encoding('UTF-8'),
+            errorCorrectionLevel: ErrorCorrectionLevel::Medium,
+            size: 240,
+            margin: 8,
+            roundBlockSizeMode: RoundBlockSizeMode::Margin,
+            labelText: 'Scan with Google Authenticator, 1Password, or similar',
+            labelFont: new OpenSans(12),
+            labelAlignment: LabelAlignment::Center,
+        );
 
         return $result->getDataUri();
     }
