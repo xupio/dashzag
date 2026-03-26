@@ -485,7 +485,9 @@
           </div>
         </form>
 
-        @if (($adminActivityLogs ?? collect())->isEmpty())
+        @php($activityRows = ($adminActivityLogs ?? collect())->values())
+
+        @if ($activityRows->isEmpty())
           <p class="text-secondary mb-0">No admin activity has been logged yet.</p>
         @else
           <div class="table-responsive">
@@ -500,26 +502,23 @@
                 </tr>
               </thead>
               <tbody>
-                @foreach ($adminActivityLogs as $activityLog)
-                  @php
-                    $details = collect($activityLog->details ?? []);
-                  @endphp
+                @foreach ($activityRows as $activityRow)
                   <tr>
                     <td>
-                      <span class="badge bg-light text-dark border">{{ str($activityLog->action)->replace('.', ' ')->title() }}</span>
+                      <span class="badge bg-light text-dark border">{{ str($activityRow->action)->replace('.', ' ')->title() }}</span>
                     </td>
                     <td>
-                      <div class="fw-semibold">{{ $activityLog->summary }}</div>
-                      <div class="text-secondary small">Subject: {{ class_basename((string) $activityLog->subject_type) ?: 'N/A' }} {{ $activityLog->subject_id ? '#'.$activityLog->subject_id : '' }}</div>
+                      <div class="fw-semibold">{{ $activityRow->summary }}</div>
+                      <div class="text-secondary small">Subject: {{ class_basename((string) $activityRow->subject_type) ?: 'N/A' }} {{ $activityRow->subject_id ? '#'.$activityRow->subject_id : '' }}</div>
                     </td>
                     <td>
-                      <div class="fw-semibold">{{ $activityLog->admin?->name ?? 'Unknown admin' }}</div>
-                      <div class="text-secondary small">{{ $activityLog->admin?->email ?? 'No email recorded' }}</div>
+                      <div class="fw-semibold">{{ $activityRow->admin?->name ?? 'Unknown admin' }}</div>
+                      <div class="text-secondary small">{{ $activityRow->admin?->email ?? 'No email recorded' }}</div>
                     </td>
                     <td style="min-width: 280px;">
-                      <div class="text-secondary small">IP: {{ $activityLog->ip_address ?: '-' }}</div>
-                      @if ($details->isNotEmpty())
-                        @foreach ($details as $key => $value)
+                      <div class="text-secondary small">IP: {{ $activityRow->ip_address ?: '-' }}</div>
+                      @if (collect($activityRow->details ?? [])->isNotEmpty())
+                        @foreach (collect($activityRow->details ?? []) as $key => $value)
                           <div class="text-secondary small">
                             <span class="fw-semibold text-dark">{{ str($key)->replace('_', ' ')->title() }}:</span>
                             {{ is_bool($value) ? ($value ? 'Yes' : 'No') : ($value === null || $value === '' ? '-' : $value) }}
@@ -530,8 +529,8 @@
                       @endif
                     </td>
                     <td>
-                      <div class="fw-semibold">{{ $activityLog->created_at?->format('M d, Y h:i A') }}</div>
-                      <div class="text-secondary small">{{ \Illuminate\Support\Str::limit((string) $activityLog->user_agent, 70) ?: 'No user agent recorded' }}</div>
+                      <div class="fw-semibold">{{ $activityRow->created_at?->format('M d, Y h:i A') }}</div>
+                      <div class="text-secondary small">{{ \Illuminate\Support\Str::limit((string) $activityRow->user_agent, 70) ?: 'No user agent recorded' }}</div>
                     </td>
                   </tr>
                 @endforeach
