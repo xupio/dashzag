@@ -500,24 +500,24 @@
                 </tr>
               </thead>
               <tbody>
-                @foreach ($adminActivityLogs as $log)
+                @foreach ($adminActivityLogs as $activityLog)
                   @php
-                    $details = collect($log->details ?? []);
+                    $details = collect($activityLog->details ?? []);
                   @endphp
                   <tr>
                     <td>
-                      <span class="badge bg-light text-dark border">{{ str($log->action)->replace('.', ' ')->title() }}</span>
+                      <span class="badge bg-light text-dark border">{{ str($activityLog->action)->replace('.', ' ')->title() }}</span>
                     </td>
                     <td>
-                      <div class="fw-semibold">{{ $log->summary }}</div>
-                      <div class="text-secondary small">Subject: {{ class_basename((string) $log->subject_type) ?: 'N/A' }} {{ $log->subject_id ? '#'.$log->subject_id : '' }}</div>
+                      <div class="fw-semibold">{{ $activityLog->summary }}</div>
+                      <div class="text-secondary small">Subject: {{ class_basename((string) $activityLog->subject_type) ?: 'N/A' }} {{ $activityLog->subject_id ? '#'.$activityLog->subject_id : '' }}</div>
                     </td>
                     <td>
-                      <div class="fw-semibold">{{ $log->admin?->name ?? 'Unknown admin' }}</div>
-                      <div class="text-secondary small">{{ $log->admin?->email ?? 'No email recorded' }}</div>
+                      <div class="fw-semibold">{{ $activityLog->admin?->name ?? 'Unknown admin' }}</div>
+                      <div class="text-secondary small">{{ $activityLog->admin?->email ?? 'No email recorded' }}</div>
                     </td>
                     <td style="min-width: 280px;">
-                      <div class="text-secondary small">IP: {{ $log->ip_address ?: '-' }}</div>
+                      <div class="text-secondary small">IP: {{ $activityLog->ip_address ?: '-' }}</div>
                       @if ($details->isNotEmpty())
                         @foreach ($details as $key => $value)
                           <div class="text-secondary small">
@@ -530,8 +530,8 @@
                       @endif
                     </td>
                     <td>
-                      <div class="fw-semibold">{{ $log->created_at?->format('M d, Y h:i A') }}</div>
-                      <div class="text-secondary small">{{ \Illuminate\Support\Str::limit((string) $log->user_agent, 70) ?: 'No user agent recorded' }}</div>
+                      <div class="fw-semibold">{{ $activityLog->created_at?->format('M d, Y h:i A') }}</div>
+                      <div class="text-secondary small">{{ \Illuminate\Support\Str::limit((string) $activityLog->user_agent, 70) ?: 'No user agent recorded' }}</div>
                     </td>
                   </tr>
                 @endforeach
