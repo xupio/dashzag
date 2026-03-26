@@ -124,6 +124,35 @@ test('user can upload payment proof after submitting the investment order', func
     Storage::disk('public')->assertExists($order->payment_proof_path);
 });
 
+test('payment proof upload rejects disguised files with invalid content signature', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+    ]);
+
+    $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
+        'package' => 'growth-500',
+        'payment_method' => 'btc_transfer',
+        'payment_reference' => 'TX-BAD-PROOF-001',
+    ]);
+
+    $order = InvestmentOrder::query()->firstOrFail();
+    $tempFile = tempnam(sys_get_temp_dir(), 'zag-proof-test');
+    file_put_contents($tempFile, 'GIF89a fake-gif-content');
+
+    $response = $this->actingAs($user)
+        ->from(route('dashboard.buy-shares', ['miner' => 'alpha-one']))
+        ->post(route('dashboard.buy-shares.proof', $order), [
+            'payment_proof' => new UploadedFile($tempFile, 'receipt.pdf', 'image/gif', null, true),
+        ]);
+
+    $response
+        ->assertRedirect(route('dashboard.buy-shares', ['miner' => 'alpha-one']))
+        ->assertSessionHasErrors('payment_proof');
+
+    expect($order->fresh()->payment_proof_path)->toBeNull();
+});
+
 test('admin can approve an investment order and activate shareholder package', function () {
     $admin = User::factory()->create([
         'email_verified_at' => now(),

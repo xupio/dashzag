@@ -293,6 +293,29 @@ test('user can upload attachment on draft and download it after sending', functi
         ->assertOk();
 });
 
+test('internal mail attachment rejects disguised files with invalid content signature', function () {
+    Storage::fake('local');
+
+    $sender = User::factory()->create(['email_verified_at' => now()]);
+    $recipient = User::factory()->create(['email_verified_at' => now()]);
+    $tempFile = tempnam(sys_get_temp_dir(), 'zag-mail-test');
+    file_put_contents($tempFile, 'GIF89a fake-gif-content');
+
+    $this->actingAs($sender)
+        ->from(route('email.compose'))
+        ->post(route('email.store'), [
+            'to' => [$recipient->id],
+            'subject' => 'Bad attachment',
+            'body' => 'This should fail.',
+            'mail_action' => 'send',
+            'attachments' => [
+                new UploadedFile($tempFile, 'bad.pdf', 'image/gif', null, true),
+            ],
+        ])
+        ->assertRedirect()
+        ->assertSessionHasErrors('attachments.0');
+});
+
 test('user can remove an attachment from a draft before sending', function () {
     Storage::fake('local');
 

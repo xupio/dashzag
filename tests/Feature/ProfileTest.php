@@ -34,6 +34,25 @@ test('profile photo can be updated', function () {
     Storage::disk('public')->assertExists($user->profile_photo_path);
 });
 
+test('profile photo upload rejects disguised files with invalid content signature', function () {
+    $user = User::factory()->create();
+    Storage::fake('public');
+
+    $tempFile = tempnam(sys_get_temp_dir(), 'zag-photo-test');
+    file_put_contents($tempFile, '%PDF-1.4 fake-pdf-content');
+
+    $response = $this
+        ->actingAs($user)
+        ->from('/profile')
+        ->patch('/profile', [
+            'profile_photo' => new UploadedFile($tempFile, 'avatar.png', 'application/pdf', null, true),
+        ]);
+
+    $response
+        ->assertRedirect('/profile')
+        ->assertSessionHasErrors('profile_photo');
+});
+
 test('payout destinations can be saved from account settings', function () {
     $user = User::factory()->create();
 

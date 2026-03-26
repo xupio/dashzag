@@ -6,6 +6,7 @@ use App\Models\InternalMessage;
 use App\Models\InternalMessageAttachment;
 use App\Models\InternalMessageRecipient;
 use App\Models\User;
+use App\Rules\AllowedFileSignature;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -19,6 +20,18 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class InternalMailController extends Controller
 {
+    protected const MAIL_ATTACHMENT_SIGNATURE_MIME_TYPES = [
+        'application/pdf',
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'text/plain',
+        'text/csv',
+        'text/x-csv',
+        'application/csv',
+        'text/comma-separated-values',
+    ];
+
     public function inbox(Request $request): View
     {
         $user = $request->user();
@@ -288,7 +301,12 @@ class InternalMailController extends Controller
                 'label' => ['nullable', Rule::in(array_keys(InternalMessage::labelOptions()))],
                 'reply_to_message_id' => ['nullable', 'integer'],
                 'attachments' => ['nullable', 'array'],
-                'attachments.*' => ['file', 'mimes:pdf,jpg,jpeg,png,webp,txt,csv', 'max:10240'],
+                'attachments.*' => [
+                    'file',
+                    'mimes:pdf,jpg,jpeg,png,webp,txt,csv',
+                    'max:10240',
+                    new AllowedFileSignature(self::MAIL_ATTACHMENT_SIGNATURE_MIME_TYPES),
+                ],
             ]);
 
             $replyMessage = $this->resolveReplyMessage($user, $validated['reply_to_message_id'] ?? null);
@@ -321,7 +339,12 @@ class InternalMailController extends Controller
             'label' => ['nullable', Rule::in(array_keys(InternalMessage::labelOptions()))],
             'reply_to_message_id' => ['nullable', 'integer'],
             'attachments' => ['nullable', 'array'],
-            'attachments.*' => ['file', 'mimes:pdf,jpg,jpeg,png,webp,txt,csv', 'max:10240'],
+            'attachments.*' => [
+                'file',
+                'mimes:pdf,jpg,jpeg,png,webp,txt,csv',
+                'max:10240',
+                new AllowedFileSignature(self::MAIL_ATTACHMENT_SIGNATURE_MIME_TYPES),
+            ],
         ]);
 
         $replyMessage = $this->resolveReplyMessage($user, $validated['reply_to_message_id'] ?? null);

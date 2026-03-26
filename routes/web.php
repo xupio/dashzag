@@ -3,6 +3,7 @@
 use App\Http\Controllers\InternalMailController;
 use App\Http\Controllers\AdminTwoFactorController;
 use App\Http\Controllers\ProfileController;
+use App\Rules\AllowedFileSignature;
 use App\Mail\FriendInvitationMail;
 use App\Models\AdminActivityLog;
 use App\Models\Earning;
@@ -4248,7 +4249,17 @@ Route::middleware(['auth', 'verified', 'admin.two_factor'])->group(function () {
         abort_unless(in_array($investmentOrder->status, ['pending', 'rejected'], true), 403);
 
         $validated = $request->validate([
-            'payment_proof' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
+            'payment_proof' => [
+                'required',
+                'file',
+                'mimes:jpg,jpeg,png,pdf',
+                'max:5120',
+                new AllowedFileSignature([
+                    'application/pdf',
+                    'image/jpeg',
+                    'image/png',
+                ]),
+            ],
         ]);
 
         if ($investmentOrder->payment_proof_path) {
