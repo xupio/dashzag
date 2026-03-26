@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Support\ActiveSession;
 use App\Support\AdminTwoFactor;
 use App\Support\MiningPlatform;
 use Illuminate\Http\RedirectResponse;
@@ -102,6 +103,7 @@ class AdminTwoFactorChallengeController extends Controller
         Auth::login($pendingUser, $remember);
 
         $request->session()->regenerate();
+        ActiveSession::issueFor($pendingUser, $request);
         $request->session()->put('auth.admin_two_factor_passed_for', $pendingUser->getKey());
 
         return redirect()->intended(route('dashboard', absolute: false));

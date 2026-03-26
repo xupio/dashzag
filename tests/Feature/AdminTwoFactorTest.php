@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Support\ActiveSession;
 use App\Support\AdminTwoFactor;
 use Illuminate\Support\Facades\Crypt;
 
@@ -49,6 +50,8 @@ test('admin login requires a second factor challenge after password authenticati
     ])->assertRedirect(route('dashboard', absolute: false));
 
     $this->assertAuthenticatedAs($admin);
+    expect($admin->fresh()->active_session_token)->not->toBeNull();
+    expect(session(ActiveSession::SESSION_KEY))->toBe($admin->fresh()->active_session_token);
 });
 
 test('non admin users still log in without two factor challenge', function () {

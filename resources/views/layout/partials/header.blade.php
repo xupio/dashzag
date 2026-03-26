@@ -5,7 +5,10 @@
           ? auth()->user()->investmentOrders()
               ->with(['miner', 'package'])
               ->whereIn('status', ['pending', 'rejected'])
-              ->whereNull('payment_proof_path')
+              ->where(function ($query) {
+                  $query->whereNull('payment_proof_path')
+                      ->orWhere('payment_proof_path', '');
+              })
               ->latest('submitted_at')
               ->first()
           : null;

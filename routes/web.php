@@ -269,9 +269,9 @@ Route::get('/dashboard', function (Request $request) {
         'weeklyHallOfFameWinnerId' => $weeklyHallOfFameWinner['user']->id ?? null,
         'monthlyHallOfFameChampionId' => $monthlyHallOfFameChampion['user']->id ?? null,
     ]);
-})->middleware(['auth', 'verified'])->name('dashboard');
+})->middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->name('dashboard');
 
-Route::middleware(['auth', 'verified', 'admin.two_factor'])->group(function () {
+Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->group(function () {
     Route::get('/dashboard/miner-report', function (Request $request) {
         MiningPlatform::ensureDefaults();
 

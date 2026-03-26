@@ -42,6 +42,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'password',
         'remember_token',
         'admin_two_factor_secret',
+        'active_session_token',
     ];
 
     protected $attributes = [

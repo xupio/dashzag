@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Support\ActiveSession;
 
 test('login screen can be rendered', function () {
     $response = $this->get('/login');
@@ -17,6 +18,8 @@ test('users can authenticate using the login screen', function () {
     ]);
 
     $this->assertAuthenticated();
+    expect($user->fresh()->active_session_token)->not->toBeNull();
+    expect(session(ActiveSession::SESSION_KEY))->toBe($user->fresh()->active_session_token);
     $response->assertRedirect(route('dashboard', absolute: false));
 });
 
@@ -38,5 +41,19 @@ test('users can logout', function () {
 
     $this->assertGuest();
     $response->assertRedirect('/');
+});
+
+test('stale sessions are logged out after a newer login token exists', function () {
+    $user = User::factory()->create([
+        'active_session_token' => 'newer-session-token',
+    ]);
+
+    $response = $this->actingAs($user)
+        ->withSession([ActiveSession::SESSION_KEY => 'older-session-token'])
+        ->get(route('dashboard'));
+
+    $response->assertRedirect(route('login'));
+    $response->assertSessionHasErrors('email');
+    $this->assertGuest();
 });
 

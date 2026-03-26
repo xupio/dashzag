@@ -184,6 +184,31 @@ test('payment popup reminder disappears after proof upload is completed', functi
     $response->assertDontSee('Finish your pending payment');
 });
 
+test('toolbar payment indicator disappears after proof upload is completed', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+    ]);
+
+    $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
+        'package' => 'growth-500',
+        'payment_method' => 'btc_transfer',
+        'payment_reference' => 'TX-HEADER-001',
+    ]);
+
+    $pendingResponse = $this->actingAs($user)->get(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+    $pendingResponse->assertSee('Finish your pending payment');
+
+    $order = InvestmentOrder::query()->firstOrFail();
+
+    $this->actingAs($user)->post(route('dashboard.buy-shares.proof', $order), [
+        'payment_proof' => UploadedFile::fake()->create('header-proof.pdf', 120, 'application/pdf'),
+    ]);
+
+    $completeResponse = $this->actingAs($user)->get(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+    $completeResponse->assertDontSee('Finish your pending payment');
+});
+
 test('payment proof upload rejects disguised files with invalid content signature', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),
