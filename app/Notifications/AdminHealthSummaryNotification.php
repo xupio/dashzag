@@ -23,7 +23,7 @@ class AdminHealthSummaryNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('Daily admin health summary')
+            ->subject('ZagChain Daily Admin Health Summary')
             ->greeting('Hello '.$notifiable->name.',')
             ->line('Here is your daily ZagChain admin health summary.')
             ->line('Pending investment orders: '.$this->summary['pending_investment_orders'])
@@ -33,7 +33,8 @@ class AdminHealthSummaryNotification extends Notification
             ->line('Stale pending investments: '.$this->summary['stale_pending_investments'])
             ->line('Stale pending payouts: '.$this->summary['stale_pending_payouts'])
             ->line('Recent admin actions: '.$this->summary['recent_admin_actions'])
-            ->line('Pending invitations: '.$this->summary['pending_friend_invitations']);
+            ->line('Pending invitations: '.$this->summary['pending_friend_invitations'])
+            ->action('Open ZagChain Security Center', route('dashboard.security-center'));
     }
 
     public function toArray(object $notifiable): array

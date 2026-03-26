@@ -59,3 +59,18 @@ test('password can be reset with valid token', function () {
     });
 });
 
+test('reset password email uses zagchain branding copy', function () {
+    $user = User::factory()->create([
+        'name' => 'Mohammad',
+    ]);
+
+    $notification = new ResetPassword('test-token');
+    $mailMessage = $notification->toMail($user);
+
+    expect($mailMessage->subject)->toBe('Reset Your ZagChain Password');
+    expect($mailMessage->greeting)->toBe('Hello Mohammad,');
+    expect(collect($mailMessage->introLines)->join(' '))
+        ->toContain('reset your ZagChain password');
+    expect($mailMessage->actionText)->toBe('Reset ZagChain Password');
+});
+

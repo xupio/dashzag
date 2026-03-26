@@ -30,7 +30,7 @@ class PayoutStatusNotification extends Notification
         $request = $this->payoutRequest->fresh() ?? $this->payoutRequest;
 
         return (new MailMessage)
-            ->subject($this->subject())
+            ->subject('ZagChain: '.$this->subject())
             ->greeting('Hello '.$notifiable->name.',')
             ->line($this->introLine())
             ->line('Gross amount: $'.number_format((float) $request->amount, 2))
@@ -39,7 +39,8 @@ class PayoutStatusNotification extends Notification
             ->line('Method: '.$this->methodLabel($request))
             ->line('Destination: '.$request->destination)
             ->line($this->statusLine($request))
-            ->line($this->notesLine($request));
+            ->line($this->notesLine($request))
+            ->action('Open ZagChain Wallet', route('dashboard.wallet'));
     }
 
     public function toArray(object $notifiable): array

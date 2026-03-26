@@ -32,7 +32,7 @@ class ActivityFeedNotification extends Notification
     {
         $data = $this->toArray($notifiable);
         $message = (new MailMessage)
-            ->subject($data['subject'])
+            ->subject('ZagChain: '.$data['subject'])
             ->greeting('Hello '.$notifiable->name.',')
             ->line($data['message']);
 
@@ -52,7 +52,7 @@ class ActivityFeedNotification extends Notification
             $message->line($data['notes_line']);
         }
 
-        return $message;
+        return $message->action('Open ZagChain Dashboard', route('dashboard'));
     }
 
     public function toArray(object $notifiable): array

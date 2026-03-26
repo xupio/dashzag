@@ -30,7 +30,7 @@ class DigestSummaryNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject($this->subject())
+            ->subject('ZagChain '.ucfirst($this->frequency).' Digest Summary')
             ->greeting('Hello '.$notifiable->name.',')
             ->line('Here is your '.$this->frequency.' activity summary for '.$this->periodLabel.'.')
             ->line('Total notifications: '.$this->summary['total'])
@@ -39,7 +39,8 @@ class DigestSummaryNotification extends Notification
             ->line('Investments: '.$this->summary['investment'])
             ->line('Network updates: '.$this->summary['network'])
             ->line('Milestones: '.$this->summary['milestone'])
-            ->line('Unread remaining: '.$this->summary['unread']);
+            ->line('Unread remaining: '.$this->summary['unread'])
+            ->action('Open ZagChain Notifications', route('dashboard.notifications'));
     }
 
     public function toArray(object $notifiable): array
