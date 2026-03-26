@@ -24,7 +24,7 @@ class FriendInvitationMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: $this->inviter->name.' invited you to join',
+            subject: $this->inviter->name.' invited you to join ZagChain',
         );
     }
 

@@ -115,3 +115,30 @@ test('user must choose a valid country when inviting a friend', function () {
     Mail::assertNothingSent();
 });
 
+test('friend invitation email uses zagchain branding and copy', function () {
+    $inviter = User::factory()->create([
+        'name' => 'Mohammad',
+        'email_verified_at' => now(),
+    ]);
+
+    $friendInvitation = FriendInvitation::create([
+        'user_id' => $inviter->id,
+        'name' => 'Future Investor',
+        'email' => 'future-investor@example.com',
+    ]);
+
+    $mail = new FriendInvitationMail(
+        $friendInvitation,
+        $inviter,
+        'https://example.com/verify-friend'
+    );
+
+    expect($mail->envelope()->subject)->toBe('Mohammad invited you to join ZagChain');
+
+    $rendered = $mail->render();
+
+    expect($rendered)
+        ->toContain('invited you to join us with ZagChain.')
+        ->toContain('branding/zagchain-logo.png');
+});
+
