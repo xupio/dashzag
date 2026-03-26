@@ -284,6 +284,26 @@ class MiningPlatform
 
         return $summary;
     }
+
+    public static function adminHealthSummary(?Carbon $since = null): array
+    {
+        $since ??= now()->subDay();
+
+        $pendingInvestmentOrders = InvestmentOrder::query()->where('status', 'pending');
+        $pendingPayoutRequests = PayoutRequest::query()->where('status', 'pending');
+
+        return [
+            'period_label' => 'the last 24 hours',
+            'pending_investment_orders' => (clone $pendingInvestmentOrders)->count(),
+            'pending_payout_requests' => (clone $pendingPayoutRequests)->count(),
+            'pending_orders_with_proof' => (clone $pendingInvestmentOrders)->whereNotNull('payment_proof_path')->count(),
+            'pending_orders_missing_proof' => (clone $pendingInvestmentOrders)->whereNull('payment_proof_path')->count(),
+            'stale_pending_investments' => (clone $pendingInvestmentOrders)->where('submitted_at', '<', $since)->count(),
+            'stale_pending_payouts' => (clone $pendingPayoutRequests)->where('requested_at', '<', $since)->count(),
+            'recent_admin_actions' => AdminActivityLog::query()->where('created_at', '>=', $since)->count(),
+            'pending_friend_invitations' => FriendInvitation::query()->whereNull('verified_at')->count(),
+        ];
+    }
     public static function notificationDefaultPreferences(): array
     {
         return [

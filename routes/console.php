@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Notifications\AdminHealthSummaryNotification;
 use App\Support\MiningPlatform;
 use App\Notifications\DigestSummaryNotification;
 use Illuminate\Foundation\Inspiring;
@@ -100,6 +101,36 @@ Artisan::command('miners:generate-daily-snapshots {--date= : Generate snapshots 
     return self::SUCCESS;
 })->purpose('Generate daily miner performance snapshots and sync per-share earnings.');
 
+Artisan::command('admin:send-health-summary', function () {
+    MiningPlatform::ensureDefaults();
+
+    $summary = MiningPlatform::adminHealthSummary();
+    $sent = 0;
+
+    User::query()
+        ->where('role', 'admin')
+        ->whereNotNull('email_verified_at')
+        ->orderBy('id')
+        ->get()
+        ->each(function (User $admin) use ($summary, &$sent) {
+            $alreadySent = $admin->notifications()
+                ->where('type', AdminHealthSummaryNotification::class)
+                ->where('created_at', '>=', now()->startOfDay())
+                ->exists();
+
+            if ($alreadySent) {
+                return;
+            }
+
+            $admin->notify(new AdminHealthSummaryNotification($summary));
+            $sent++;
+        });
+
+    $this->info('Sent '.$sent.' admin health summary notifications.');
+
+    return self::SUCCESS;
+})->purpose('Send the daily admin health summary notification to verified admins.');
+
 Artisan::command('hall-of-fame:capture {--category= : Limit capture to weekly or monthly snapshots}', function () {
     MiningPlatform::ensureDefaults();
 
@@ -133,3 +164,4 @@ Schedule::command('notifications:send-digests --frequency=weekly')->weeklyOn(1, 
 Schedule::command('miners:generate-daily-snapshots')->dailyAt('00:15');
 Schedule::command('hall-of-fame:capture --category=weekly')->weeklyOn(1, '00:35');
 Schedule::command('hall-of-fame:capture --category=monthly')->monthlyOn(1, '00:45');
+Schedule::command('admin:send-health-summary')->dailyAt('10:00');

@@ -135,6 +135,23 @@ php artisan route:cache
 php artisan view:cache</pre>
               </div>
             </div>
+            <div class="col-lg-6">
+              <div class="border rounded p-3 h-100 bg-white">
+                <div class="fw-semibold mb-2">Lost admin device recovery</div>
+                <div class="small text-secondary mb-2">If your authenticator phone is lost, disable 2FA on the server first, then re-enroll it from your profile.</div>
+                <pre class="bg-light border rounded p-3 small mb-2" style="white-space: pre-wrap;">cd /home/u723968965/laravel-app
+php -r "require 'vendor/autoload.php'; \$app=require 'bootstrap/app.php'; \$kernel=\$app->make(Illuminate\Contracts\Console\Kernel::class); \$kernel->bootstrap(); \$user=App\Models\User::where('email','xupio.dso1234@gmail.com')->first(); if (! \$user) { echo 'Admin not found'; exit(1); } \$user->forceFill(['admin_two_factor_secret'=>null,'admin_two_factor_confirmed_at'=>null])->save(); echo 'Admin 2FA disabled for '.$user->email;"</pre>
+                <div class="small text-secondary mb-0">After that: log in, open Profile, generate a new authenticator setup, scan the QR code, and confirm the 6-digit code.</div>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="border rounded p-3 h-100 bg-white">
+                <div class="fw-semibold mb-2">Printable checklist file</div>
+                <div class="small text-secondary mb-2">The short runbook lives in the project if you want to keep it beside Hostinger.</div>
+                <div class="bg-light border rounded p-3 small fw-semibold">PRODUCTION_BACKUP_CHECKLIST.md</div>
+                <div class="small text-secondary mt-2 mb-0">Use it for backup timing, after-deploy checks, and the admin-device recovery flow.</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
