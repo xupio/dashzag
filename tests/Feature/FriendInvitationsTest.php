@@ -58,3 +58,60 @@ test('user cannot resend someone else pending friend invitation', function () {
     Mail::assertNothingSent();
 });
 
+test('user can invite a friend with required name email and country', function () {
+    Mail::fake();
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->post(route('dashboard.friends.invite'), [
+        'name' => 'New Friend',
+        'email' => 'new-friend@example.com',
+        'phone' => '',
+        'country' => 'United Arab Emirates',
+    ]);
+
+    $response->assertRedirect(route('dashboard.friends'));
+    $response->assertSessionHas('invite_success');
+
+    $this->assertDatabaseHas('friend_invitations', [
+        'user_id' => $user->id,
+        'name' => 'New Friend',
+        'email' => 'new-friend@example.com',
+        'phone' => null,
+        'country' => 'United Arab Emirates',
+    ]);
+
+    Mail::assertSent(FriendInvitationMail::class, function (FriendInvitationMail $mail) {
+        return $mail->hasTo('new-friend@example.com');
+    });
+});
+
+test('user must choose a valid country when inviting a friend', function () {
+    Mail::fake();
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->from(route('dashboard.friends'))
+        ->actingAs($user)
+        ->post(route('dashboard.friends.invite'), [
+            'name' => 'New Friend',
+            'email' => 'new-friend@example.com',
+            'phone' => '',
+            'country' => 'Atlantis',
+        ]);
+
+    $response->assertRedirect(route('dashboard.friends'));
+    $response->assertSessionHasErrors('country');
+
+    $this->assertDatabaseMissing('friend_invitations', [
+        'user_id' => $user->id,
+        'email' => 'new-friend@example.com',
+    ]);
+
+    Mail::assertNothingSent();
+});
+

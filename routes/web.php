@@ -3996,19 +3996,61 @@ Route::middleware(['auth', 'verified', 'admin.two_factor'])->group(function () {
 
     Route::get('/dashboard/friends', function () {
         $user = request()->user();
+        $friendInvitationCountries = [
+            'Australia',
+            'Bahrain',
+            'Canada',
+            'Egypt',
+            'France',
+            'Germany',
+            'India',
+            'Iraq',
+            'Jordan',
+            'Kuwait',
+            'Lebanon',
+            'Oman',
+            'Qatar',
+            'Saudi Arabia',
+            'Turkey',
+            'United Arab Emirates',
+            'United Kingdom',
+            'United States',
+        ];
 
         return view('pages.general.friends', [
             'user' => $user,
             'friendInvitations' => $user->friendInvitations,
+            'friendInvitationCountries' => $friendInvitationCountries,
         ]);
     })->name('dashboard.friends');
 
     Route::post('/dashboard/friends/invite', function (Request $request) {
+        $friendInvitationCountries = [
+            'Australia',
+            'Bahrain',
+            'Canada',
+            'Egypt',
+            'France',
+            'Germany',
+            'India',
+            'Iraq',
+            'Jordan',
+            'Kuwait',
+            'Lebanon',
+            'Oman',
+            'Qatar',
+            'Saudi Arabia',
+            'Turkey',
+            'United Arab Emirates',
+            'United Kingdom',
+            'United States',
+        ];
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
-            'country' => ['nullable', 'string', 'max:100'],
+            'country' => ['required', 'string', Rule::in($friendInvitationCountries)],
         ]);
 
         $friendInvitation = FriendInvitation::updateOrCreate(

@@ -1,4 +1,4 @@
-@extends('layout.master')
+ï»¿@extends('layout.master')
 
 @section('content')
 <div class="row">
@@ -70,8 +70,8 @@
                   <tr>
                     <td>{{ $friendInvitation->name }}</td>
                     <td>{{ $friendInvitation->email }}</td>
-                    <td>{{ $friendInvitation->phone ?: '—' }}</td>
-                    <td>{{ $friendInvitation->country ?: '—' }}</td>
+                    <td>{{ $friendInvitation->phone ?: 'â€”' }}</td>
+                    <td>{{ $friendInvitation->country ?: 'â€”' }}</td>
                     <td>
                       @if ($friendInvitation->registered_at)
                         <span class="badge bg-success">Registered friend</span>
@@ -170,4 +170,5 @@
     </script>
   @endif
 @endpush
+
 
