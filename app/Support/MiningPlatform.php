@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\AdminActivityLog;
 use App\Models\Earning;
 use App\Models\FriendInvitation;
 use App\Models\HallOfFameSnapshot;
@@ -18,6 +19,7 @@ use App\Models\UserInvestment;
 use App\Models\UserLevel;
 use App\Notifications\ActivityFeedNotification;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -2736,6 +2738,20 @@ class MiningPlatform
         foreach ($node['children'] as $child) {
             self::appendReferralTreeChartNode($child, $nodeId, $nodes, $links);
         }
+    }
+
+    public static function logAdminActivity(User $admin, string $action, string $summary, ?Model $subject = null, array $details = []): AdminActivityLog
+    {
+        return AdminActivityLog::create([
+            'admin_user_id' => $admin->id,
+            'action' => $action,
+            'subject_type' => $subject ? $subject->getMorphClass() : null,
+            'subject_id' => $subject?->getKey(),
+            'summary' => Str::limit($summary, 255),
+            'details' => $details,
+            'ip_address' => request()?->ip(),
+            'user_agent' => Str::limit((string) request()?->userAgent(), 1000),
+        ]);
     }
 }
 

@@ -416,19 +416,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/email/drafts', [InternalMailController::class, 'drafts'])->name('email.drafts');
     Route::get('/email/sent', [InternalMailController::class, 'sent'])->name('email.sent');
     Route::get('/email/compose', [InternalMailController::class, 'compose'])->name('email.compose');
-    Route::post('/email/send', [InternalMailController::class, 'store'])->name('email.store');
-    Route::post('/email/{message}/reply', [InternalMailController::class, 'reply'])->name('email.reply');
+    Route::post('/email/send', [InternalMailController::class, 'store'])->middleware('throttle:12,1')->name('email.store');
+    Route::post('/email/{message}/reply', [InternalMailController::class, 'reply'])->middleware('throttle:20,1')->name('email.reply');
     Route::get('/email/attachments/{attachment}/download', [InternalMailController::class, 'downloadAttachment'])->name('email.attachments.download');
-    Route::post('/email/drafts/{draft}/attachments/{attachment}/remove', [InternalMailController::class, 'removeDraftAttachment'])->name('email.draft-attachments.remove');
-    Route::post('/email/drafts/{draft}/delete', [InternalMailController::class, 'deleteDraft'])->name('email.drafts.delete');
+    Route::post('/email/drafts/{draft}/attachments/{attachment}/remove', [InternalMailController::class, 'removeDraftAttachment'])->middleware('throttle:30,1')->name('email.draft-attachments.remove');
+    Route::post('/email/drafts/{draft}/delete', [InternalMailController::class, 'deleteDraft'])->middleware('throttle:20,1')->name('email.drafts.delete');
     Route::get('/email/inbox/{recipient}/read', [InternalMailController::class, 'showInbox'])->name('email.read');
-    Route::post('/email/inbox/{recipient}/toggle-star', [InternalMailController::class, 'toggleStar'])->name('email.toggle-star');
-    Route::post('/email/inbox/{recipient}/toggle-read', [InternalMailController::class, 'toggleRead'])->name('email.toggle-read');
-    Route::post('/email/inbox/{recipient}/archive', [InternalMailController::class, 'archive'])->name('email.archive');
-    Route::post('/email/inbox/{recipient}/delete', [InternalMailController::class, 'deleteRecipientMessage'])->name('email.delete');
-    Route::post('/email/inbox/{recipient}/restore', [InternalMailController::class, 'restoreRecipientMessage'])->name('email.restore');
-    Route::post('/email/inbox/{recipient}/purge', [InternalMailController::class, 'purgeRecipientMessage'])->name('email.purge');
-    Route::post('/email/inbox/bulk-action', [InternalMailController::class, 'bulkMailboxAction'])->name('email.bulk');
+    Route::post('/email/inbox/{recipient}/toggle-star', [InternalMailController::class, 'toggleStar'])->middleware('throttle:40,1')->name('email.toggle-star');
+    Route::post('/email/inbox/{recipient}/toggle-read', [InternalMailController::class, 'toggleRead'])->middleware('throttle:40,1')->name('email.toggle-read');
+    Route::post('/email/inbox/{recipient}/archive', [InternalMailController::class, 'archive'])->middleware('throttle:30,1')->name('email.archive');
+    Route::post('/email/inbox/{recipient}/delete', [InternalMailController::class, 'deleteRecipientMessage'])->middleware('throttle:30,1')->name('email.delete');
+    Route::post('/email/inbox/{recipient}/restore', [InternalMailController::class, 'restoreRecipientMessage'])->middleware('throttle:30,1')->name('email.restore');
+    Route::post('/email/inbox/{recipient}/purge', [InternalMailController::class, 'purgeRecipientMessage'])->middleware('throttle:15,1')->name('email.purge');
+    Route::post('/email/inbox/bulk-action', [InternalMailController::class, 'bulkMailboxAction'])->middleware('throttle:10,1')->name('email.bulk');
     Route::get('/email/sent/{message}/read', [InternalMailController::class, 'showSent'])->name('email.sent.read');
 
     Route::get('/dashboard/profile', function () {
@@ -1370,7 +1370,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         $user->notify(new PayoutStatusNotification($payoutRequest, 'submitted'));
 
         return redirect()->route('dashboard.wallet')->with('wallet_success', 'Your payout request has been submitted successfully.');
-    })->name('dashboard.wallet.request');
+    })->middleware('throttle:5,1')->name('dashboard.wallet.request');
 
     Route::post('/dashboard/wallet/generate', function () {
         MiningPlatform::ensureDefaults();
@@ -3065,10 +3065,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ]);
 
             $payoutRequest = MiningPlatform::approvePayoutRequest($payoutRequest, $validated['admin_notes'] ?? null);
+            MiningPlatform::logAdminActivity(
+                $request->user(),
+                'payout.approve',
+                'Approved payout request #'.$payoutRequest->id,
+                $payoutRequest,
+                [
+                    'user_id' => $payoutRequest->user_id,
+                    'method' => $payoutRequest->method,
+                    'amount' => (float) $payoutRequest->amount,
+                    'admin_notes' => $validated['admin_notes'] ?? null,
+                ],
+            );
             $payoutRequest->user?->notify(new PayoutStatusNotification($payoutRequest, 'approved'));
 
             return redirect()->route('dashboard.operations')->with('operations_success', 'Payout request approved successfully.');
-        })->name('dashboard.operations.payouts.approve');
+        })->middleware('throttle:20,1')->name('dashboard.operations.payouts.approve');
 
         Route::post('/dashboard/operations/payouts/{payoutRequest}/pay', function (Request $request, PayoutRequest $payoutRequest) {
             $validated = $request->validate([
@@ -3081,11 +3093,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 $validated['transaction_reference'] ?? null,
                 $validated['admin_notes'] ?? null,
             );
+            MiningPlatform::logAdminActivity(
+                $request->user(),
+                'payout.pay',
+                'Marked payout request #'.$payoutRequest->id.' as paid',
+                $payoutRequest,
+                [
+                    'user_id' => $payoutRequest->user_id,
+                    'method' => $payoutRequest->method,
+                    'amount' => (float) $payoutRequest->amount,
+                    'transaction_reference' => $validated['transaction_reference'] ?? null,
+                    'admin_notes' => $validated['admin_notes'] ?? null,
+                ],
+            );
 
             $payoutRequest->user?->notify(new PayoutStatusNotification($payoutRequest, 'paid'));
 
             return redirect()->route('dashboard.operations')->with('operations_success', 'Payout request marked as paid.');
-        })->name('dashboard.operations.payouts.pay');
+        })->middleware('throttle:20,1')->name('dashboard.operations.payouts.pay');
 
         Route::post('/dashboard/operations/investment-orders/{investmentOrder}/approve', function (Request $request, InvestmentOrder $investmentOrder) {
             $validated = $request->validate([
@@ -3115,6 +3140,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
             );
 
             $investmentOrder = $investmentOrder->fresh(['user', 'package']);
+            MiningPlatform::logAdminActivity(
+                $request->user(),
+                $allowWithoutProof ? 'investment.approve_without_proof' : 'investment.approve',
+                'Approved investment order #'.$investmentOrder->id,
+                $investmentOrder,
+                [
+                    'user_id' => $investmentOrder->user_id,
+                    'package' => $investmentOrder->package?->slug,
+                    'amount' => (float) $investmentOrder->amount,
+                    'allow_without_proof' => $allowWithoutProof,
+                    'admin_notes' => $validated['admin_notes'] ?? null,
+                ],
+            );
 
             if ($allowWithoutProof) {
                 $overrideTemplate = MiningPlatform::activityTemplate('investment_payment_override', [
@@ -3151,16 +3189,29 @@ Route::middleware(['auth', 'verified'])->group(function () {
             }
 
             return redirect()->route('dashboard.operations')->with('operations_success', $allowWithoutProof ? 'Investment order approved without proof override.' : 'Investment order approved successfully.');
-        })->name('dashboard.operations.investment-orders.approve');
+        })->middleware('throttle:20,1')->name('dashboard.operations.investment-orders.approve');
         Route::post('/dashboard/operations/investment-orders/{investmentOrder}/reject', function (Request $request, InvestmentOrder $investmentOrder) {
             $validated = $request->validate([
                 'admin_notes' => ['required', 'string', 'max:1000'],
             ]);
 
             MiningPlatform::rejectInvestmentOrder($investmentOrder, $request->user(), $validated['admin_notes']);
+            $investmentOrder = $investmentOrder->fresh(['package']);
+            MiningPlatform::logAdminActivity(
+                $request->user(),
+                'investment.reject',
+                'Rejected investment order #'.$investmentOrder->id,
+                $investmentOrder,
+                [
+                    'user_id' => $investmentOrder->user_id,
+                    'package' => $investmentOrder->package?->slug,
+                    'amount' => (float) $investmentOrder->amount,
+                    'admin_notes' => $validated['admin_notes'],
+                ],
+            );
 
             return redirect()->route('dashboard.operations')->with('operations_success', 'Investment order rejected successfully.');
-        })->name('dashboard.operations.investment-orders.reject');
+        })->middleware('throttle:20,1')->name('dashboard.operations.investment-orders.reject');
 
         Route::get('/dashboard/rewards', function () {
             MiningPlatform::ensureDefaults();
@@ -4158,7 +4209,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return redirect()
             ->route('dashboard.buy-shares', ['miner' => $package->miner?->slug])
             ->with('subscription_success', 'Your payment for '.$package->name.' has been submitted. Upload the payment proof after you complete the transfer.');
-    })->name('dashboard.buy-shares.subscribe');
+    })->middleware('throttle:8,1')->name('dashboard.buy-shares.subscribe');
 
     Route::post('/dashboard/buy-shares/{investmentOrder}/proof', function (Request $request, InvestmentOrder $investmentOrder) {
         MiningPlatform::ensureDefaults();
@@ -4201,7 +4252,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         return redirect()
             ->route('dashboard.buy-shares', ['miner' => $investmentOrder->miner?->slug])
             ->with('subscription_success', 'Payment proof uploaded successfully. The admin team can review it now.');
-    })->name('dashboard.buy-shares.proof');
+    })->middleware('throttle:6,1')->name('dashboard.buy-shares.proof');
 
     Route::get('/investment-orders/{investmentOrder}/proof-file', function (Request $request, InvestmentOrder $investmentOrder) {
         abort_unless($investmentOrder->payment_proof_path, 404);

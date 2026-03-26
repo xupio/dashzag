@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AdminActivityLog;
 use App\Models\InvestmentOrder;
 use App\Models\User;
 use App\Support\MiningPlatform;
@@ -166,6 +167,11 @@ test('admin can approve an investment order and activate shareholder package', f
     expect((int) $user->investments->first()->shares_owned)->toBe(5);
     expect($user->userLevel)->not->toBeNull();
     expect($user->notifications->pluck('data.subject'))->toContain('Investment subscription activated');
+    expect(AdminActivityLog::query()
+        ->where('admin_user_id', $admin->id)
+        ->where('action', 'investment.approve')
+        ->where('subject_id', $order->id)
+        ->exists())->toBeTrue();
 });
 
 test('admin can reject an investment order and leave it inactive', function () {
@@ -206,6 +212,11 @@ test('admin can reject an investment order and leave it inactive', function () {
     expect($user->shareholder)->toBeNull();
     expect($user->investments)->toHaveCount(0);
     expect($user->notifications->pluck('data.subject'))->toContain('Investment payment rejected');
+    expect(AdminActivityLog::query()
+        ->where('admin_user_id', $admin->id)
+        ->where('action', 'investment.reject')
+        ->where('subject_id', $order->id)
+        ->exists())->toBeTrue();
 });
 
 test('admin operations page shows proof preview controls for uploaded investment receipts', function () {

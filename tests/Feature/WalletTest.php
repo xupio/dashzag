@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AdminActivityLog;
 use App\Models\Earning;
 use App\Models\InvestmentOrder;
 use App\Models\PayoutRequest;
@@ -425,6 +426,11 @@ test('admin can approve and pay payout requests with audit details', function ()
     expect($payoutRequest->status)->toBe('approved');
     expect($payoutRequest->admin_notes)->toBe('Checked wallet ownership and approved.');
     expect($payoutRequest->approved_at)->not->toBeNull();
+    expect(AdminActivityLog::query()
+        ->where('admin_user_id', $admin->id)
+        ->where('action', 'payout.approve')
+        ->where('subject_id', $payoutRequest->id)
+        ->exists())->toBeTrue();
 
     $this->actingAs($admin)->post(route('dashboard.operations.payouts.pay', $payoutRequest), [
         'transaction_reference' => 'TX-20260311-0001',
@@ -440,6 +446,11 @@ test('admin can approve and pay payout requests with audit details', function ()
     expect($payoutRequest->admin_notes)->toBe('Sent manually through treasury wallet.');
     expect($payoutRequest->processed_at)->not->toBeNull();
     expect($user->earnings->where('status', 'paid')->sum('amount'))->toBe(30.0);
+    expect(AdminActivityLog::query()
+        ->where('admin_user_id', $admin->id)
+        ->where('action', 'payout.pay')
+        ->where('subject_id', $payoutRequest->id)
+        ->exists())->toBeTrue();
 });
 
 test('non admin user cannot access operations page', function () {

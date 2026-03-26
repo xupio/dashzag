@@ -14,4 +14,7 @@ test('security headers are added to web responses', function () {
     $response->assertHeader('X-Content-Type-Options', 'nosniff');
     $response->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     $response->assertHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    $response->assertHeader('Content-Security-Policy');
+    expect($response->headers->get('Content-Security-Policy'))->toContain("default-src 'self'");
+    expect($response->headers->get('Content-Security-Policy'))->toContain("object-src 'none'");
 });
