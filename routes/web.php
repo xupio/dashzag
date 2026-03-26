@@ -20,6 +20,9 @@ use App\Notifications\ActivityFeedNotification;
 use App\Notifications\DigestSummaryNotification;
 use App\Notifications\PayoutStatusNotification;
 use App\Support\MiningPlatform;
+use Endroid\QrCode\ErrorCorrectionLevel;
+use Endroid\QrCode\QrCode;
+use Endroid\QrCode\Writer\SvgWriter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
@@ -4043,6 +4046,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         $sharesSold = MiningPlatform::totalSharesSold($miner);
 
+        $qrWriter = new SvgWriter();
+
         $paymentMethods = collect([
             [
                 'key' => 'btc_transfer',
@@ -4068,7 +4073,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 'reference_hint' => MiningPlatform::platformSetting('payment_bank_transfer_reference_hint'),
                 'instruction' => MiningPlatform::platformSetting('payment_bank_transfer_instruction'),
             ],
-        ])->filter(fn (array $method) => $method['enabled'])->values();
+        ])->map(function (array $method) use ($qrWriter) {
+            $destination = trim((string) ($method['destination'] ?? ''));
+            $method['qr_code_data_uri'] = null;
+
+            if (in_array($method['key'], ['btc_transfer', 'usdt_transfer'], true) && '' !== $destination) {
+                $method['qr_code_data_uri'] = $qrWriter->write(new QrCode(
+                    data: $destination,
+                    size: 160,
+                    margin: 8,
+                    errorCorrectionLevel: ErrorCorrectionLevel::Medium,
+                ))->getDataUri();
+            }
+
+            return $method;
+        })->filter(fn (array $method) => $method['enabled'])->values();
         return view('pages.general.buy-shares', [
             'user' => $user,
             'level' => $level,

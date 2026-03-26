@@ -288,7 +288,7 @@ class InternalMailController extends Controller
                 'label' => ['nullable', Rule::in(array_keys(InternalMessage::labelOptions()))],
                 'reply_to_message_id' => ['nullable', 'integer'],
                 'attachments' => ['nullable', 'array'],
-                'attachments.*' => ['file', 'max:10240'],
+                'attachments.*' => ['file', 'mimes:pdf,jpg,jpeg,png,webp,txt,csv', 'max:10240'],
             ]);
 
             $replyMessage = $this->resolveReplyMessage($user, $validated['reply_to_message_id'] ?? null);
@@ -321,7 +321,7 @@ class InternalMailController extends Controller
             'label' => ['nullable', Rule::in(array_keys(InternalMessage::labelOptions()))],
             'reply_to_message_id' => ['nullable', 'integer'],
             'attachments' => ['nullable', 'array'],
-            'attachments.*' => ['file', 'max:10240'],
+            'attachments.*' => ['file', 'mimes:pdf,jpg,jpeg,png,webp,txt,csv', 'max:10240'],
         ]);
 
         $replyMessage = $this->resolveReplyMessage($user, $validated['reply_to_message_id'] ?? null);

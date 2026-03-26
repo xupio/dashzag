@@ -383,6 +383,9 @@ test('user sees configured payment destination details on buy shares page', func
         ->assertSee('bc1qexamplecompanywallet')
         ->assertSee('Send the exact package amount to the BTC wallet')
         ->assertSee('Send BTC only. Do not send any other coin or token to this address.')
-        ->assertSee('Submit the BTC transaction hash after sending.');
+        ->assertSee('Submit the BTC transaction hash after sending.')
+        ->assertSee('qr_code_data_uri')
+        ->assertSee('data:image')
+        ->assertDontSee('api.qrserver.com');
 });
 

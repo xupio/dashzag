@@ -489,9 +489,7 @@
             const instructions = method.instruction || 'Follow the payment instructions from the admin team.';
             const isCrypto = cryptoMethods.includes(method.key);
             const meta = methodMeta[method.key] ?? methodMeta.bank_transfer;
-            const qrUrl = isCrypto
-                ? `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(destination)}`
-                : null;
+            const qrDataUri = isCrypto ? method.qr_code_data_uri : null;
 
             panel.innerHTML = `
                 <div class="d-flex flex-column gap-3">
@@ -521,10 +519,10 @@
                             <div class="text-muted">${meta.referenceLabel}</div>
                             <div class="text-success small d-none mt-2" data-payment-copy-feedback>Copied to clipboard.</div>
                         </div>
-                        ${qrUrl ? `
+                        ${qrDataUri ? `
                             <div class="text-center border rounded p-2 bg-white">
                                 <div class="text-muted text-uppercase small mb-2">Scan QR</div>
-                                <img src="${qrUrl}" alt="${method.label} QR code" class="img-fluid" style="max-width: 160px;">
+                                <img src="${qrDataUri}" alt="${method.label} QR code" class="img-fluid" style="max-width: 160px;">
                                 <div class="text-muted small mt-2">Confirm the destination text matches before sending.</div>
                             </div>
                         ` : ''}
