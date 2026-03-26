@@ -370,6 +370,86 @@
 </div>
 
 <div class="row">
+  <div class="col-12 stretch-card mb-4">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
+            <h5 class="mb-1">Investor payout board</h5>
+            <p class="text-secondary mb-0">Track active investors, their investment start date, the next payout countdown, and how much earnings balance they can withdraw right now.</p>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <span class="badge bg-primary">{{ ($investorPayoutBoard ?? collect())->count() }} active investors</span>
+            <span class="badge bg-success">${{ number_format((float) collect($investorPayoutBoard ?? [])->sum('available_to_withdraw'), 2) }} withdrawable now</span>
+          </div>
+        </div>
+
+        @if (($investorPayoutBoard ?? collect())->isEmpty())
+          <p class="text-secondary mb-0">No active investors are available for payout tracking yet.</p>
+        @else
+          <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Investor</th>
+                  <th>Packages</th>
+                  <th>Investment date</th>
+                  <th>Next payout date</th>
+                  <th>Countdown</th>
+                  <th>Withdrawable now</th>
+                  <th>Projected next payout</th>
+                  <th class="text-end">Profile</th>
+                </tr>
+              </thead>
+              <tbody>
+                @foreach (($investorPayoutBoard ?? collect()) as $investorRow)
+                  <tr onclick="window.location='{{ route('dashboard.investors.show', $investorRow['user']) }}'" style="cursor: pointer;">
+                    <td>
+                      <div class="fw-semibold">{{ $investorRow['user']->name }}</div>
+                      <div class="text-secondary small">{{ $investorRow['user']->email }}</div>
+                    </td>
+                    <td>
+                      <div class="fw-semibold">{{ $investorRow['active_investment_count'] }} active</div>
+                      <div class="text-secondary small">{{ $investorRow['active_package_names']->implode(', ') ?: '—' }}</div>
+                    </td>
+                    <td>
+                      <div class="fw-semibold">{{ $investorRow['first_investment_date']?->format('M d, Y') ?? '—' }}</div>
+                      <div class="text-secondary small">{{ $investorRow['first_investment_date']?->diffForHumans() ?? 'No active investment date' }}</div>
+                    </td>
+                    <td>
+                      <div class="fw-semibold">{{ $investorRow['next_payout_date']?->format('M d, Y') ?? '—' }}</div>
+                      <div class="text-secondary small">Monthly cycle target</div>
+                    </td>
+                    <td>
+                      @if (! is_null($investorRow['days_until_next_payout']))
+                        <span class="badge {{ $investorRow['days_until_next_payout'] <= 3 ? 'bg-warning text-dark' : 'bg-info' }}">
+                          {{ $investorRow['days_until_next_payout'] }} day{{ $investorRow['days_until_next_payout'] === 1 ? '' : 's' }} left
+                        </span>
+                      @else
+                        <span class="text-secondary small">—</span>
+                      @endif
+                    </td>
+                    <td>
+                      <div class="fw-semibold text-success">${{ number_format((float) $investorRow['available_to_withdraw'], 2) }}</div>
+                      <div class="text-secondary small">Earnings only</div>
+                    </td>
+                    <td>
+                      <div class="fw-semibold">${{ number_format((float) $investorRow['projected_next_payout'], 2) }}</div>
+                      <div class="text-secondary small">Expected on next cycle</div>
+                    </td>
+                    <td class="text-end">
+                      <a href="{{ route('dashboard.investors.show', $investorRow['user']) }}" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();">Open profile</a>
+                    </td>
+                  </tr>
+                @endforeach
+              </tbody>
+            </table>
+          </div>
+        @endif
+      </div>
+    </div>
+  </div>
+
   <div class="col-12 stretch-card">
     <div class="card">
       <div class="card-body">

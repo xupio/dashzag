@@ -394,6 +394,54 @@ test('admin operations page shows recent admin activity logs', function () {
         });
 });
 
+test('admin operations page shows investor payout board with countdown and withdrawable balance', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'admin',
+    ]);
+
+    $investor = User::factory()->create([
+        'email_verified_at' => now(),
+        'name' => 'Payout Countdown Investor',
+        'email' => 'payout-countdown@example.test',
+    ]);
+
+    $package = InvestmentPackage::query()->where('slug', 'growth-500')->firstOrFail();
+    $miner = Miner::query()->where('slug', 'alpha-one')->firstOrFail();
+
+    UserInvestment::query()->create([
+        'user_id' => $investor->id,
+        'miner_id' => $miner->id,
+        'package_id' => $package->id,
+        'amount' => 500,
+        'shares_owned' => 5,
+        'monthly_return_rate' => 0.0850,
+        'level_bonus_rate' => 0,
+        'team_bonus_rate' => 0,
+        'status' => 'active',
+        'subscribed_at' => now()->subDays(10),
+    ]);
+
+    \App\Models\Earning::query()->create([
+        'user_id' => $investor->id,
+        'investment_id' => null,
+        'earned_on' => now()->toDateString(),
+        'amount' => 120,
+        'source' => 'mining_return',
+        'status' => 'available',
+        'notes' => 'Available monthly earning.',
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('dashboard.operations'))
+        ->assertOk()
+        ->assertSee('Investor payout board')
+        ->assertSee('Payout Countdown Investor')
+        ->assertSee('withdrawable now', false)
+        ->assertSee('Earnings only')
+        ->assertSee('Projected next payout');
+});
+
 test('admin operations page can filter admin activity logs by action', function () {
     $admin = User::factory()->create([
         'email_verified_at' => now(),

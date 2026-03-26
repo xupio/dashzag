@@ -4,7 +4,8 @@
       $headerPendingProofOrder = auth()->check()
           ? auth()->user()->investmentOrders()
               ->with(['miner', 'package'])
-              ->whereIn('status', ['pending', 'rejected'])
+              ->where('status', 'pending')
+              ->whereNull('proof_uploaded_at')
               ->where(function ($query) {
                   $query->whereNull('payment_proof_path')
                       ->orWhere('payment_proof_path', '');

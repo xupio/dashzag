@@ -27,6 +27,7 @@ use Endroid\QrCode\ErrorCorrectionLevel;
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\SvgWriter;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
@@ -2867,6 +2868,47 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
 
             $adminActivityLogs = $adminActivityLogsQuery->limit(20)->get();
 
+            $investorPayoutBoard = User::query()
+                ->whereHas('investments', fn ($query) => $query->where('status', 'active'))
+                ->with([
+                    'investments' => fn ($query) => $query->where('status', 'active')->with('package')->orderBy('subscribed_at'),
+                    'earnings',
+                ])
+                ->orderBy('name')
+                ->get()
+                ->map(function (User $investor) {
+                    $activeInvestments = $investor->investments->where('status', 'active')->values();
+                    $firstInvestmentDate = $activeInvestments->min('subscribed_at');
+                    $nextPayoutDate = $activeInvestments
+                        ->map(function (UserInvestment $investment) {
+                            $anchorDate = ($investment->subscribed_at ?? now())->copy()->startOfDay();
+                            $nextDate = $anchorDate->copy();
+
+                            while ($nextDate->lte(now()->startOfDay())) {
+                                $nextDate->addMonthNoOverflow();
+                            }
+
+                            return $nextDate;
+                        })
+                        ->sort()
+                        ->first();
+
+                    $availableToWithdraw = (float) $investor->earnings->where('status', 'available')->sum('amount');
+                    $projectedNextPayout = (float) $activeInvestments->sum(fn (UserInvestment $investment) => MiningPlatform::investmentProjectedRewardAmount($investment));
+
+                    return [
+                        'user' => $investor,
+                        'active_investment_count' => $activeInvestments->count(),
+                        'first_investment_date' => $firstInvestmentDate instanceof Carbon ? $firstInvestmentDate : null,
+                        'next_payout_date' => $nextPayoutDate instanceof Carbon ? $nextPayoutDate : null,
+                        'days_until_next_payout' => $nextPayoutDate instanceof Carbon ? max(now()->startOfDay()->diffInDays($nextPayoutDate, false), 0) : null,
+                        'available_to_withdraw' => $availableToWithdraw,
+                        'projected_next_payout' => $projectedNextPayout,
+                        'active_package_names' => $activeInvestments->pluck('package.name')->filter()->unique()->values(),
+                    ];
+                })
+                ->values();
+
             return view('pages.general.operations', [
                 'payoutRequests' => PayoutRequest::with(['user', 'earnings'])->latest('requested_at')->get(),
                 'investmentOrders' => $investmentOrders,
@@ -2904,6 +2946,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'activityFilters' => [
                     'action' => $activityAction,
                 ],
+                'investorPayoutBoard' => $investorPayoutBoard,
             ]);
         })->name('dashboard.operations');
 
