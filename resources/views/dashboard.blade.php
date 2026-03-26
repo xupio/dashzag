@@ -6,6 +6,8 @@
 
 @section('content')
 @php
+  $dashboardViewer = auth()->user();
+  $isAdminViewer = $dashboardViewer?->isAdmin() ?? false;
   $powerBadgeClasses = [
       'secondary' => 'bg-secondary-subtle text-secondary',
       'info' => 'bg-info-subtle text-info',
@@ -48,6 +50,62 @@
                 {{ $networkMiner->name }}
               </a>
             @endforeach
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+@endif
+
+@if ($isAdminViewer)
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card border-0 shadow-sm" style="background: linear-gradient(135deg, rgba(10, 42, 130, 0.08), rgba(101, 113, 255, 0.04));">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+            <div>
+              <div class="text-uppercase small fw-semibold text-primary mb-2">Admin safety center</div>
+              <h5 class="mb-1">Production security snapshot</h5>
+              <p class="text-secondary mb-0">Quick checks before migrations, payment updates, and major production changes.</p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+              <a href="{{ route('profile.edit') }}" class="btn btn-outline-primary btn-sm">Open account security</a>
+              <a href="{{ route('dashboard.operations') }}" class="btn btn-outline-secondary btn-sm">Open operations</a>
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-md-4">
+              <div class="border rounded p-3 h-100 bg-white">
+                <div class="text-secondary small mb-1">Admin 2FA</div>
+                <div class="fw-semibold mb-2">{{ $dashboardViewer->hasAdminTwoFactorEnabled() ? 'Enabled' : 'Action needed' }}</div>
+                <div class="small text-secondary">
+                  @if ($dashboardViewer->hasAdminTwoFactorEnabled())
+                    Your admin login challenge is active and protecting dashboard access.
+                  @else
+                    Enable Admin 2FA from Account Settings before handling wallets, payouts, or user approvals.
+                  @endif
+                </div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="border rounded p-3 h-100 bg-white">
+                <div class="text-secondary small mb-1">Before running migrations</div>
+                <div class="fw-semibold mb-2">Create a fresh DB backup</div>
+                <div class="small text-secondary">Export the production database before `php artisan migrate --force`, payment changes, or wallet updates.</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="border rounded p-3 h-100 bg-white">
+                <div class="text-secondary small mb-1">Deployment reminder</div>
+                <div class="fw-semibold mb-2">Rebuild caches after deploy</div>
+                <div class="small text-secondary">Run `optimize:clear`, rebuild caches, and confirm login, wallet, buy-shares, and operations pages load cleanly.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="alert alert-light border mt-3 mb-0">
+            Emergency note: if the admin device is lost, use the recovery command in <span class="fw-semibold">BACKUP_AND_RECOVERY.md</span> to disable 2FA on the server and re-enroll it.
           </div>
         </div>
       </div>
