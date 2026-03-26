@@ -14,6 +14,15 @@
         </div>
 
         <div class="col-lg-6">
+            @if ($user->isAdmin())
+                <div class="card mb-4">
+                    <div class="card-header">Admin 2FA</div>
+                    <div class="card-body">
+                        @include('profile.partials.admin-two-factor-form')
+                    </div>
+                </div>
+            @endif
+
             <div class="card mb-4">
                 <div class="card-header">Payout Wallets</div>
                 <div class="card-body">

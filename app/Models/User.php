@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Notifications\InvitationAwareVerifyEmail;
+use App\Support\AdminTwoFactor;
 use App\Support\MiningPlatform;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,6 +23,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'is_email_visible',
         'profile_photo_path',
+        'admin_two_factor_secret',
+        'admin_two_factor_confirmed_at',
         'btc_wallet_address',
         'usdt_wallet_address',
         'bank_transfer_details',
@@ -38,6 +41,7 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $hidden = [
         'password',
         'remember_token',
+        'admin_two_factor_secret',
     ];
 
     protected $attributes = [
@@ -198,11 +202,31 @@ class User extends Authenticatable implements MustVerifyEmail
         };
     }
 
+    public function hasAdminTwoFactorEnabled(): bool
+    {
+        return $this->isAdmin()
+            && filled($this->admin_two_factor_secret)
+            && $this->admin_two_factor_confirmed_at !== null;
+    }
+
+    public function hasPendingAdminTwoFactorSetup(): bool
+    {
+        return $this->isAdmin()
+            && filled($this->admin_two_factor_secret)
+            && $this->admin_two_factor_confirmed_at === null;
+    }
+
+    public function adminTwoFactorSecret(): ?string
+    {
+        return AdminTwoFactor::decryptSecret($this->admin_two_factor_secret);
+    }
+
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'is_email_visible' => 'boolean',
+            'admin_two_factor_confirmed_at' => 'datetime',
             'password' => 'hashed',
             'notification_preferences' => 'array',
             'last_daily_digest_sent_at' => 'datetime',

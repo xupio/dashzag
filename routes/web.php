@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\InternalMailController;
+use App\Http\Controllers\AdminTwoFactorController;
 use App\Http\Controllers\ProfileController;
 use App\Mail\FriendInvitationMail;
 use App\Models\AdminActivityLog;
@@ -269,7 +270,7 @@ Route::get('/dashboard', function (Request $request) {
     ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'verified', 'admin.two_factor'])->group(function () {
     Route::get('/dashboard/miner-report', function (Request $request) {
         MiningPlatform::ensureDefaults();
 
@@ -4036,6 +4037,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::post('/profile/admin-two-factor/setup', [AdminTwoFactorController::class, 'store'])
+        ->middleware(['admin', 'throttle:6,1'])
+        ->name('profile.admin-two-factor.store');
+    Route::post('/profile/admin-two-factor/confirm', [AdminTwoFactorController::class, 'confirm'])
+        ->middleware(['admin', 'throttle:6,1'])
+        ->name('profile.admin-two-factor.confirm');
+    Route::delete('/profile/admin-two-factor', [AdminTwoFactorController::class, 'destroy'])
+        ->middleware(['admin', 'throttle:6,1'])
+        ->name('profile.admin-two-factor.destroy');
 
 
     Route::group(['prefix' => 'apps'], function () {
