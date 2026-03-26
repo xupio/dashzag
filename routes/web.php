@@ -2907,6 +2907,38 @@ Route::middleware(['auth', 'verified', 'admin.two_factor'])->group(function () {
             ]);
         })->name('dashboard.operations');
 
+        Route::get('/dashboard/security-center', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $admin = $request->user();
+            $currentHealthSummary = MiningPlatform::adminHealthSummary();
+            $adminNotifications = $admin->notifications()
+                ->latest()
+                ->limit(50)
+                ->get()
+                ->filter(fn ($notification) => ($notification->data['category'] ?? null) === 'admin')
+                ->values();
+
+            $criticalAlerts = $adminNotifications
+                ->filter(fn ($notification) => ($notification->data['status'] ?? null) === 'warning')
+                ->values();
+
+            $healthSummaryNotifications = $adminNotifications
+                ->filter(fn ($notification) => ($notification->data['subject'] ?? null) === 'Daily admin health summary')
+                ->values();
+
+            return view('pages.general.security-center', [
+                'currentHealthSummary' => $currentHealthSummary,
+                'criticalAlerts' => $criticalAlerts->take(10),
+                'healthSummaryNotifications' => $healthSummaryNotifications->take(5),
+                'recentAdminActivityLogs' => AdminActivityLog::query()
+                    ->with('admin')
+                    ->latest()
+                    ->limit(15)
+                    ->get(),
+            ]);
+        })->name('dashboard.security-center');
+
         Route::get('/dashboard/operations/export', function () {
             MiningPlatform::ensureDefaults();
 
