@@ -304,6 +304,36 @@ class MiningPlatform
             'pending_friend_invitations' => FriendInvitation::query()->whereNull('verified_at')->count(),
         ];
     }
+
+    public static function notifyAdminsOfCriticalAlert(
+        string $subject,
+        string $message,
+        ?string $statusLine = null,
+        ?string $notesLine = null,
+        ?string $contextLabel = null,
+        ?string $contextValue = null,
+        array $details = [],
+    ): void {
+        User::query()
+            ->where('role', 'admin')
+            ->whereNotNull('email_verified_at')
+            ->orderBy('id')
+            ->get()
+            ->each(function (User $admin) use ($subject, $message, $statusLine, $notesLine, $contextLabel, $contextValue, $details) {
+                $admin->notify(new ActivityFeedNotification([
+                    'category' => 'admin',
+                    'status' => 'warning',
+                    'subject' => $subject,
+                    'message' => $message,
+                    'status_line' => $statusLine,
+                    'notes_line' => $notesLine,
+                    'context_label' => $contextLabel,
+                    'context_value' => $contextValue,
+                    'force_mail' => true,
+                    'details' => $details,
+                ]));
+            });
+    }
     public static function notificationDefaultPreferences(): array
     {
         return [

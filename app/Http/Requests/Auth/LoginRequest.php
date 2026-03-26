@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Support\MiningPlatform;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
@@ -44,6 +45,24 @@ class LoginRequest extends FormRequest
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
+            $attempts = RateLimiter::attempts($this->throttleKey());
+
+            if ($attempts >= 3) {
+                MiningPlatform::notifyAdminsOfCriticalAlert(
+                    'Repeated failed login attempts detected',
+                    'A login identifier has failed authentication multiple times.',
+                    'Attempts: '.$attempts,
+                    'Review recent activity and confirm the admin account is protected with 2FA.',
+                    'Login identifier',
+                    Str::lower((string) $this->input('email')),
+                    [
+                        'email' => Str::lower((string) $this->input('email')),
+                        'ip' => $this->ip(),
+                        'attempts' => $attempts,
+                    ],
+                );
+            }
+
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
             ]);
@@ -64,6 +83,20 @@ class LoginRequest extends FormRequest
         }
 
         event(new Lockout($this));
+
+        MiningPlatform::notifyAdminsOfCriticalAlert(
+            'Login lockout triggered',
+            'A login identifier has been rate limited after too many failed attempts.',
+            'Throttle window: '.$seconds.' seconds',
+            'Investigate the login source if this repeats.',
+            'Login identifier',
+            Str::lower((string) $this->input('email')),
+            [
+                'email' => Str::lower((string) $this->input('email')),
+                'ip' => $this->ip(),
+                'seconds' => $seconds,
+            ],
+        );
 
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
