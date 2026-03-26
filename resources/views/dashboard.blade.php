@@ -66,11 +66,12 @@
             <div>
               <div class="text-uppercase small fw-semibold text-primary mb-2">Admin safety center</div>
               <h5 class="mb-1">Production security snapshot</h5>
-              <p class="text-secondary mb-0">Quick checks before migrations, payment updates, and major production changes.</p>
+              <p class="text-secondary mb-0">Quick checks before migrations, payment updates, and major production changes. Use the actions below when you actually need to do something.</p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
               <a href="{{ route('profile.edit') }}" class="btn btn-outline-primary btn-sm">Open account security</a>
               <a href="{{ route('dashboard.operations') }}" class="btn btn-outline-secondary btn-sm">Open operations</a>
+              <a href="{{ route('dashboard.settings') }}" class="btn btn-outline-dark btn-sm">Open platform settings</a>
             </div>
           </div>
 
@@ -106,6 +107,34 @@
 
           <div class="alert alert-light border mt-3 mb-0">
             Emergency note: if the admin device is lost, use the recovery command in <span class="fw-semibold">BACKUP_AND_RECOVERY.md</span> to disable 2FA on the server and re-enroll it.
+          </div>
+
+          <div class="row g-3 mt-1">
+            <div class="col-lg-6">
+              <div class="border rounded p-3 h-100 bg-white">
+                <div class="fw-semibold mb-2">What to do before a deploy</div>
+                <div class="small text-secondary mb-2">Use this every time you push production changes that affect data, auth, payments, or wallets.</div>
+                <ol class="small text-secondary ps-3 mb-0">
+                  <li>Create a fresh database backup.</li>
+                  <li>Deploy the new code to Hostinger.</li>
+                  <li>Run migrations only if the release includes a new migration.</li>
+                  <li>Clear and rebuild Laravel caches.</li>
+                  <li>Test login, buy shares, wallet, and operations pages.</li>
+                </ol>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <div class="border rounded p-3 h-100 bg-white">
+                <div class="fw-semibold mb-2">Quick server commands</div>
+                <div class="small text-secondary mb-2">Run these after a normal code deploy on Hostinger.</div>
+                <pre class="bg-light border rounded p-3 small mb-0" style="white-space: pre-wrap;">cd /home/u723968965/laravel-app
+git pull origin main
+php artisan optimize:clear
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache</pre>
+              </div>
+            </div>
           </div>
         </div>
       </div>
