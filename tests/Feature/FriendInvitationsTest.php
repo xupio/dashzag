@@ -142,3 +142,63 @@ test('friend invitation email uses zagchain branding and copy', function () {
         ->toContain('branding/zagchain-logo.png');
 });
 
+test('user cannot send more than the daily friend invitation email limit', function () {
+    Mail::fake();
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    foreach (range(1, 10) as $attempt) {
+        $this->actingAs($user)->post(route('dashboard.friends.invite'), [
+            'name' => 'New Friend '.$attempt,
+            'email' => 'new-friend-'.$attempt.'@example.com',
+            'phone' => '',
+            'country' => 'United Arab Emirates',
+        ])->assertRedirect(route('dashboard.friends'));
+    }
+
+    $response = $this->from(route('dashboard.friends'))
+        ->actingAs($user)
+        ->post(route('dashboard.friends.invite'), [
+            'name' => 'New Friend',
+            'email' => 'new-friend@example.com',
+            'phone' => '',
+            'country' => 'United Arab Emirates',
+        ]);
+
+    $response->assertRedirect(route('dashboard.friends'));
+    $response->assertSessionHas('invite_limit');
+
+    Mail::assertSent(FriendInvitationMail::class, 10);
+});
+
+test('user cannot resend more than the daily friend invitation email limit', function () {
+    Mail::fake();
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $friendInvitation = FriendInvitation::create([
+        'user_id' => $user->id,
+        'name' => 'Pending Friend',
+        'email' => 'pending-friend@example.com',
+    ]);
+
+    foreach (range(1, 10) as $attempt) {
+        $this->actingAs($user)
+            ->post(route('dashboard.friends.resend', $friendInvitation))
+            ->assertRedirect(route('dashboard.friends'));
+    }
+
+    $response = $this->from(route('dashboard.friends'))
+        ->actingAs($user)
+        ->post(route('dashboard.friends.resend', $friendInvitation));
+
+    $response->assertRedirect(route('dashboard.friends'));
+    $response->assertSessionHas('invite_limit');
+
+    Mail::assertSent(FriendInvitationMail::class, 10);
+});
+

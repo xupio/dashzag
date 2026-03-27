@@ -4109,7 +4109,11 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
     });
 
     Route::get('/dashboard/friends', function () {
+        $friendInvitationDailyEmailLimit = 10;
         $user = request()->user();
+        $friendInvitationEmailsSentToday = optional($user->friend_invitation_emails_sent_on)->isToday()
+            ? (int) ($user->friend_invitation_emails_sent_count ?? 0)
+            : 0;
         $friendInvitationCountries = [
             'Australia',
             'Bahrain',
@@ -4135,10 +4139,16 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             'user' => $user,
             'friendInvitations' => $user->friendInvitations,
             'friendInvitationCountries' => $friendInvitationCountries,
+            'friendInvitationDailyEmailLimit' => $friendInvitationDailyEmailLimit,
+            'friendInvitationEmailsRemaining' => max($friendInvitationDailyEmailLimit - $friendInvitationEmailsSentToday, 0),
         ]);
     })->name('dashboard.friends');
 
     Route::post('/dashboard/friends/invite', function (Request $request) {
+        $friendInvitationDailyEmailLimit = 10;
+        $friendInvitationEmailsSentToday = optional($request->user()->friend_invitation_emails_sent_on)->isToday()
+            ? (int) ($request->user()->friend_invitation_emails_sent_count ?? 0)
+            : 0;
         $friendInvitationCountries = [
             'Australia',
             'Bahrain',
@@ -4167,6 +4177,12 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             'country' => ['required', 'string', Rule::in($friendInvitationCountries)],
         ]);
 
+        if ($friendInvitationEmailsSentToday >= $friendInvitationDailyEmailLimit) {
+            return redirect()
+                ->route('dashboard.friends')
+                ->with('invite_limit', 'Daily invitation email limit reached. You can send up to '.$friendInvitationDailyEmailLimit.' invitation emails per day.');
+        }
+
         $friendInvitation = FriendInvitation::updateOrCreate(
             [
                 'user_id' => $request->user()->id,
@@ -4189,16 +4205,31 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             new FriendInvitationMail($friendInvitation, $request->user(), $verificationUrl)
         );
 
+        $request->user()->forceFill([
+            'friend_invitation_emails_sent_on' => today(),
+            'friend_invitation_emails_sent_count' => $friendInvitationEmailsSentToday + 1,
+        ])->save();
+
         return redirect()
             ->route('dashboard.friends')
             ->with('invite_success', $validated['name'].' has been invited successfully and the email has been sent.');
     })->name('dashboard.friends.invite');
 
     Route::post('/dashboard/friends/{friendInvitation}/resend', function (Request $request, FriendInvitation $friendInvitation) {
+        $friendInvitationDailyEmailLimit = 10;
+        $friendInvitationEmailsSentToday = optional($request->user()->friend_invitation_emails_sent_on)->isToday()
+            ? (int) ($request->user()->friend_invitation_emails_sent_count ?? 0)
+            : 0;
         abort_unless($friendInvitation->user_id === $request->user()->id, 403);
 
         if ($friendInvitation->verified_at) {
             return redirect()->route('dashboard.friends')->with('invite_success', $friendInvitation->name.' is already verified, so no resend was needed.');
+        }
+
+        if ($friendInvitationEmailsSentToday >= $friendInvitationDailyEmailLimit) {
+            return redirect()
+                ->route('dashboard.friends')
+                ->with('invite_limit', 'Daily invitation email limit reached. You can send up to '.$friendInvitationDailyEmailLimit.' invitation emails per day.');
         }
 
         $verificationUrl = URL::temporarySignedRoute(
@@ -4210,6 +4241,11 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
         Mail::to($friendInvitation->email)->send(
             new FriendInvitationMail($friendInvitation, $request->user(), $verificationUrl)
         );
+
+        $request->user()->forceFill([
+            'friend_invitation_emails_sent_on' => today(),
+            'friend_invitation_emails_sent_count' => $friendInvitationEmailsSentToday + 1,
+        ])->save();
 
         return redirect()
             ->route('dashboard.friends')

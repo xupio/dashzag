@@ -31,6 +31,17 @@
   </div>
 @endif
 
+@if (session('invite_limit'))
+  <div class="row">
+    <div class="col-12">
+      <div class="alert alert-warning d-flex align-items-center justify-content-between" role="alert">
+        <span>{{ session('invite_limit') }}</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    </div>
+  </div>
+@endif
+
 <div class="row">
   <div class="col-12 stretch-card">
     <div class="card">
@@ -39,6 +50,7 @@
           <div>
             <h5 class="mb-1">Friend invitations</h5>
             <p class="text-secondary mb-0">Saved invitations for {{ $user->name }}.</p>
+            <p class="text-secondary small mb-0">Email limit: {{ $friendInvitationEmailsRemaining }} of {{ $friendInvitationDailyEmailLimit }} invitation emails remaining today.</p>
           </div>
           <span class="badge bg-primary">{{ $friendInvitations->count() }} total</span>
         </div>

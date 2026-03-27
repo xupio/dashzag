@@ -36,6 +36,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'notification_preferences',
         'last_daily_digest_sent_at',
         'last_weekly_digest_sent_at',
+        'friend_invitation_emails_sent_on',
+        'friend_invitation_emails_sent_count',
     ];
 
     protected $hidden = [
@@ -237,8 +239,9 @@ class User extends Authenticatable implements MustVerifyEmail
             'notification_preferences' => 'array',
             'last_daily_digest_sent_at' => 'datetime',
             'last_weekly_digest_sent_at' => 'datetime',
+            'friend_invitation_emails_sent_on' => 'date',
+            'friend_invitation_emails_sent_count' => 'integer',
         ];
     }
 }
-
 
