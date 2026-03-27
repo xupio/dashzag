@@ -1,0 +1,6 @@
+Scenario,User Has Basic 100,Visible Registration Reward,3-Level Tree Investment,50 Percent Unlock Cap,Available Reward,Pending Reward,Explanation
+Example 1,No,25,500,250,0,25,"Reward is visible but locked because the user is not under Basic 100."
+Example 2,Yes,25,100,50,25,0,"Reward is fully unlocked because 25 is below the 50 unlock cap."
+Example 3,Yes,75,100,50,50,25,"Only 50 can be collected now. The remaining 25 stays visible and locked."
+Example 4,Yes,100,120,60,60,40,"User can see 100 total, but only 60 is collectable until the tree grows."
+Example 5,Yes,100,200,100,100,0,"Once tree investment reaches 200, the full 100 becomes available."
