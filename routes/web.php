@@ -760,6 +760,14 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
         $dashboardNotification = $request->user()->notifications()->whereKey($notification)->firstOrFail();
         $dashboardNotification->markAsRead();
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'status' => 'ok',
+                'notification_id' => $dashboardNotification->id,
+                'read_at' => optional($dashboardNotification->read_at)->toISOString(),
+            ]);
+        }
+
         return redirect()->route('dashboard.notifications')->with('notifications_success', 'Notification marked as read.');
     })->name('dashboard.notifications.read');
 
@@ -2880,19 +2888,14 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 ->map(function (User $investor) {
                     $activeInvestments = $investor->investments->where('status', 'active')->values();
                     $firstInvestmentDate = $activeInvestments->min('subscribed_at');
-                    $nextPayoutDate = $activeInvestments
-                        ->map(function (UserInvestment $investment) {
-                            $anchorDate = ($investment->subscribed_at ?? now())->copy()->startOfDay();
-                            $nextDate = $anchorDate->copy();
+                    $anchorDate = $firstInvestmentDate instanceof Carbon
+                        ? $firstInvestmentDate->copy()->startOfDay()
+                        : null;
+                    $nextPayoutDate = $anchorDate?->copy();
 
-                            while ($nextDate->lte(now()->startOfDay())) {
-                                $nextDate->addMonthNoOverflow();
-                            }
-
-                            return $nextDate;
-                        })
-                        ->sort()
-                        ->first();
+                    while ($nextPayoutDate instanceof Carbon && $nextPayoutDate->lte(now()->startOfDay())) {
+                        $nextPayoutDate->addMonthNoOverflow();
+                    }
 
                     $availableToWithdraw = (float) $investor->earnings->where('status', 'available')->sum('amount');
                     $projectedNextPayout = (float) $activeInvestments->sum(fn (UserInvestment $investment) => MiningPlatform::investmentProjectedRewardAmount($investment));

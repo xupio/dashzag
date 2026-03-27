@@ -7,12 +7,27 @@
 
     <title>{{ config('app.name', 'Laravel') }}</title>
 
-    <link rel="icon" type="image/png" href="{{ asset('branding/zag-smal.png') }}">
+    <link rel="icon" type="image/png" href="{{ asset('branding/ZagChain3.png') }}">
+    <link href="{{ asset('splash-screen.css') }}" rel="stylesheet">
     @include('layout.partials.vite-app-assets')
     <link rel="stylesheet" href="{{ asset('nobleui/css/nobleui.css') }}">
     @stack('styles')
 </head>
 <body class="nobleui-body">
+<script>
+    var splash = document.createElement("div");
+    splash.innerHTML = `
+      <div class="splash-screen">
+        <div class="logo"></div>
+        <div class="spinner"></div>
+      </div>`;
+
+    document.body.insertBefore(splash, document.body.firstChild);
+
+    document.addEventListener("DOMContentLoaded", function () {
+      document.body.classList.add("loaded");
+    });
+</script>
 <div class="main-wrapper">
     @include('layouts.navigation')
 
@@ -55,4 +70,3 @@
 @stack('scripts')
 </body>
 </html>
-

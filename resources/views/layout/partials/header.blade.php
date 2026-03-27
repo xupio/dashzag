@@ -208,14 +208,14 @@
         <a class="nav-link dropdown-toggle" href="#" id="notificationDropdown" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
           <i data-lucide="bell"></i>
           @if ($headerUnreadCount > 0)
-            <div class="indicator">
+            <div class="indicator" data-header-notification-indicator>
               <div class="circle"></div>
             </div>
           @endif
         </a>
         <div class="dropdown-menu p-0" aria-labelledby="notificationDropdown">
           <div class="px-3 py-2 d-flex align-items-center justify-content-between border-bottom">
-            <p>{{ $headerUnreadCount }} New Notifications</p>
+            <p data-header-notification-count="{{ $headerUnreadCount }}">{{ $headerUnreadCount }} New Notifications</p>
             <a href="{{ route('dashboard.notifications') }}" class="text-secondary">Open feed</a>
           </div>
           <div class="p-1">
@@ -294,4 +294,3 @@
 
   </div>
 </nav>
-

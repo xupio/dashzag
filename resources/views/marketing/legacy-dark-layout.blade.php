@@ -5,7 +5,7 @@
     <meta http-equiv="x-ua-compatible" content="ie=edge">
     <title>{{ $pageTitle ?? 'ZagChain' }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="icon" type="image/png" href="{{ asset('branding/zag-smal.png') }}">
+    <link rel="icon" type="image/png" href="{{ asset('branding/ZagChain3.png') }}">
     <link rel="stylesheet" href="{{ asset('legacy-start/assets/css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="{{ asset('legacy-start/assets/css/owl.carousel.min.css') }}">
     <link rel="stylesheet" href="{{ asset('legacy-start/assets/css/slicknav.css') }}">
@@ -214,7 +214,7 @@
             <div class="preloader-inner position-relative">
                 <div class="preloader-circle"></div>
                 <div class="preloader-img pere-text">
-                    <img src="{{ asset('branding/zagchain-logo.png') }}" alt="ZagChain loader" style="max-width: 180px; width: 100%; height: auto;">
+                    <img src="{{ asset('branding/ZagChain3.png') }}" alt="ZagChain loader" style="max-width: 180px; width: 100%; height: auto;">
                 </div>
             </div>
         </div>

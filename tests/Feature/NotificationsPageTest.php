@@ -43,7 +43,9 @@ test('verified user can open notifications page', function () {
     $response->assertOk();
     $response->assertSee('Notifications');
     $response->assertSee('Payout Request Submitted');
-    $response->assertSee('Clear read');
+    $response->assertSee('Press any message to open the full details');
+    $response->assertSee('State');
+    $response->assertSee('Unread');
     $response->assertSee('Clear previews');
 });
 
@@ -114,6 +116,25 @@ test('user can mark a notification as read', function () {
     $this->actingAs($user)
         ->post(route('dashboard.notifications.read', $notification->id))
         ->assertRedirect(route('dashboard.notifications'));
+
+    expect($notification->fresh()->read_at)->not->toBeNull();
+});
+
+test('user can mark a notification as read through popup request', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $payoutRequest = payoutRequestForNotification($user);
+    $user->notify(new PayoutStatusNotification($payoutRequest, 'submitted'));
+
+    $notification = $user->notifications()->firstOrFail();
+
+    $this->actingAs($user)
+        ->postJson(route('dashboard.notifications.read', $notification->id))
+        ->assertOk()
+        ->assertJsonPath('status', 'ok')
+        ->assertJsonPath('notification_id', $notification->id);
 
     expect($notification->fresh()->read_at)->not->toBeNull();
 });

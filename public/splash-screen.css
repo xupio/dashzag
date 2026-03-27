@@ -26,10 +26,12 @@
 }
 
 .splash-screen .logo {
-  background-image: url(./build/images/logo-mini-light.png);
-  width: 30px;
-  height: 30px;
-  background-size: 30px;
+  background-image: url(./branding/ZagChain3.png);
+  width: 52px;
+  height: 52px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
   position: absolute;
   z-index: 1;
  }
@@ -102,5 +104,5 @@
 }
 
 [data-bs-theme="dark"] .splash-screen .logo {
-  background-image: url(./build/images/logo-mini-dark.png);
+  background-image: url(./branding/ZagChain3.png);
 }
