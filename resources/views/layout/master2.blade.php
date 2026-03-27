@@ -17,6 +17,7 @@ License: You must have a valid license to legally use this template for your pro
 	<meta name="keywords" content="nobleui, bootstrap, bootstrap 5, bootstrap5, admin, dashboard, template, responsive, css, sass, html, laravel, theme, front-end, ui kit, web">
 
   <title>{{ config('app.name', 'ZagChain') }}</title>
+  @include('layout.partials.google-analytics')
 
   <!-- color-modes:js -->
   <script src="{{ asset('build/assets/color-modes-CkunOepb.js') }}"></script>

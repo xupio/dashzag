@@ -6,6 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>{{ config('app.name', 'Laravel') }}</title>
+    @include('layout.partials.google-analytics')
 
     <link rel="icon" type="image/png" href="{{ asset('branding/ZagChain3.png') }}">
     <link href="{{ asset('splash-screen.css') }}" rel="stylesheet">
