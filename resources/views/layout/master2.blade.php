@@ -99,5 +99,6 @@ License: You must have a valid license to legally use this template for your pro
     <!-- end common js -->
 
     @stack('custom-scripts')
+    @include('layout.partials.user-activity-tracker')
 </body>
 </html>

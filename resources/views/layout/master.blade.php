@@ -108,5 +108,6 @@ class="sidebar-dark">
     <!-- end common js -->
 
     @stack('custom-scripts')
+    @include('layout.partials.user-activity-tracker')
 </body>
 </html>

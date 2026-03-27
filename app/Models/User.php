@@ -153,6 +153,16 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(InvestmentOrder::class)->latest('submitted_at');
     }
 
+    public function loginEvents(): HasMany
+    {
+        return $this->hasMany(UserLoginEvent::class)->latest('login_at');
+    }
+
+    public function pageActivityLogs(): HasMany
+    {
+        return $this->hasMany(UserPageActivityLog::class)->latest('ended_at');
+    }
+
     public function earnings(): HasMany
     {
         return $this->hasMany(Earning::class)->latest('earned_on');
@@ -244,4 +254,3 @@ class User extends Authenticatable implements MustVerifyEmail
         ];
     }
 }
-

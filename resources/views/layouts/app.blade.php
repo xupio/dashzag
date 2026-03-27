@@ -69,5 +69,6 @@
 
 <script src="{{ asset('nobleui/js/nobleui.js') }}"></script>
 @stack('scripts')
+@include('layout.partials.user-activity-tracker')
 </body>
 </html>

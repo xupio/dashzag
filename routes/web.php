@@ -18,11 +18,14 @@ use App\Models\PayoutRequest;
 use App\Models\ReferralEvent;
 use App\Models\Shareholder;
 use App\Models\User;
+use App\Models\UserLoginEvent;
 use App\Models\UserInvestment;
+use App\Models\UserPageActivityLog;
 use App\Notifications\ActivityFeedNotification;
 use App\Notifications\DigestSummaryNotification;
 use App\Notifications\PayoutStatusNotification;
 use App\Support\MiningPlatform;
+use App\Support\UserActivity;
 use Endroid\QrCode\ErrorCorrectionLevel;
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\SvgWriter;
@@ -274,6 +277,19 @@ Route::get('/dashboard', function (Request $request) {
 })->middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->name('dashboard');
 
 Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->group(function () {
+    Route::post('/dashboard/activity/page-visit', function (Request $request) {
+        $validated = $request->validate([
+            'path' => ['required', 'string', 'max:255'],
+            'route_name' => ['nullable', 'string', 'max:255'],
+            'page_title' => ['nullable', 'string', 'max:255'],
+            'seconds_spent' => ['required', 'integer', 'min:1', 'max:86400'],
+        ]);
+
+        UserActivity::recordPageVisit($request->user(), $request, $validated);
+
+        return response()->noContent();
+    })->name('dashboard.activity.page-visit');
+
     Route::get('/dashboard/miner-report', function (Request $request) {
         MiningPlatform::ensureDefaults();
 
@@ -2634,6 +2650,98 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 fclose($handle);
             }, $filename, ['Content-Type' => 'text/csv']);
         })->name('dashboard.users.export');
+
+        Route::get('/dashboard/user-activity', function (Request $request) {
+            abort_unless($request->user()?->isAdmin(), 403);
+
+            $search = trim((string) $request->query('search', ''));
+            $selectedUserId = (int) $request->query('user_id', 0);
+
+            $usersQuery = User::query()
+                ->withCount('friendInvitations')
+                ->orderBy('name');
+
+            if ($search !== '') {
+                $usersQuery->where(function ($query) use ($search) {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                });
+            }
+
+            $users = $usersQuery->get();
+
+            $loginStats = UserLoginEvent::query()
+                ->selectRaw('user_id, COUNT(*) as login_count, MAX(login_at) as last_login_at')
+                ->groupBy('user_id')
+                ->get()
+                ->keyBy('user_id');
+
+            $pageTimeStats = UserPageActivityLog::query()
+                ->selectRaw('user_id, SUM(seconds_spent) as total_seconds')
+                ->groupBy('user_id')
+                ->get()
+                ->keyBy('user_id');
+
+            $topPagesByUser = UserPageActivityLog::query()
+                ->selectRaw('user_id, path, SUM(seconds_spent) as total_seconds')
+                ->groupBy('user_id', 'path')
+                ->get()
+                ->groupBy('user_id')
+                ->map(function ($rows) {
+                    return $rows->sortByDesc('total_seconds')->take(3)->values();
+                });
+
+            $activityRows = $users->map(function (User $user) use ($loginStats, $pageTimeStats, $topPagesByUser) {
+                $loginStat = $loginStats->get($user->id);
+                $pageStat = $pageTimeStats->get($user->id);
+
+                return [
+                    'user' => $user,
+                    'login_count' => (int) ($loginStat->login_count ?? 0),
+                    'last_login_at' => filled($loginStat->last_login_at ?? null) ? Carbon::parse($loginStat->last_login_at) : null,
+                    'invitation_count' => (int) $user->friend_invitations_count,
+                    'total_seconds' => (int) ($pageStat->total_seconds ?? 0),
+                    'top_pages' => $topPagesByUser->get($user->id, collect()),
+                ];
+            })->values();
+
+            $selectedUser = $selectedUserId > 0 ? $users->firstWhere('id', $selectedUserId) : null;
+            $selectedUserPageBreakdown = collect();
+            $selectedUserRecentLogins = collect();
+
+            if ($selectedUser) {
+                $selectedUserPageBreakdown = UserPageActivityLog::query()
+                    ->where('user_id', $selectedUser->id)
+                    ->selectRaw('path, route_name, SUM(seconds_spent) as total_seconds, MAX(ended_at) as last_seen_at')
+                    ->groupBy('path', 'route_name')
+                    ->orderByDesc('total_seconds')
+                    ->limit(20)
+                    ->get()
+                    ->map(function ($row) {
+                        $row->last_seen_at = filled($row->last_seen_at) ? Carbon::parse($row->last_seen_at) : null;
+
+                        return $row;
+                    });
+
+                $selectedUserRecentLogins = UserLoginEvent::query()
+                    ->where('user_id', $selectedUser->id)
+                    ->latest('login_at')
+                    ->limit(10)
+                    ->get();
+            }
+
+            return view('pages.general.user-activity', [
+                'activityRows' => $activityRows,
+                'activitySearch' => $search,
+                'selectedUser' => $selectedUser,
+                'selectedUserPageBreakdown' => $selectedUserPageBreakdown,
+                'selectedUserRecentLogins' => $selectedUserRecentLogins,
+                'totalTrackedUsers' => $activityRows->count(),
+                'totalLogins' => $activityRows->sum('login_count'),
+                'totalInvitations' => $activityRows->sum('invitation_count'),
+                'totalTrackedHours' => round($activityRows->sum('total_seconds') / 3600, 1),
+            ]);
+        })->name('dashboard.user-activity');
 
         Route::post('/dashboard/users/{user}/role', function (Request $request, User $user) {
             $validated = $request->validate([

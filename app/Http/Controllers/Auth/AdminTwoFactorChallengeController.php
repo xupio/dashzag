@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Support\ActiveSession;
 use App\Support\AdminTwoFactor;
 use App\Support\MiningPlatform;
+use App\Support\UserActivity;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -104,6 +105,7 @@ class AdminTwoFactorChallengeController extends Controller
 
         $request->session()->regenerate();
         ActiveSession::issueFor($pendingUser, $request);
+        UserActivity::recordLogin($pendingUser, $request);
         $request->session()->put('auth.admin_two_factor_passed_for', $pendingUser->getKey());
 
         return redirect()->intended(route('dashboard', absolute: false));
