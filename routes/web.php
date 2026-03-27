@@ -2950,10 +2950,8 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             ]);
         })->name('dashboard.operations');
 
-        Route::get('/dashboard/security-center', function (Request $request) {
+        $securityCenterPayload = function (User $admin): array {
             MiningPlatform::ensureDefaults();
-
-            $admin = $request->user();
             $currentHealthSummary = MiningPlatform::adminHealthSummary();
             $adminNotifications = $admin->notifications()
                 ->latest()
@@ -2970,7 +2968,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 ->filter(fn ($notification) => ($notification->data['subject'] ?? null) === 'Daily admin health summary')
                 ->values();
 
-            return view('pages.general.security-center', [
+            return [
                 'currentHealthSummary' => $currentHealthSummary,
                 'criticalAlerts' => $criticalAlerts->take(10),
                 'healthSummaryNotifications' => $healthSummaryNotifications->take(5),
@@ -2979,8 +2977,33 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                     ->latest()
                     ->limit(15)
                     ->get(),
-            ]);
+            ];
+        };
+
+        Route::get('/dashboard/security-center', function (Request $request) use ($securityCenterPayload) {
+            return view('pages.general.security-center', $securityCenterPayload($request->user()));
         })->name('dashboard.security-center');
+
+        Route::get('/dashboard/security-center/export/word', function (Request $request) use ($securityCenterPayload) {
+            $content = view('pages.general.security-center-export', $securityCenterPayload($request->user()) + [
+                'autoPrint' => false,
+            ])->render();
+
+            return response($content, 200, [
+                'Content-Type' => 'application/msword; charset=UTF-8',
+                'Content-Disposition' => 'attachment; filename="zagchain-security-center-'.now()->format('Ymd-His').'.doc"',
+            ]);
+        })->name('dashboard.security-center.export.word');
+
+        Route::get('/dashboard/security-center/export/pdf', function (Request $request) use ($securityCenterPayload) {
+            return response(
+                view('pages.general.security-center-export', $securityCenterPayload($request->user()) + [
+                    'autoPrint' => true,
+                ])->render(),
+                200,
+                ['Content-Type' => 'text/html; charset=UTF-8']
+            );
+        })->name('dashboard.security-center.export.pdf');
 
         Route::get('/dashboard/operations/export', function () {
             MiningPlatform::ensureDefaults();

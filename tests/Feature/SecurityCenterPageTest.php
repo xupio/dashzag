@@ -48,10 +48,28 @@ test('admin can open the security center page', function () {
 
     $response->assertOk();
     $response->assertSee('Security Center');
+    $response->assertSee('Admin safety center');
     $response->assertSee('Current health snapshot');
     $response->assertSee('Repeated failed login attempts detected');
     $response->assertSee('Daily admin health summary');
     $response->assertSee('Approved payout request #42');
+});
+
+test('admin can export the security center as word and printable pdf view', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $wordResponse = $this->actingAs($admin)->get(route('dashboard.security-center.export.word'));
+    $wordResponse->assertOk();
+    $wordResponse->assertHeader('content-type', 'application/msword; charset=UTF-8');
+    $wordResponse->assertSee('ZagChain Security Center');
+    $wordResponse->assertSee('Admin safety center');
+
+    $pdfResponse = $this->actingAs($admin)->get(route('dashboard.security-center.export.pdf'));
+    $pdfResponse->assertOk();
+    $pdfResponse->assertSee('ZagChain Security Center');
+    $pdfResponse->assertSee('Print / Save as PDF');
 });
 
 test('non admin users cannot open the security center page', function () {

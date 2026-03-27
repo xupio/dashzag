@@ -9,11 +9,20 @@
         <p class="text-secondary mb-0">One place to review admin protection, critical alerts, recent security activity, and operational health.</p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ route('dashboard.security-center.export.word') }}" class="btn btn-outline-dark btn-sm">Export Word</a>
+        <a href="{{ route('dashboard.security-center.export.pdf') }}" class="btn btn-outline-success btn-sm" target="_blank">Export PDF</a>
         <a href="{{ route('profile.edit') }}" class="btn btn-outline-primary btn-sm">Open account security</a>
         <a href="{{ route('dashboard.notifications', ['filter' => 'all']) }}" class="btn btn-outline-secondary btn-sm">Open notifications</a>
         <a href="{{ route('dashboard.operations') }}" class="btn btn-primary btn-sm">Open operations</a>
       </div>
     </div>
+  </div>
+</div>
+
+<div class="row mb-4">
+  <div class="col-12">
+    @php($adminSafetyViewer = auth()->user())
+    @include('pages.general.partials.admin-safety-center')
   </div>
 </div>
 
