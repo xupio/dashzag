@@ -28,9 +28,84 @@
     <p class="text-secondary mb-0">Track live production, share pricing, miner capacity, and overall package performance.</p>
   </div>
   <div class="d-flex gap-2 flex-wrap">
+    <button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#systemPresentationModal">
+      How ZagChain works
+    </button>
     <a href="{{ route('dashboard.buy-shares') }}?miner={{ $miner->slug }}" class="btn btn-primary btn-sm">Buy shares</a>
     <a href="{{ route('dashboard.miner-report', ['miner' => $miner->slug]) }}" class="btn btn-outline-secondary btn-sm">Open Daily Miner Report</a>
     <a href="{{ route('dashboard.profile') }}" class="btn btn-outline-primary btn-sm">Personal profile</a>
+  </div>
+</div>
+
+<div class="modal fade" id="systemPresentationModal" tabindex="-1" aria-labelledby="systemPresentationModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title mb-1" id="systemPresentationModalLabel">How ZagChain works</h5>
+          <p class="text-secondary mb-0">A quick presentation of the investment flow, daily earnings, rewards, and withdrawals.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="border rounded-3 p-4 h-100 bg-light">
+              <span class="badge bg-primary mb-3">Step 1</span>
+              <h5 class="mb-2">Choose a package</h5>
+              <p class="text-secondary mb-0">Each miner offers share packages. The investor selects a package, chooses a payment method, submits payment proof, and waits for admin review.</p>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="border rounded-3 p-4 h-100 bg-light">
+              <span class="badge bg-primary mb-3">Step 2</span>
+              <h5 class="mb-2">Miner performance drives daily earnings</h5>
+              <p class="text-secondary mb-0">Every day the miner records hashrate, uptime, revenue, and costs. The net result becomes the revenue-per-share value distributed to active investors.</p>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="border rounded-3 p-4 h-100">
+              <span class="badge bg-success mb-3">Step 3</span>
+              <h5 class="mb-2">Rewards grow with network activity</h5>
+              <p class="text-secondary mb-0">Referral and network rewards become visible as your network verifies, registers, and invests. Some rewards unlock only after specific package and investment conditions are met.</p>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="border rounded-3 p-4 h-100">
+              <span class="badge bg-success mb-3">Step 4</span>
+              <h5 class="mb-2">Withdraw earnings, not package capital</h5>
+              <p class="text-secondary mb-0">Only available earnings can be withdrawn. Purchased shares, miner asset value, and package capital stay invested and are not part of the withdrawable balance.</p>
+            </div>
+          </div>
+          <div class="col-12">
+            <div class="border rounded-3 p-4" style="background: linear-gradient(135deg, rgba(101,113,255,.08), rgba(5,163,74,.08));">
+              <div class="row g-3 align-items-center">
+                <div class="col-lg-8">
+                  <h5 class="mb-2">What the investor should do next</h5>
+                  <ul class="text-secondary mb-0 ps-3">
+                    <li>Review the miner overview and the daily report.</li>
+                    <li>Use Buy Shares to purchase the right package.</li>
+                    <li>Upload payment proof in the purchase popup and wait for approval.</li>
+                    <li>Track daily earnings, rewards, and payout availability from the dashboard and wallet.</li>
+                  </ul>
+                </div>
+                <div class="col-lg-4">
+                  <div class="border rounded-3 bg-white p-3 h-100">
+                    <div class="text-secondary small mb-1">Quick route</div>
+                    <div class="fw-semibold mb-2">Investor path</div>
+                    <div class="small text-secondary">Register -> Verify -> Buy shares -> Earn daily -> Grow referrals -> Request payout</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a href="{{ route('dashboard.buy-shares') }}?miner={{ $miner->slug }}" class="btn btn-primary">Open Buy Shares</a>
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
   </div>
 </div>
 
