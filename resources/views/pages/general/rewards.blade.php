@@ -8,9 +8,14 @@
         <h4 class="mb-1">Reward Settings</h4>
         <p class="text-secondary mb-0">Control referral rewards, team bonuses, and the Free Starter unlock mission from the admin panel.</p>
       </div>
-      <a href="{{ route('dashboard.network-admin') }}" class="btn btn-outline-primary btn-icon-text">
-        <i data-lucide="git-branch-plus" class="btn-icon-prepend"></i> Open network admin
-      </a>
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ route('dashboard.rewards.referral-registration-guide') }}" class="btn btn-outline-success btn-icon-text">
+          <i data-lucide="book-open-text" class="btn-icon-prepend"></i> Open reward guide
+        </a>
+        <a href="{{ route('dashboard.network-admin') }}" class="btn btn-outline-primary btn-icon-text">
+          <i data-lucide="git-branch-plus" class="btn-icon-prepend"></i> Open network admin
+        </a>
+      </div>
     </div>
   </div>
 </div>

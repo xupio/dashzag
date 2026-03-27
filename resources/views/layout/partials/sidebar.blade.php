@@ -84,13 +84,13 @@
 
       @if (auth()->user()?->isAdmin())
         <li class="nav-item nav-category">Admin</li>
-        <li class="nav-item {{ active_class(['dashboard/analytics', 'dashboard/digests', 'dashboard/network-admin', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/security-center', 'dashboard/rewards', 'dashboard/settings', 'dashboard/notification-rules', 'dashboard/notification-templates', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/mock-manager']) }}">
-          <a class="nav-link" data-bs-toggle="collapse" href="#adminMenu" role="button" aria-expanded="{{ is_active_route(['dashboard/analytics', 'dashboard/digests', 'dashboard/network-admin', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/security-center', 'dashboard/rewards', 'dashboard/settings', 'dashboard/notification-rules', 'dashboard/notification-templates', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/mock-manager']) }}" aria-controls="adminMenu">
+        <li class="nav-item {{ active_class(['dashboard/analytics', 'dashboard/digests', 'dashboard/network-admin', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/security-center', 'dashboard/rewards', 'dashboard/rewards/referral-registration-guide', 'dashboard/settings', 'dashboard/notification-rules', 'dashboard/notification-templates', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/mock-manager']) }}">
+          <a class="nav-link" data-bs-toggle="collapse" href="#adminMenu" role="button" aria-expanded="{{ is_active_route(['dashboard/analytics', 'dashboard/digests', 'dashboard/network-admin', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/security-center', 'dashboard/rewards', 'dashboard/rewards/referral-registration-guide', 'dashboard/settings', 'dashboard/notification-rules', 'dashboard/notification-templates', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/mock-manager']) }}" aria-controls="adminMenu">
             <i class="link-icon" data-lucide="shield"></i>
             <span class="link-title">Admin</span>
             <i class="link-arrow" data-lucide="chevron-down"></i>
           </a>
-          <div class="collapse {{ show_class(['dashboard/analytics', 'dashboard/digests', 'dashboard/network-admin', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/security-center', 'dashboard/rewards', 'dashboard/settings', 'dashboard/notification-rules', 'dashboard/notification-templates', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/mock-manager']) }}" data-bs-parent="#sidebarNav" id="adminMenu">
+          <div class="collapse {{ show_class(['dashboard/analytics', 'dashboard/digests', 'dashboard/network-admin', 'dashboard/shareholders', 'dashboard/users', 'dashboard/operations', 'dashboard/security-center', 'dashboard/rewards', 'dashboard/rewards/referral-registration-guide', 'dashboard/settings', 'dashboard/notification-rules', 'dashboard/notification-templates', 'dashboard/packages', 'dashboard/miners', 'dashboard/miner', 'dashboard/mock-manager']) }}" data-bs-parent="#sidebarNav" id="adminMenu">
             <ul class="nav sub-menu">
               <li class="nav-item">
                 <a href="{{ route('dashboard.analytics') }}" class="nav-link {{ active_class(['dashboard/analytics']) }}">Analytics</a>
@@ -115,6 +115,9 @@
               </li>
               <li class="nav-item">
                 <a href="{{ route('dashboard.rewards') }}" class="nav-link {{ active_class(['dashboard/rewards']) }}">Rewards</a>
+              </li>
+              <li class="nav-item">
+                <a href="{{ route('dashboard.rewards.referral-registration-guide') }}" class="nav-link {{ active_class(['dashboard/rewards/referral-registration-guide']) }}">Referral Reward Guide</a>
               </li>
               <li class="nav-item">
                 <a href="{{ route('dashboard.settings') }}" class="nav-link {{ active_class(['dashboard/settings']) }}">Settings</a>

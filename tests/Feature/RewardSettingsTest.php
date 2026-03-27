@@ -20,6 +20,20 @@ test('admin can view reward settings page', function () {
         ->assertSee('Free Starter mission');
 });
 
+test('admin can open referral registration reward guide page', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'admin',
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('dashboard.rewards.referral-registration-guide'))
+        ->assertOk()
+        ->assertSee('Referral Registration Reward Guide')
+        ->assertSee('Basic 100 required')
+        ->assertSee('Number examples');
+});
+
 test('admin can update reward settings', function () {
     $admin = User::factory()->create([
         'email_verified_at' => now(),
@@ -43,6 +57,9 @@ test('admin can update reward settings', function () {
             'team_level_3_subscription_reward_rate' => 0.0060,
             'team_level_4_subscription_reward_rate' => 0.0030,
             'team_level_5_subscription_reward_rate' => 0.0015,
+            'profile_power_basic_max_rate' => 0.04,
+            'profile_power_growth_max_rate' => 0.06,
+            'profile_power_scale_max_rate' => 0.07,
         ])
         ->assertRedirect(route('dashboard.rewards'));
 
@@ -60,6 +77,17 @@ test('non admin cannot access reward settings page', function () {
 
     $this->actingAs($user)
         ->get(route('dashboard.rewards'))
+        ->assertForbidden();
+});
+
+test('non admin cannot access referral registration reward guide page', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'user',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('dashboard.rewards.referral-registration-guide'))
         ->assertForbidden();
 });
 

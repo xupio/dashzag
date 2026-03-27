@@ -28,6 +28,7 @@ use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\SvgWriter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
@@ -3340,6 +3341,48 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'settings' => MiningPlatform::rewardSettings(),
             ]);
         })->name('dashboard.rewards');
+
+        Route::get('/dashboard/rewards/referral-registration-guide', function () {
+            $markdownPath = base_path('REFERRAL_REGISTRATION_REWARD_SYSTEM.md');
+            $csvPath = base_path('REFERRAL_REGISTRATION_REWARD_EXAMPLES.csv');
+
+            $explanation = File::exists($markdownPath)
+                ? trim((string) File::get($markdownPath))
+                : '';
+            $explanationLines = collect(preg_split("/\r\n|\n|\r/", $explanation))
+                ->map(fn (?string $line) => trim((string) $line))
+                ->filter()
+                ->values();
+
+            $csvRows = collect();
+
+            if (File::exists($csvPath)) {
+                $lines = collect(preg_split("/\r\n|\n|\r/", trim((string) File::get($csvPath))))->filter();
+                $headers = $lines->isNotEmpty() ? str_getcsv((string) $lines->shift()) : [];
+                $csvRows = $lines->map(function (string $line) use ($headers) {
+                    $values = str_getcsv($line);
+
+                    return collect($headers)->mapWithKeys(function ($header, $index) use ($values) {
+                        return [$header => $values[$index] ?? ''];
+                    });
+                })->values();
+            }
+
+            return view('pages.general.referral-registration-reward-guide', [
+                'rewardGuideMarkdown' => $explanation,
+                'rewardGuideLines' => $explanationLines,
+                'rewardGuideExamples' => $csvRows,
+            ]);
+        })->name('dashboard.rewards.referral-registration-guide');
+
+        Route::get('/dashboard/rewards/referral-registration-guide/examples', function () {
+            $csvPath = base_path('REFERRAL_REGISTRATION_REWARD_EXAMPLES.csv');
+            abort_unless(File::exists($csvPath), 404);
+
+            return response()->download($csvPath, 'referral-registration-reward-examples.csv', [
+                'Content-Type' => 'text/csv; charset=UTF-8',
+            ]);
+        })->name('dashboard.rewards.referral-registration-guide.examples');
 
         Route::post('/dashboard/rewards', function (Request $request) {
             MiningPlatform::ensureDefaults();
