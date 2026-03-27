@@ -78,7 +78,7 @@
                     <td>{{ $order->submitted_at?->format('M d, Y h:i A') }}</td>
                     <td><span class="badge {{ $statusBadge }}">{{ str($order->status)->title() }}</span></td>
                     <td>
-                      <div class="text-secondary small">Reviewed by: {{ $order->approver?->name ?? '-' }}</div>
+                      <div class="text-secondary small">Reviewed by: {{ $order->approver?->adminLabel() ?? '-' }}</div>
                       <div class="text-secondary small">Approved at: {{ $order->approved_at?->format('M d, Y h:i A') ?? '-' }}</div>
                       <div class="text-secondary small">Rejected at: {{ $order->rejected_at?->format('M d, Y h:i A') ?? '-' }}</div>
                       <div class="text-secondary small">Cancelled at: {{ $order->cancelled_at?->format('M d, Y h:i A') ?? '-' }}</div>

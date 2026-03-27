@@ -262,8 +262,8 @@
                   <tr>
                     <td><span class="badge bg-light text-dark border">{{ str($activityLog->action)->replace('.', ' ')->title() }}</span></td>
                     <td>
-                      <div class="fw-semibold">{{ $activityLog->admin?->name ?? 'Unknown admin' }}</div>
-                      <div class="text-secondary small">{{ strtolower($activityLog->admin?->email ?? '') }}</div>
+                      <div class="fw-semibold">{{ $activityLog->admin?->adminLabel() ?? 'Admin ID unavailable' }}</div>
+                      <div class="text-secondary small">Reviewed by admin account</div>
                     </td>
                     <td>{{ $activityLog->summary }}</td>
                     <td class="text-end text-secondary small">{{ $activityLog->created_at?->format('M d, Y h:i A') }}</td>

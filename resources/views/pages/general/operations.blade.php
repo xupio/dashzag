@@ -324,7 +324,7 @@
                       <span class="badge {{ $statusBadge }}">{{ str($order->status)->title() }}</span>
                     </td>
                     <td>
-                      <div class="text-secondary small">Reviewed by: {{ $order->approver?->name ?? '-' }}</div>
+                      <div class="text-secondary small">Reviewed by: {{ $order->approver?->adminLabel() ?? '-' }}</div>
                       <div class="text-secondary small">Approved at: {{ $order->approved_at?->format('M d, Y h:i A') ?? '-' }}</div>
                       <div class="text-secondary small">Rejected at: {{ $order->rejected_at?->format('M d, Y h:i A') ?? '-' }}</div>
                       <div class="text-secondary small">Cancelled at: {{ $order->cancelled_at?->format('M d, Y h:i A') ?? '-' }}</div>
@@ -592,8 +592,8 @@
                       <div class="text-secondary small">Subject: {{ class_basename((string) $activityRow->subject_type) ?: 'N/A' }} {{ $activityRow->subject_id ? '#'.$activityRow->subject_id : '' }}</div>
                     </td>
                     <td>
-                      <div class="fw-semibold">{{ $activityRow->admin?->name ?? 'Unknown admin' }}</div>
-                      <div class="text-secondary small">{{ $activityRow->admin?->email ?? 'No email recorded' }}</div>
+                      <div class="fw-semibold">{{ $activityRow->admin?->adminLabel() ?? 'Admin ID unavailable' }}</div>
+                      <div class="text-secondary small">Reviewed by admin account</div>
                     </td>
                     <td style="min-width: 280px;">
                       <div class="text-secondary small">IP: {{ $activityRow->ip_address ?: '-' }}</div>

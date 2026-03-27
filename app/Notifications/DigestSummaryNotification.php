@@ -16,7 +16,7 @@ class DigestSummaryNotification extends Notification
         protected string $periodLabel,
         protected string $source = 'system',
         protected ?int $triggeredById = null,
-        protected ?string $triggeredByName = null,
+        protected ?string $triggeredByLabel = null,
     ) {
     }
 
@@ -60,7 +60,7 @@ class DigestSummaryNotification extends Notification
             'digest_summary' => $this->summary,
             'digest_source' => $this->source,
             'triggered_by_id' => $this->triggeredById,
-            'triggered_by_name' => $this->triggeredByName,
+            'triggered_by_name' => $this->triggeredByLabel,
         ];
     }
 

@@ -82,7 +82,7 @@
         @foreach ($recentAdminActivityLogs as $activityLog)
           <tr>
             <td>{{ str($activityLog->action)->replace('.', ' ')->title() }}</td>
-            <td>{{ $activityLog->admin?->name ?? 'Unknown admin' }}</td>
+            <td>{{ $activityLog->admin?->adminLabel() ?? 'Admin ID unavailable' }}</td>
             <td>{{ $activityLog->summary }}</td>
             <td>{{ $activityLog->created_at?->format('M d, Y h:i A') }}</td>
           </tr>

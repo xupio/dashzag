@@ -210,7 +210,7 @@
                   </td>
                   <td>{{ ucfirst($entry['data']['digest_frequency'] ?? 'weekly') }}</td>
                   <td><span class="badge bg-secondary">{{ $sourceLabel }}</span></td>
-                  <td>{{ $entry['data']['triggered_by_name'] ?? 'System' }}</td>
+                  <td>{{ (isset($entry['data']['triggered_by_id']) && $entry['data']['triggered_by_id']) ? 'Admin #'.$entry['data']['triggered_by_id'] : ($entry['data']['triggered_by_name'] ?? 'System') }}</td>
                   <td>{{ $entry['data']['context_value'] ?? '—' }}</td>
                   <td>{{ $entry['data']['amount'] ?? 0 }}</td>
                   <td>{{ $entry['notification']->created_at?->format('M d, Y h:i A') ?? '—' }}</td>

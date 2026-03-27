@@ -54,6 +54,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->role === 'admin';
     }
 
+    public function adminLabel(): string
+    {
+        return 'Admin #'.$this->id;
+    }
+
     public static function defaultNotificationPreferences(): array
     {
         return array_replace_recursive(MiningPlatform::notificationDefaultPreferences(), [
@@ -235,6 +240,5 @@ class User extends Authenticatable implements MustVerifyEmail
         ];
     }
 }
-
 
 

@@ -1801,7 +1801,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             abort_unless($user->hasVerifiedEmail(), 422, 'Digest can only be sent to verified users.');
 
             $summary = MiningPlatform::digestSummaryForUser($user, $validated['frequency']);
-            $user->notify(new DigestSummaryNotification($summary['frequency'], $summary, $summary['period_label'], 'admin_manual', $request->user()->id, $request->user()->name));
+            $user->notify(new DigestSummaryNotification($summary['frequency'], $summary, $summary['period_label'], 'admin_manual', $request->user()->id, $request->user()->adminLabel()));
 
             if ($summary['frequency'] === 'daily') {
                 $user->forceFill(['last_daily_digest_sent_at' => now()])->save();
@@ -1852,7 +1852,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
 
             foreach ($users as $user) {
                 $summary = MiningPlatform::digestSummaryForUser($user, $validated['frequency']);
-                $user->notify(new DigestSummaryNotification($summary['frequency'], $summary, $summary['period_label'], 'admin_bulk', $request->user()->id, $request->user()->name));
+                $user->notify(new DigestSummaryNotification($summary['frequency'], $summary, $summary['period_label'], 'admin_bulk', $request->user()->id, $request->user()->adminLabel()));
 
                 if ($summary['frequency'] === 'daily') {
                     $user->forceFill(['last_daily_digest_sent_at' => now()])->save();
@@ -2017,7 +2017,9 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                         $entry['user']->email,
                         $entry['data']['digest_frequency'] ?? 'weekly',
                         $entry['data']['digest_source'] ?? 'system',
-                        $entry['data']['triggered_by_name'] ?? 'System',
+                        (isset($entry['data']['triggered_by_id']) && $entry['data']['triggered_by_id'])
+                            ? 'Admin #'.$entry['data']['triggered_by_id']
+                            : ($entry['data']['triggered_by_name'] ?? 'System'),
                         $entry['data']['period_label'] ?? 'Last activity window',
                         $entry['data']['amount'] ?? 0,
                         optional($entry['notification']->created_at)->format('Y-m-d H:i:s'),
@@ -3103,7 +3105,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                         $order->payment_reference,
                         $order->payment_proof_path ? 'uploaded' : 'missing',
                         $order->status,
-                        $order->approver?->name,
+                        $order->approver?->adminLabel(),
                         optional($order->approved_at)->format('Y-m-d H:i:s'),
                         optional($order->rejected_at)->format('Y-m-d H:i:s'),
                         optional($order->cancelled_at)->format('Y-m-d H:i:s'),
