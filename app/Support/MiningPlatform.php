@@ -2373,12 +2373,15 @@ class MiningPlatform
     public static function awardReferralRegistration(User $registeredUser): Collection
     {
         return FriendInvitation::query()->with('user')->where('email', $registeredUser->email)->get()->map(function (FriendInvitation $invitation) use ($registeredUser) {
+            $reward = Earning::firstOrCreate(
+                ['user_id' => $invitation->user_id, 'investment_id' => null, 'earned_on' => now()->toDateString(), 'source' => 'referral_registration', 'notes' => 'Referral registration reward for '.$registeredUser->email.'.'],
+                ['amount' => (float) self::rewardSetting('referral_registration_reward'), 'status' => 'pending'],
+            );
+
+            self::syncReferralRegistrationRewards($invitation->user->fresh());
             self::maybeCelebrateProfilePower($invitation->user->fresh());
 
-            return Earning::firstOrCreate(
-                ['user_id' => $invitation->user_id, 'investment_id' => null, 'earned_on' => now()->toDateString(), 'source' => 'referral_registration', 'notes' => 'Referral registration reward for '.$registeredUser->email.'.'],
-                ['amount' => (float) self::rewardSetting('referral_registration_reward'), 'status' => 'available'],
-            );
+            return $reward->fresh();
         });
     }
 
@@ -2398,6 +2401,155 @@ class MiningPlatform
         self::awardTeamSubscriptionRewards($referredUser, $investment);
 
         return $rewards;
+    }
+
+    public static function syncReferralRegistrationRewards(User $user): void
+    {
+        $user->loadMissing(['investments.package', 'sponsoredUsers']);
+
+        $allRegistrationRewards = $user->earnings()
+            ->where('source', 'referral_registration')
+            ->orderBy('earned_on')
+            ->orderBy('id')
+            ->get();
+
+        if ($allRegistrationRewards->isEmpty()) {
+            return;
+        }
+
+        $committedStatuses = ['paid', 'payout_pending'];
+        $adjustableRewards = $allRegistrationRewards->whereNotIn('status', $committedStatuses)->values();
+        $committedAmount = (float) $allRegistrationRewards->whereIn('status', $committedStatuses)->sum('amount');
+        $totalRewardAmount = (float) $allRegistrationRewards->sum('amount');
+
+        $unlockCap = self::eligibleReferralRegistrationUnlockCap($user);
+        $availableTarget = max(min($totalRewardAmount, $unlockCap) - $committedAmount, 0);
+
+        DB::transaction(function () use ($adjustableRewards, $availableTarget) {
+            $remainingAvailable = round($availableTarget, 2);
+
+            foreach ($adjustableRewards as $reward) {
+                $rewardAmount = round((float) $reward->amount, 2);
+
+                if ($rewardAmount <= 0) {
+                    continue;
+                }
+
+                if ($remainingAvailable >= $rewardAmount) {
+                    if ($reward->status !== 'available') {
+                        $reward->forceFill(['status' => 'available'])->save();
+                    }
+
+                    $remainingAvailable = round($remainingAvailable - $rewardAmount, 2);
+                    continue;
+                }
+
+                if ($remainingAvailable <= 0) {
+                    if ($reward->status !== 'pending') {
+                        $reward->forceFill(['status' => 'pending'])->save();
+                    }
+
+                    continue;
+                }
+
+                $pendingAmount = round($rewardAmount - $remainingAvailable, 2);
+
+                $reward->forceFill([
+                    'amount' => $remainingAvailable,
+                    'status' => 'available',
+                ])->save();
+
+                Earning::create([
+                    'user_id' => $reward->user_id,
+                    'investment_id' => $reward->investment_id,
+                    'payout_request_id' => null,
+                    'earned_on' => $reward->earned_on,
+                    'amount' => $pendingAmount,
+                    'source' => $reward->source,
+                    'status' => 'pending',
+                    'notes' => $reward->notes,
+                ]);
+
+                $remainingAvailable = 0;
+            }
+        });
+    }
+
+    public static function syncReferralRegistrationRewardsForUserAndAncestors(User $user, int $maxDepth = 3): void
+    {
+        $currentUser = $user->fresh();
+        $depth = 0;
+
+        while ($currentUser && $depth <= $maxDepth) {
+            self::syncReferralRegistrationRewards($currentUser);
+            $currentUser = $currentUser->sponsor()->first();
+            $depth++;
+        }
+    }
+
+    public static function eligibleReferralRegistrationUnlockCap(User $user): float
+    {
+        if (! self::hasActiveBasic100Investment($user)) {
+            return 0.0;
+        }
+
+        $treeInvestmentVolume = self::referralTreeInvestmentVolume($user, 3);
+
+        if ($treeInvestmentVolume <= 0) {
+            return 0.0;
+        }
+
+        return round($treeInvestmentVolume * 0.5, 2);
+    }
+
+    public static function hasActiveBasic100Investment(User $user): bool
+    {
+        if ($user->relationLoaded('investments')) {
+            return $user->investments
+                ->where('status', 'active')
+                ->contains(fn (UserInvestment $investment) => $investment->package?->slug === self::BASIC_UPGRADE_PACKAGE_SLUG);
+        }
+
+        return $user->investments()
+            ->where('status', 'active')
+            ->whereHas('package', fn ($query) => $query->where('slug', self::BASIC_UPGRADE_PACKAGE_SLUG))
+            ->exists();
+    }
+
+    public static function referralTreeInvestmentVolume(User $user, int $maxDepth = 3): float
+    {
+        $treeUserIds = self::referralTreeUserIds($user, $maxDepth);
+
+        if ($treeUserIds->isEmpty()) {
+            return 0.0;
+        }
+
+        return round((float) UserInvestment::query()
+            ->whereIn('user_id', $treeUserIds)
+            ->where('status', 'active')
+            ->where('amount', '>', 0)
+            ->sum('amount'), 2);
+    }
+
+    public static function referralTreeUserIds(User $user, int $maxDepth = 3): Collection
+    {
+        $currentLevelIds = collect([$user->id]);
+        $treeIds = collect();
+
+        foreach (range(1, $maxDepth) as $depth) {
+            $nextLevelIds = User::query()
+                ->whereIn('sponsor_user_id', $currentLevelIds)
+                ->pluck('id');
+
+            if ($nextLevelIds->isEmpty()) {
+                break;
+            }
+
+            $treeIds = $treeIds->merge($nextLevelIds);
+            $currentLevelIds = $nextLevelIds;
+        }
+
+        return $treeIds->unique()->values();
     }
 
     public static function awardTeamSubscriptionRewards(User $referredUser, UserInvestment $investment): void

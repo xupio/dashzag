@@ -109,6 +109,8 @@ class UserInvestment extends Model
                 $currentSponsor = $currentSponsor->sponsor;
                 $depth++;
             }
+
+            MiningPlatform::syncReferralRegistrationRewardsForUserAndAncestors($investment->user);
         });
     }
 

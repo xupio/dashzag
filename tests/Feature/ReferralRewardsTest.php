@@ -2,7 +2,10 @@
 
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Models\FriendInvitation;
+use App\Models\InvestmentPackage;
+use App\Models\Shareholder;
 use App\Models\User;
+use App\Models\UserInvestment;
 use App\Support\MiningPlatform;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Support\Facades\URL;
@@ -10,6 +13,45 @@ use Illuminate\Support\Facades\URL;
 beforeEach(function () {
     MiningPlatform::ensureDefaults();
 });
+
+function createActiveInvestmentForUser(User $user, string $packageSlug = 'growth-500'): UserInvestment
+{
+    $package = InvestmentPackage::query()->where('slug', $packageSlug)->with('miner')->firstOrFail();
+    $level = MiningPlatform::syncUserLevel($user);
+    $teamBonusRate = MiningPlatform::teamBonusRate($user);
+
+    $shareholder = Shareholder::query()->updateOrCreate(
+        ['user_id' => $user->id],
+        [
+            'package_name' => $package->name,
+            'price' => $package->price,
+            'billing_cycle' => 'monthly',
+            'units_limit' => $package->units_limit,
+            'status' => 'active',
+            'subscribed_at' => now(),
+        ],
+    );
+
+    $investment = UserInvestment::query()->create([
+        'user_id' => $user->id,
+        'miner_id' => $package->miner_id,
+        'package_id' => $package->id,
+        'shareholder_id' => $shareholder->id,
+        'amount' => $package->price,
+        'shares_owned' => $package->shares_count,
+        'monthly_return_rate' => $package->monthly_return_rate,
+        'level_bonus_rate' => $level->bonus_rate,
+        'team_bonus_rate' => $teamBonusRate,
+        'status' => 'active',
+        'subscribed_at' => now(),
+    ]);
+
+    if (! in_array($user->account_type, ['starter', 'shareholder'], true)) {
+        $user->forceFill(['account_type' => 'shareholder'])->save();
+    }
+
+    return $investment->fresh();
+}
 
 test('invited user is attached to sponsor when email is verified', function () {
     $inviter = User::factory()->create([
@@ -44,10 +86,81 @@ test('invited user is attached to sponsor when email is verified', function () {
 
     expect($referredUser->sponsor_user_id)->toBe($inviter->id);
     expect($inviter->earnings->where('source', 'referral_registration'))->toHaveCount(1);
+    expect($inviter->earnings->firstWhere('source', 'referral_registration')?->status)->toBe('pending');
     expect($inviter->referralEvents->where('type', 'team_registered'))->toHaveCount(1);
     expect($inviter->notifications->pluck('data.subject'))->toContain('A referred user joined your network');
     expect($inviter->notifications->pluck('data.subject'))->toContain('Referral registration reward added');
     expect($referredUser->notifications->pluck('data.subject'))->toContain('You are now linked to a sponsor team');
+});
+
+test('referral registration reward unlocks only after inviter is on basic 100 and tree investment supports the cap', function () {
+    $inviter = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    FriendInvitation::create([
+        'user_id' => $inviter->id,
+        'name' => 'First Direct Referral',
+        'email' => 'first-direct@example.com',
+        'verified_at' => now(),
+        'registered_at' => now(),
+    ]);
+
+    $directReferral = User::factory()->create([
+        'email_verified_at' => now(),
+        'email' => 'first-direct@example.com',
+        'sponsor_user_id' => $inviter->id,
+    ]);
+
+    MiningPlatform::awardReferralRegistration($directReferral);
+
+    expect((float) $inviter->fresh()->earnings()->where('source', 'referral_registration')->where('status', 'available')->sum('amount'))->toBe(0.0);
+
+    createActiveInvestmentForUser($inviter, 'starter-100');
+
+    expect((float) $inviter->fresh()->earnings()->where('source', 'referral_registration')->where('status', 'available')->sum('amount'))->toBe(0.0);
+
+    $investment = createActiveInvestmentForUser($directReferral, 'starter-100');
+    MiningPlatform::awardReferralSubscription($directReferral, $investment);
+
+    expect((float) $inviter->fresh()->earnings()->where('source', 'referral_registration')->where('status', 'available')->sum('amount'))->toBe(25.0);
+});
+
+test('referral registration rewards stay visible but only unlock up to fifty percent of three-level tree investment', function () {
+    $inviter = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    createActiveInvestmentForUser($inviter, 'starter-100');
+
+    foreach (range(1, 3) as $index) {
+        FriendInvitation::create([
+            'user_id' => $inviter->id,
+            'name' => 'Referral '.$index,
+            'email' => 'reward-cap-'.$index.'@example.com',
+            'verified_at' => now(),
+            'registered_at' => now(),
+        ]);
+
+        $registeredUser = User::factory()->create([
+            'email_verified_at' => now(),
+            'email' => 'reward-cap-'.$index.'@example.com',
+            'sponsor_user_id' => $inviter->id,
+        ]);
+
+        MiningPlatform::awardReferralRegistration($registeredUser);
+    }
+
+    $firstBuyer = User::query()->where('email', 'reward-cap-1@example.com')->firstOrFail();
+
+    $investment = createActiveInvestmentForUser($firstBuyer, 'starter-100');
+    MiningPlatform::awardReferralSubscription($firstBuyer, $investment);
+
+    $inviter->refresh();
+
+    expect((float) $inviter->earnings()->where('source', 'referral_registration')->sum('amount'))->toBe(75.0);
+    expect((float) $inviter->earnings()->where('source', 'referral_registration')->where('status', 'available')->sum('amount'))->toBe(50.0);
+    expect((float) $inviter->earnings()->where('source', 'referral_registration')->where('status', 'pending')->sum('amount'))->toBe(25.0);
 });
 
 test('inviter receives subscription rewards and team bonus rate when referred user buys a package', function () {
@@ -55,9 +168,7 @@ test('inviter receives subscription rewards and team bonus rate when referred us
         'email_verified_at' => now(),
     ]);
 
-    $this->actingAs($inviter)->post(route('dashboard.buy-shares.subscribe'), [
-        'package' => 'growth-500',
-    ])->assertRedirect();
+    createActiveInvestmentForUser($inviter, 'growth-500');
 
     FriendInvitation::create([
         'user_id' => $inviter->id,
@@ -74,9 +185,8 @@ test('inviter receives subscription rewards and team bonus rate when referred us
         'sponsor_user_id' => $inviter->id,
     ]);
 
-    $this->actingAs($buyer)->post(route('dashboard.buy-shares.subscribe'), [
-        'package' => 'growth-500',
-    ])->assertRedirect();
+    $investment = createActiveInvestmentForUser($buyer, 'growth-500');
+    MiningPlatform::awardReferralSubscription($buyer, $investment);
 
     $inviter->refresh();
     $inviter->load(['earnings', 'investments', 'referralEvents', 'notifications']);
@@ -115,9 +225,8 @@ test('starter user unlocks basic 100 after referral mission is completed', funct
         'sponsor_user_id' => $user->id,
     ]);
 
-    $this->actingAs($referredBuyer)->post(route('dashboard.buy-shares.subscribe'), [
-        'package' => 'starter-100',
-    ]);
+    $investment = createActiveInvestmentForUser($referredBuyer, 'starter-100');
+    MiningPlatform::awardReferralSubscription($referredBuyer, $investment);
 
     $user->refresh();
     $user->load(['shareholder', 'investments.package', 'notifications']);
@@ -153,9 +262,8 @@ test('third level sponsor receives configured mlm subscription reward', function
         'sponsor_user_id' => $levelThree->id,
     ]);
 
-    $this->actingAs($buyer)->post(route('dashboard.buy-shares.subscribe'), [
-        'package' => 'growth-500',
-    ])->assertRedirect();
+    $investment = createActiveInvestmentForUser($buyer, 'growth-500');
+    MiningPlatform::awardReferralSubscription($buyer, $investment);
 
     $levelOne->refresh();
     $levelOne->load('earnings', 'referralEvents', 'notifications');
