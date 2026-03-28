@@ -314,7 +314,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             ->groupBy(fn ($earning) => optional($earning->earned_on)?->toDateString() ?? 'unknown')
             ->map(function ($earnings, $date) {
                 return [
-                    'label' => Carbon\Carbon::parse($date)->format('M d'),
+                    'label' => Carbon::parse($date)->format('M d'),
                     'total' => round((float) $earnings->sum('amount'), 2),
                 ];
             })
@@ -3982,7 +3982,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             ]);
 
             $miner = Miner::where('slug', $validated['miner_slug'])->firstOrFail();
-            $targetDate = Carbon\Carbon::parse($validated['logged_on'] ?? now()->toDateString())->startOfDay();
+            $targetDate = Carbon::parse($validated['logged_on'] ?? now()->toDateString())->startOfDay();
             $yesterday = $targetDate->copy()->subDay()->toDateString();
             $sourceLog = $miner->performanceLogs()
                 ->whereDate('logged_on', $yesterday)
