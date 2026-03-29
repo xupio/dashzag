@@ -7,6 +7,8 @@
 @section('content')
 @php
   $dashboardViewer = auth()->user();
+  $latestDashboardPerformanceLog = $livePerformanceSummary['latest_log'] ?? null;
+  $dailyOutputValue = $latestDashboardPerformanceLog?->revenue_usd ?? $miner->daily_output_usd;
   $powerBadgeClasses = [
       'secondary' => 'bg-secondary-subtle text-secondary',
       'info' => 'bg-info-subtle text-info',
@@ -136,11 +138,12 @@
     <div class="card">
       <div class="card-body">
         <p class="text-secondary mb-1">Daily output</p>
-        <h3 class="mb-2">${{ number_format((float) $miner->daily_output_usd, 2) }}</h3>
+        <h3 class="mb-2">${{ number_format((float) $dailyOutputValue, 2) }}</h3>
         <div class="d-flex align-items-center gap-2 text-success">
           <i data-lucide="activity" class="icon-sm"></i>
           <span>{{ number_format((float) collect($performanceUptimeData)->last(), 2) }}% uptime today</span>
         </div>
+        <div class="text-secondary small mt-2">Live revenue from the latest hashrate snapshot.</div>
       </div>
     </div>
   </div>
