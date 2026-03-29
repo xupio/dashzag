@@ -333,6 +333,16 @@
           </table>
         </div>
 
+        <div class="border rounded p-3 bg-light mb-4">
+          <div class="fw-semibold mb-2">How this reward table is calculated</div>
+          <div class="small text-secondary mb-2">Each amount is based on the selected package price of <span class="fw-semibold text-dark">${{ number_format((float) $selectedPackage->price, 2) }}</span>.</div>
+          <div class="small text-secondary mb-1">Base package return = package price x package monthly return rate.</div>
+          <div class="small text-secondary mb-1">Level bonus = package price x current user level bonus rate.</div>
+          <div class="small text-secondary mb-1">Invite + team bonus = package price x (verified-invite bonus + active-direct-investor bonus).</div>
+          <div class="small text-secondary mb-1">Profile power boost = package price x package cap rate x (profile power score / 100).</div>
+          <div class="small text-secondary">Total package reward = base return + level bonus + invite/team bonus + profile power boost.</div>
+        </div>
+
         <div class="row g-3 mb-4">
           <div class="col-md-6">
             <div class="border rounded p-3 h-100">

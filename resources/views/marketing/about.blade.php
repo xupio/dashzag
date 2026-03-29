@@ -3,27 +3,14 @@
 @section('content')
 <main>
     <div class="slider-area">
-        <div class="single-slider slider-height2 d-flex align-items-center legacy-page-hero" style="background-image: url('{{ asset('legacy-start/assets/img/hero/about.jpg') }}');">
-            <div class="container">
-                <div class="row">
-                    <div class="col-xl-12">
-                        <div class="hero-cap">
-                            <h2>How It Works</h2>
-                            <nav aria-label="breadcrumb">
-                                <ol class="breadcrumb">
-                                    <li class="breadcrumb-item"><a href="{{ route('landing') }}">Home</a></li>
-                                    <li class="breadcrumb-item"><a href="{{ route('marketing.how-it-works') }}">How It Works</a></li>
-                                </ol>
-                            </nav>
-                            <p class="legacy-page-intro">ZagChain is designed as one connected client journey. The user registers, chooses a subscription package, grows profile power, builds a referral structure, follows miner visibility, and understands profits from one dashboard experience instead of separate disconnected systems.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div class="single-slider slider-height2 legacy-page-hero">
+            <video class="legacy-page-video" autoplay muted loop playsinline>
+                <source src="{{ asset('branding/ZagChainvid.mp4') }}" type="video/mp4">
+            </video>
         </div>
     </div>
 
-    <section class="about-low-area section-padding30">
+    <section class="about-low-area section-padding30 pt-0">
         <div class="container">
             <div class="row align-items-center mb-80">
                 <div class="col-lg-6 col-md-12">

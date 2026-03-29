@@ -66,12 +66,21 @@
             background-size: cover;
             background-position: center;
             position: relative;
+            overflow: hidden;
         }
         .legacy-page-hero::before {
             background: rgba(5, 9, 35, 0.75);
             content: "";
             inset: 0;
             position: absolute;
+        }
+        .legacy-page-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            z-index: 1;
         }
         .legacy-stat-card,
         .legacy-step-card {
@@ -262,8 +271,8 @@
                                             </ul>
                                         </nav>
                                     </div>
-                                    <div class="header-right-btn d-none d-lg-block ml-20">
-                                        <a href="{{ route('register') }}" class="btn header-btn">Get Started</a>
+                                    <div class="header-right-btn d-none d-lg-flex ml-20 gap-2">
+                                        <a href="{{ route('login') }}" class="btn header-btn">Login</a>
                                     </div>
                                 </div>
                             </div>

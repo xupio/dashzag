@@ -13,7 +13,7 @@
                         <div class="hero-pera">
                             <p>ZagChain combines mining subscriptions, profile-power rewards, daily reporting, and network growth inside one dark dashboard experience.</p>
                         </div>
-                        <div class="d-flex flex-wrap gap-3 mt-4">
+                        <div class="d-flex flex-wrap gap-3 mt-4 align-items-center">
                             <a href="{{ route('register') }}" class="btn">Create Account</a>
                             <a href="{{ route('marketing.how-it-works') }}" class="btn" style="background:#1f2b6c;border-color:#1f2b6c;">How It Works</a>
                         </div>

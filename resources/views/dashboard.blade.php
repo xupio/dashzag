@@ -9,6 +9,9 @@
   $dashboardViewer = auth()->user();
   $latestDashboardPerformanceLog = $livePerformanceSummary['latest_log'] ?? null;
   $dailyOutputValue = $latestDashboardPerformanceLog?->revenue_usd ?? $miner->daily_output_usd;
+  $monthlyOutputValue = ($performanceRevenueData ?? collect())->count() > 0
+      ? collect($performanceRevenueData)->avg() * 30
+      : $miner->monthly_output_usd;
   $powerBadgeClasses = [
       'secondary' => 'bg-secondary-subtle text-secondary',
       'info' => 'bg-info-subtle text-info',
@@ -173,8 +176,9 @@
     <div class="card">
       <div class="card-body">
         <p class="text-secondary mb-1">Monthly output</p>
-        <h3 class="mb-2">${{ number_format((float) $miner->monthly_output_usd, 2) }}</h3>
+        <h3 class="mb-2">${{ number_format((float) $monthlyOutputValue, 2) }}</h3>
         <div class="text-secondary small">Active packages: {{ $miner->packages->count() }}</div>
+        <div class="text-secondary small">Based on the recent daily performance average.</div>
       </div>
     </div>
   </div>
