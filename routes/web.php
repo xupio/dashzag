@@ -1312,6 +1312,8 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
         }
 
         $user = request()->user()->load(['userLevel', 'earnings.investment.package', 'earnings.investment.miner', 'investments.package', 'payoutRequests']);
+        MiningPlatform::syncMiningDailyShareUnlocks($user);
+        $user->load(['earnings.investment.package', 'earnings.investment.miner']);
         $wallet = MiningPlatform::walletSummary($user);
         $activeInvestments = $user->investments->where('status', 'active')->values();
         $expectedMonthlyEarnings = MiningPlatform::expectedMonthlyEarnings($user);
@@ -4696,7 +4698,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
 
 
 

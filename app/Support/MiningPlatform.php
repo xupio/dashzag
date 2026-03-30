@@ -2234,6 +2234,7 @@ class MiningPlatform
             ->get()
             ->map(function (UserInvestment $investment) use ($log) {
                 $amount = round((float) $investment->shares_owned * (float) $log->revenue_per_share_usd, 2);
+                $isUnlocked = self::investmentHasCompletedInitialCycle($investment, $log->logged_on);
 
                 $earning = Earning::query()
                     ->where('user_id', $investment->user_id)
@@ -2249,14 +2250,65 @@ class MiningPlatform
 
                 $earning->fill([
                     'amount' => $amount,
-                    'status' => 'available',
-                    'notes' => 'Daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share.',
+                    'status' => $isUnlocked ? 'available' : 'pending',
+                    'notes' => $isUnlocked
+                        ? 'Daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share.'
+                        : 'Locked daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share. It unlocks after the first 30-day cycle.',
                 ]);
 
                 $earning->save();
 
                 return $earning;
                 });
+    }
+
+    public static function investmentHasCompletedInitialCycle(UserInvestment $investment, Carbon|string|null $asOf = null): bool
+    {
+        $subscribedAt = $investment->subscribed_at?->copy();
+
+        if (! $subscribedAt) {
+            return false;
+        }
+
+        $comparisonDate = $asOf instanceof Carbon
+            ? $asOf->copy()
+            : Carbon::parse($asOf ?? now());
+
+        return $subscribedAt->diffInDays($comparisonDate->endOfDay(), false) >= 30;
+    }
+
+    public static function syncMiningDailyShareUnlocks(User $user): void
+    {
+        $user->loadMissing('investments');
+
+        $paidInvestmentIds = $user->investments
+            ->where('amount', '>', 0)
+            ->pluck('id');
+
+        if ($paidInvestmentIds->isEmpty()) {
+            return;
+        }
+
+        $investments = $user->investments->keyBy('id');
+
+        $user->earnings()
+            ->where('source', 'mining_daily_share')
+            ->whereIn('investment_id', $paidInvestmentIds)
+            ->get()
+            ->each(function (Earning $earning) use ($investments) {
+                $investment = $investments->get($earning->investment_id);
+
+                if (! $investment) {
+                    return;
+                }
+
+                $shouldBeAvailable = self::investmentHasCompletedInitialCycle($investment, $earning->earned_on);
+                $targetStatus = $shouldBeAvailable ? 'available' : 'pending';
+
+                if ($earning->status !== $targetStatus) {
+                    $earning->forceFill(['status' => $targetStatus])->save();
+                }
+            });
     }
 
     public static function minerPerformanceSummary(Miner $miner, int $days = 7): array
