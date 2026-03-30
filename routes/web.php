@@ -1409,7 +1409,9 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
 
         return redirect()
             ->route('dashboard.wallet')
-            ->with('wallet_success', $generated->count().' monthly earning entries are now available in your wallet.');
+            ->with('wallet_success', $generated->count() > 0
+                ? $generated->count().' monthly earning entries are now available in your wallet.'
+                : 'No monthly return is available yet. Each paid package must complete a full 30-day cycle before the mining return unlocks.');
     })->name('dashboard.wallet.generate');
 
     Route::middleware('admin')->group(function () {
@@ -4694,7 +4696,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
 
 
 

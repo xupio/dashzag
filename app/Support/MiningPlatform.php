@@ -2351,7 +2351,7 @@ class MiningPlatform
 
     public static function generateMonthlyEarnings(User $user, ?Carbon $month = null): Collection
     {
-        $period = ($month ?? now())->copy()->startOfMonth();
+        $asOf = ($month ?? now())->copy()->endOfDay();
         $user->loadMissing(['userLevel', 'friendInvitations', 'sponsoredUsers.investments']);
         $powerScore = (float) (self::profilePowerSummary($user)['score'] ?? 0);
 
@@ -2360,14 +2360,42 @@ class MiningPlatform
             ->where('status', 'active')
             ->where('amount', '>', 0)
             ->get()
-            ->map(function (UserInvestment $investment) use ($user, $period, $powerScore) {
+            ->flatMap(function (UserInvestment $investment) use ($user, $asOf, $powerScore) {
+                $subscribedAt = $investment->subscribed_at?->copy();
+
+                if (! $subscribedAt) {
+                    return collect();
+                }
+
+                $elapsedDays = $subscribedAt->diffInDays($asOf, false);
+
+                if ($elapsedDays < 30) {
+                    return collect();
+                }
+
+                $completedCycles = intdiv($elapsedDays, 30);
                 $amount = self::investmentProjectedRewardAmountForScore($investment, $powerScore);
 
-                return Earning::firstOrCreate(
-                    ['user_id' => $user->id, 'investment_id' => $investment->id, 'earned_on' => $period->toDateString(), 'source' => 'mining_return'],
-                    ['amount' => $amount, 'status' => 'available', 'notes' => 'Monthly mining return generated for '.$period->format('F Y').'.'],
-                );
-            });
+                return collect(range(1, $completedCycles))
+                    ->map(function (int $cycleNumber) use ($user, $investment, $subscribedAt, $amount) {
+                        $dueDate = $subscribedAt->copy()->addDays($cycleNumber * 30);
+
+                        return Earning::firstOrCreate(
+                            [
+                                'user_id' => $user->id,
+                                'investment_id' => $investment->id,
+                                'earned_on' => $dueDate->toDateString(),
+                                'source' => 'mining_return',
+                            ],
+                            [
+                                'amount' => $amount,
+                                'status' => 'available',
+                                'notes' => 'Monthly mining return unlocked after completing a 30-day cycle ending on '.$dueDate->format('M d, Y').'.',
+                            ],
+                        );
+                    });
+            })
+            ->values();
     }
 
     public static function awardReferralRegistration(User $registeredUser): Collection

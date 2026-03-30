@@ -84,7 +84,7 @@
         <div class="border rounded p-3 mb-3 bg-light"><div class="text-secondary small">Expected monthly earnings</div><div class="fw-semibold">${{ number_format($expectedMonthlyEarnings, 2) }}</div></div>
         <div class="border rounded p-3 mb-3 bg-light"><div class="text-secondary small">Payout requests</div><div class="fw-semibold">{{ $payoutRequests->count() }}</div></div>
         <div class="alert alert-light border mb-0">
-          Only your available earnings can be withdrawn from this wallet. Your asset value, share amount, and invested capital stay locked in your packages and are not part of payout requests.{{ count($payoutMethods) === 0 ? ' Payout requests are currently disabled by the admin team.' : '' }}
+          Only your available earnings can be withdrawn from this wallet. Monthly mining returns unlock only after each paid package completes a full 30-day cycle from its subscription date. Your asset value, share amount, and invested capital stay locked in your packages and are not part of payout requests.{{ count($payoutMethods) === 0 ? ' Payout requests are currently disabled by the admin team.' : '' }}
         </div>
       </div>
     </div>
@@ -95,7 +95,7 @@
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
           <div>
             <h5 class="mb-1">Earnings history</h5>
-            <p class="text-secondary mb-0">Every projected, referral, or generated wallet transaction for this user.</p>
+            <p class="text-secondary mb-0">Every projected, referral, or unlocked wallet transaction for this user.</p>
           </div>
           <span class="badge bg-primary">{{ $earnings->count() }} entries</span>
         </div>
@@ -109,7 +109,7 @@
         @if ($earnings->isEmpty())
           <div class="text-center py-5">
             <h5 class="mb-2">No wallet entries yet</h5>
-            <p class="text-secondary mb-0">Buy a package first, then generate monthly earnings to populate the wallet.</p>
+            <p class="text-secondary mb-0">Buy a package first, then wait for the first full 30-day cycle before monthly earnings can unlock.</p>
           </div>
         @else
           <div class="table-responsive">
