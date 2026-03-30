@@ -45,7 +45,19 @@
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Available balance</p><h4 class="mb-0">${{ number_format($wallet['available'], 2) }}</h4></div></div></div>
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Pending balance</p><h4 class="mb-0">${{ number_format($wallet['pending'], 2) }}</h4></div></div></div>
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Paid out</p><h4 class="mb-0">${{ number_format($wallet['paid'], 2) }}</h4></div></div></div>
-  <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Total earnings</p><h4 class="mb-0">${{ number_format($wallet['total'], 2) }}</h4></div></div></div>
+  <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Confirmed earnings</p><h4 class="mb-0">${{ number_format($wallet['total'], 2) }}</h4></div></div></div>
+</div>
+
+<div class="row mb-4">
+  <div class="col-md-4 grid-margin stretch-card">
+    <div class="card border-warning">
+      <div class="card-body">
+        <p class="text-secondary mb-1">Projected monthly preview</p>
+        <h4 class="mb-1">${{ number_format($wallet['projected'] ?? 0, 2) }}</h4>
+        <p class="text-secondary mb-0">This is only an estimate after approval. It is not confirmed or withdrawable until the 30-day cycle finishes.</p>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="row mb-4">
@@ -84,7 +96,7 @@
         <div class="border rounded p-3 mb-3 bg-light"><div class="text-secondary small">Expected monthly earnings</div><div class="fw-semibold">${{ number_format($expectedMonthlyEarnings, 2) }}</div></div>
         <div class="border rounded p-3 mb-3 bg-light"><div class="text-secondary small">Payout requests</div><div class="fw-semibold">{{ $payoutRequests->count() }}</div></div>
         <div class="alert alert-light border mb-0">
-          Only your available earnings can be withdrawn from this wallet. Monthly mining returns unlock only after each paid package completes a full 30-day cycle from its subscription date. Your asset value, share amount, and invested capital stay locked in your packages and are not part of payout requests.{{ count($payoutMethods) === 0 ? ' Payout requests are currently disabled by the admin team.' : '' }}
+          Only your available earnings can be withdrawn from this wallet. Monthly mining returns unlock only after each paid package completes a full 30-day cycle from its subscription date. Projected monthly return entries are preview values only and may still change before the cycle ends. Your asset value, share amount, and invested capital stay locked in your packages and are not part of payout requests.{{ count($payoutMethods) === 0 ? ' Payout requests are currently disabled by the admin team.' : '' }}
         </div>
       </div>
     </div>

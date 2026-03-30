@@ -2091,7 +2091,7 @@ class MiningPlatform
                 [
                     'amount' => self::investmentProjectedRewardAmount($investment),
                     'status' => 'pending',
-                    'notes' => 'Initial projected monthly return generated after investment order approval.',
+                    'notes' => 'Initial estimated monthly return preview generated after investment order approval. Final monthly return is confirmed only after the full 30-day cycle.',
                 ],
             );
 
@@ -2764,12 +2764,15 @@ class MiningPlatform
     public static function walletSummary(User $user): array
     {
         $earnings = $user->earnings()->get();
+        $projected = $earnings->where('source', 'projected_return');
+        $walletEarnings = $earnings->reject(fn (Earning $earning) => $earning->source === 'projected_return');
 
         return [
-            'available' => (float) $earnings->where('status', 'available')->sum('amount'),
-            'pending' => (float) $earnings->whereIn('status', ['pending', 'payout_pending'])->sum('amount'),
-            'paid' => (float) $earnings->where('status', 'paid')->sum('amount'),
-            'total' => (float) $earnings->sum('amount'),
+            'available' => (float) $walletEarnings->where('status', 'available')->sum('amount'),
+            'pending' => (float) $walletEarnings->whereIn('status', ['pending', 'payout_pending'])->sum('amount'),
+            'paid' => (float) $walletEarnings->where('status', 'paid')->sum('amount'),
+            'total' => (float) $walletEarnings->sum('amount'),
+            'projected' => (float) $projected->sum('amount'),
         ];
     }
 
