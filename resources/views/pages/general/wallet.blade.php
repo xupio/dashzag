@@ -95,6 +95,20 @@
         <div class="border rounded p-3 mb-3 bg-light"><div class="text-secondary small">Active investments</div><div class="fw-semibold">{{ $activeInvestments->count() }}</div></div>
         <div class="border rounded p-3 mb-3 bg-light"><div class="text-secondary small">Expected monthly earnings</div><div class="fw-semibold">${{ number_format($expectedMonthlyEarnings, 2) }}</div></div>
         <div class="border rounded p-3 mb-3 bg-light"><div class="text-secondary small">Payout requests</div><div class="fw-semibold">{{ $payoutRequests->count() }}</div></div>
+        @if (($miningProfitCaps ?? collect())->isNotEmpty())
+          <div class="border rounded p-3 mb-3 bg-light">
+            <div class="fw-semibold mb-2">Mining profit caps</div>
+            <div class="small text-secondary mb-2">Daily mining share is capped by your package's displayed monthly rate.</div>
+            <div class="d-flex flex-column gap-2">
+              @foreach ($miningProfitCaps as $cap)
+                <div class="border rounded bg-white p-2">
+                  <div class="fw-semibold">{{ $cap['package_name'] }}</div>
+                  <div class="small text-secondary">Daily cap: ${{ number_format($cap['daily_cap'], 2) }} | Monthly cap: ${{ number_format($cap['monthly_cap'], 2) }}</div>
+                </div>
+              @endforeach
+            </div>
+          </div>
+        @endif
         <div class="alert alert-light border mb-0">
           Only your available earnings can be withdrawn from this wallet. All mining profit stays locked until each paid package completes its first full 30-day cycle from the subscription date. Projected monthly return entries are preview values only and may still change before the cycle ends. Your asset value, share amount, and invested capital stay locked in your packages and are not part of payout requests.{{ count($payoutMethods) === 0 ? ' Payout requests are currently disabled by the admin team.' : '' }}
         </div>

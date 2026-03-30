@@ -148,6 +148,36 @@
   </div>
 </div>
 
+@if (($packageDailyCaps ?? collect())->isNotEmpty())
+<div class="row mb-4">
+  <div class="col-12 stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
+            <h5 class="mb-1">Package mining share caps</h5>
+            <p class="text-secondary mb-0">Daily mining share is capped by the package's displayed monthly rate, separate from extra reward bonuses.</p>
+          </div>
+          <span class="badge bg-primary">{{ $packageDailyCaps->count() }} packages</span>
+        </div>
+        <div class="row g-3">
+          @foreach ($packageDailyCaps as $cap)
+            <div class="col-md-4">
+              <div class="border rounded p-3 h-100 bg-light">
+                <div class="fw-semibold">{{ $cap['name'] }}</div>
+                <div class="small text-secondary mb-2">Package price: ${{ number_format($cap['price'], 2) }}</div>
+                <div class="small text-secondary">Monthly base cap: {{ number_format($cap['monthly_rate'] * 100, 2) }}%</div>
+                <div class="fw-semibold mt-1">Daily share cap: ${{ number_format($cap['daily_cap'], 2) }}</div>
+              </div>
+            </div>
+          @endforeach
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+@endif
+
 <div class="row">
   <div class="col-xl-7 grid-margin stretch-card">
     <div class="card">
@@ -482,4 +512,3 @@
   });
 </script>
 @endpush
-

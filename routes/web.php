@@ -1318,6 +1318,15 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
         $activeInvestments = $user->investments->where('status', 'active')->values();
         $expectedMonthlyEarnings = MiningPlatform::expectedMonthlyEarnings($user);
         $earnings = $user->earnings;
+        $miningProfitCaps = $activeInvestments
+            ->where('amount', '>', 0)
+            ->map(fn ($investment) => [
+                'investment_id' => $investment->id,
+                'package_name' => $investment->package?->name ?? 'Package',
+                'monthly_cap' => round(((float) $investment->amount) * (float) ($investment->package?->monthly_return_rate ?? $investment->monthly_return_rate), 2),
+                'daily_cap' => MiningPlatform::investmentBaseDailyShareCap($investment),
+            ])
+            ->values();
 
         $walletSourceBreakdown = [
             'miner_daily_share' => [
@@ -1358,6 +1367,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             'payoutRequests' => $user->payoutRequests,
             'activeInvestments' => $activeInvestments,
             'expectedMonthlyEarnings' => $expectedMonthlyEarnings,
+            'miningProfitCaps' => $miningProfitCaps,
             'payoutMethods' => MiningPlatform::activePayoutMethods(),
             'defaultPayoutMethod' => collect(MiningPlatform::activePayoutMethods())->first(),
         ]);
@@ -3807,6 +3817,17 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             $sharesSold = MiningPlatform::totalSharesSold($miner);
             $automaticSnapshot = MiningPlatform::performanceSnapshotForDate($miner);
             $latestLog = $miner->performanceLogs->first();
+            $packageDailyCaps = $miner->packages
+                ->map(fn ($package) => [
+                    'package_id' => $package->id,
+                    'name' => $package->name,
+                    'price' => (float) $package->price,
+                    'monthly_rate' => (float) $package->monthly_return_rate,
+                    'daily_cap' => $package->price > 0
+                        ? round(((float) $package->price * (float) $package->monthly_return_rate) / 30, 2)
+                        : 0.0,
+                ])
+                ->values();
 
             return view('pages.general.miner', [
                 'miners' => $miners,
@@ -3816,6 +3837,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'recentLogs' => $miner->performanceLogs,
                 'automaticSnapshot' => $automaticSnapshot,
                 'latestLog' => $latestLog,
+                'packageDailyCaps' => $packageDailyCaps,
             ]);
         })->name('dashboard.miner');
 
@@ -4698,8 +4720,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
-
 
 
 
