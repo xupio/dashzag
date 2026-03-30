@@ -37,6 +37,10 @@
   <div class="alert alert-success">{{ session('log_success') }}</div>
 @endif
 
+@if (session('log_error'))
+  <div class="alert alert-warning">{{ session('log_error') }}</div>
+@endif
+
 @if ($errors->any())
   <div class="alert alert-danger">
     <div class="fw-semibold mb-1">Miner settings were not saved.</div>

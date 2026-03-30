@@ -4020,6 +4020,14 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 ->with('log_success', 'Yesterday\'s performance was copied into '.$targetDate->format('M d, Y').' for '.$miner->name.'.');
         })->name('dashboard.miner.logs.copy-yesterday');
 
+        Route::get('/dashboard/miner/logs/generate', function (Request $request) {
+            $miner = MiningPlatform::resolveMiner($request->query('miner'));
+
+            return redirect()
+                ->to(route('dashboard.miner').'?miner='.$miner->slug)
+                ->with('log_error', 'Use the generate button on the miner page to create an automatic snapshot.');
+        })->name('dashboard.miner.logs.generate.form');
+
         Route::post('/dashboard/miner/logs/generate', function (Request $request) {
             MiningPlatform::ensureDefaults();
 
