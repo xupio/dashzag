@@ -462,7 +462,10 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
         $activeInvestments = $user->investments->where('status', 'active')->values();
         $totalInvested = (float) $activeInvestments->sum('amount');
         $expectedMonthlyEarnings = MiningPlatform::expectedMonthlyEarnings($user);
-        $availableEarnings = (float) $user->earnings->where('status', 'available')->sum('amount');
+        MiningPlatform::syncMiningDailyShareUnlocks($user);
+        $user->load('earnings');
+        $walletSummary = MiningPlatform::walletSummary($user);
+        $availableEarnings = (float) ($walletSummary['available'] ?? 0);
         $pendingReferrals = $user->friendInvitations->whereNull('verified_at')->count();
         $verifiedReferrals = $user->friendInvitations->whereNotNull('verified_at')->count();
         $registeredReferrals = $user->friendInvitations->whereNotNull('registered_at')->count();
@@ -537,6 +540,31 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             ->pluck('title')
             ->values()
             ->all();
+        $profileInvestmentStatus = $activeInvestments
+            ->where('amount', '>', 0)
+            ->map(function ($investment) use ($user) {
+                $investmentEarnings = $user->earnings->where('investment_id', $investment->id);
+                $unlockDate = $investment->subscribed_at?->copy()?->addDays(30);
+
+                return [
+                    'investment_id' => $investment->id,
+                    'package_name' => $investment->package?->name ?? 'Package',
+                    'subscribed_at' => $investment->subscribed_at,
+                    'unlock_date' => $unlockDate,
+                    'is_unlocked' => $unlockDate ? now()->greaterThanOrEqualTo($unlockDate) : false,
+                    'days_remaining' => $unlockDate && now()->lt($unlockDate) ? now()->diffInDays($unlockDate) : 0,
+                    'available_amount' => round((float) $investmentEarnings->where('status', 'available')->where('source', '!=', 'projected_return')->sum('amount'), 2),
+                    'locked_amount' => round((float) $investmentEarnings->whereIn('status', ['pending', 'payout_pending'])->where('source', '!=', 'projected_return')->sum('amount'), 2),
+                    'projected_amount' => round((float) $investmentEarnings->where('source', 'projected_return')->sum('amount'), 2),
+                    'daily_cap' => MiningPlatform::investmentBaseDailyShareCap($investment),
+                    'monthly_cap' => round(((float) $investment->amount) * (float) ($investment->package?->monthly_return_rate ?? $investment->monthly_return_rate), 2),
+                ];
+            })
+            ->values();
+        $nextInvestmentUnlock = $profileInvestmentStatus
+            ->where('is_unlocked', false)
+            ->sortBy(fn ($row) => optional($row['unlock_date'])->timestamp ?? PHP_INT_MAX)
+            ->first();
         $profileRewardBoostSummary = collect([
             [
                 'label' => 'Basic 100',
@@ -596,6 +624,9 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             'recentHallOfFameWins' => $recentHallOfFameWins,
             'hallOfFameWinCounts' => $hallOfFameWinCounts,
             'profileRewardBoostSummary' => $profileRewardBoostSummary,
+            'walletSummary' => $walletSummary,
+            'profileInvestmentStatus' => $profileInvestmentStatus,
+            'nextInvestmentUnlock' => $nextInvestmentUnlock,
             'profileInvestmentLabels' => $investmentAllocation->keys()->values()->all(),
             'profileInvestmentSeries' => $investmentAllocation->values()->all(),
             'profileFinanceLabels' => ['Invested', 'Monthly return', 'Wallet'],
@@ -1327,6 +1358,27 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'daily_cap' => MiningPlatform::investmentBaseDailyShareCap($investment),
             ])
             ->values();
+        $packageWalletBreakdown = $activeInvestments
+            ->where('amount', '>', 0)
+            ->map(function ($investment) use ($earnings) {
+                $unlockDate = $investment->subscribed_at?->copy()?->addDays(30);
+                $investmentEarnings = $earnings->where('investment_id', $investment->id);
+
+                return [
+                    'investment_id' => $investment->id,
+                    'package_name' => $investment->package?->name ?? 'Package',
+                    'subscribed_at' => $investment->subscribed_at,
+                    'unlock_date' => $unlockDate,
+                    'is_unlocked' => $unlockDate ? now()->greaterThanOrEqualTo($unlockDate) : false,
+                    'days_remaining' => $unlockDate && now()->lt($unlockDate) ? now()->diffInDays($unlockDate) : 0,
+                    'available_amount' => round((float) $investmentEarnings->where('status', 'available')->where('source', '!=', 'projected_return')->sum('amount'), 2),
+                    'locked_amount' => round((float) $investmentEarnings->whereIn('status', ['pending', 'payout_pending'])->where('source', '!=', 'projected_return')->sum('amount'), 2),
+                    'projected_amount' => round((float) $investmentEarnings->where('source', 'projected_return')->sum('amount'), 2),
+                    'daily_cap' => MiningPlatform::investmentBaseDailyShareCap($investment),
+                    'monthly_cap' => round(((float) $investment->amount) * (float) ($investment->package?->monthly_return_rate ?? $investment->monthly_return_rate), 2),
+                ];
+            })
+            ->values();
 
         $walletSourceBreakdown = [
             'miner_daily_share' => [
@@ -1368,6 +1420,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             'activeInvestments' => $activeInvestments,
             'expectedMonthlyEarnings' => $expectedMonthlyEarnings,
             'miningProfitCaps' => $miningProfitCaps,
+            'packageWalletBreakdown' => $packageWalletBreakdown,
             'payoutMethods' => MiningPlatform::activePayoutMethods(),
             'defaultPayoutMethod' => collect(MiningPlatform::activePayoutMethods())->first(),
         ]);
@@ -4720,10 +4773,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
-
-
-
 
 
 

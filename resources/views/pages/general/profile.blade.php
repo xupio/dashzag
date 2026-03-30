@@ -583,8 +583,8 @@
           <div class="col-md-4">
             <div class="border rounded p-3 h-100">
               <p class="text-secondary mb-1">Available wallet balance</p>
-              <h4 class="mb-2">${{ number_format($availableEarnings, 2) }}</h4>
-              <small class="text-secondary">Ready inside your earnings wallet.</small>
+              <h4 class="mb-2">${{ number_format($walletSummary['available'] ?? $availableEarnings, 2) }}</h4>
+              <small class="text-secondary">Confirmed earnings already unlocked.</small>
             </div>
           </div>
         </div>
@@ -600,12 +600,67 @@
           </div>
           <div class="col-md-6">
             <div class="border rounded p-3 h-100">
-              <p class="text-secondary mb-1">Current level</p>
-              <div class="fw-semibold mb-2">{{ $displayTierName }}</div>
-              <div class="text-secondary small">Base bonus: {{ number_format((float) $level->bonus_rate * 100, 2) }}%.</div>
+              <p class="text-secondary mb-1">Profit status</p>
+              <div class="fw-semibold mb-2">${{ number_format((float) ($walletSummary['pending'] ?? 0), 2) }} locked | ${{ number_format((float) ($walletSummary['projected'] ?? 0), 2) }} projected</div>
+              <div class="text-secondary small">
+                @if ($nextInvestmentUnlock)
+                  Next unlock: {{ $nextInvestmentUnlock['package_name'] }} on {{ $nextInvestmentUnlock['unlock_date']?->format('M d, Y') }}.
+                @else
+                  All active packages have completed their first unlock cycle.
+                @endif
+              </div>
             </div>
           </div>
         </div>
+        @if (($profileInvestmentStatus ?? collect())->isNotEmpty())
+          <div class="row g-3 mt-1">
+            @foreach ($profileInvestmentStatus as $investmentStatus)
+              <div class="col-xl-6">
+                <div class="border rounded p-3 h-100 bg-light">
+                  <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                      <div class="fw-semibold">{{ $investmentStatus['package_name'] }}</div>
+                      <div class="text-secondary small">Subscribed {{ $investmentStatus['subscribed_at']?->format('M d, Y') ?? '—' }}</div>
+                    </div>
+                    <span class="badge {{ $investmentStatus['is_unlocked'] ? 'bg-success' : 'bg-warning text-dark' }}">
+                      {{ $investmentStatus['is_unlocked'] ? 'Unlocked' : ($investmentStatus['days_remaining'].' days left') }}
+                    </span>
+                  </div>
+                  <div class="text-secondary small mb-2">
+                    First unlock date: {{ $investmentStatus['unlock_date']?->format('M d, Y') ?? '—' }}
+                  </div>
+                  <div class="row g-2">
+                    <div class="col-sm-6">
+                      <div class="border rounded bg-white p-2">
+                        <div class="text-secondary small">Available</div>
+                        <div class="fw-semibold">${{ number_format($investmentStatus['available_amount'], 2) }}</div>
+                      </div>
+                    </div>
+                    <div class="col-sm-6">
+                      <div class="border rounded bg-white p-2">
+                        <div class="text-secondary small">Locked</div>
+                        <div class="fw-semibold">${{ number_format($investmentStatus['locked_amount'], 2) }}</div>
+                      </div>
+                    </div>
+                    <div class="col-sm-6">
+                      <div class="border rounded bg-white p-2">
+                        <div class="text-secondary small">Projected</div>
+                        <div class="fw-semibold">${{ number_format($investmentStatus['projected_amount'], 2) }}</div>
+                      </div>
+                    </div>
+                    <div class="col-sm-6">
+                      <div class="border rounded bg-white p-2">
+                        <div class="text-secondary small">Cap</div>
+                        <div class="fw-semibold">${{ number_format($investmentStatus['daily_cap'], 2) }}/day</div>
+                        <div class="text-secondary small">${{ number_format($investmentStatus['monthly_cap'], 2) }}/month</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            @endforeach
+          </div>
+        @endif
       </div>
     </div>
   </div>
