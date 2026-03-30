@@ -3,19 +3,13 @@
 @section('content')
 @php
   $snapshotDate = \Illuminate\Support\Carbon::parse($automaticSnapshot['logged_on'] ?? now()->toDateString());
-  $canManageMiner = auth()->user()?->isAdmin();
 @endphp
 <div class="row">
   <div class="col-12 grid-margin">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
       <div>
         <h4 class="mb-1">{{ $miner->name }} Miner Details</h4>
-        <p class="text-secondary mb-0">
-          {{ $canManageMiner
-              ? 'Use this page for the full technical, capacity, and admin-level management of the selected miner.'
-              : 'Use this page to review miner performance, capacity, and recent operating history.'
-          }}
-        </p>
+        <p class="text-secondary mb-0">Use this page for the full technical, capacity, and admin-level management of the selected miner.</p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
         <a href="{{ route('dashboard') }}?miner={{ $miner->slug }}" class="btn btn-outline-primary btn-icon-text">
@@ -155,15 +149,6 @@
 </div>
 
 <div class="row">
-  @unless ($canManageMiner)
-    <div class="col-12 grid-margin">
-      <div class="alert alert-info mb-0">
-        This view is read-only for investor accounts. Miner management actions are available only to admins.
-      </div>
-    </div>
-  @endunless
-
-  @if ($canManageMiner)
   <div class="col-xl-7 grid-margin stretch-card">
     <div class="card">
       <div class="card-body">
@@ -268,9 +253,7 @@
       </div>
     </div>
   </div>
-  @endif
 
-  @if ($canManageMiner)
   <div class="col-xl-5 grid-margin stretch-card">
     <div class="d-flex flex-column gap-4 w-100">
       <div class="card">
@@ -409,7 +392,6 @@
       </div>
     </div>
   </div>
-  @endif
 </div>
 
 <div class="row">
