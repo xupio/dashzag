@@ -2233,7 +2233,11 @@ class MiningPlatform
             ->where('amount', '>', 0)
             ->get()
             ->map(function (UserInvestment $investment) use ($log) {
-                $amount = round((float) $investment->shares_owned * (float) $log->revenue_per_share_usd, 2);
+                $rawAmount = round((float) $investment->shares_owned * (float) $log->revenue_per_share_usd, 2);
+                $packageDailyCap = self::investmentBaseDailyShareCap($investment);
+                $amount = $packageDailyCap > 0
+                    ? round(min($rawAmount, $packageDailyCap), 2)
+                    : $rawAmount;
                 $isUnlocked = self::investmentHasCompletedInitialCycle($investment, $log->logged_on);
 
                 $earning = Earning::query()
@@ -2252,14 +2256,27 @@ class MiningPlatform
                     'amount' => $amount,
                     'status' => $isUnlocked ? 'available' : 'pending',
                     'notes' => $isUnlocked
-                        ? 'Daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share.'
-                        : 'Locked daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share. It unlocks after the first 30-day cycle.',
+                        ? 'Daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share, capped by the package base monthly return path.'
+                        : 'Locked daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share, capped by the package base monthly return path. It unlocks after the first 30-day cycle.',
                 ]);
 
                 $earning->save();
 
                 return $earning;
                 });
+    }
+
+    public static function investmentBaseDailyShareCap(UserInvestment $investment): float
+    {
+        $investment->loadMissing('package');
+
+        $packageRate = (float) ($investment->package?->monthly_return_rate ?? $investment->monthly_return_rate);
+
+        if ((float) $investment->amount <= 0 || $packageRate <= 0) {
+            return 0.0;
+        }
+
+        return round(((float) $investment->amount * $packageRate) / 30, 2);
     }
 
     public static function investmentHasCompletedInitialCycle(UserInvestment $investment, Carbon|string|null $asOf = null): bool
