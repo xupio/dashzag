@@ -190,16 +190,19 @@
               <label class="form-label">Daily output (USD)</label>
               <input type="number" step="0.01" min="0" name="daily_output_usd" class="form-control @error('daily_output_usd') is-invalid @enderror" value="{{ old('daily_output_usd', $miner->daily_output_usd) }}" required>
               @error('daily_output_usd')<div class="invalid-feedback">{{ $message }}</div>@enderror
+              <div class="form-text">Miner operating output per day in USD.</div>
             </div>
             <div class="col-md-6">
               <label class="form-label">Monthly output (USD)</label>
               <input type="number" step="0.01" min="0" name="monthly_output_usd" class="form-control @error('monthly_output_usd') is-invalid @enderror" value="{{ old('monthly_output_usd', $miner->monthly_output_usd) }}" required>
               @error('monthly_output_usd')<div class="invalid-feedback">{{ $message }}</div>@enderror
+              <div class="form-text">Miner operating output per month in USD.</div>
             </div>
             <div class="col-md-6">
               <label class="form-label">Base monthly return rate (%)</label><div class="form-text mb-2">Enter a normal percent. Example: <code>8</code> means 8%.</div>
               <input type="number" step="0.01" min="0" max="100" name="base_monthly_return_rate" id="minerBaseMonthlyReturnRateInput" class="form-control @error('base_monthly_return_rate') is-invalid @enderror" value="{{ old('base_monthly_return_rate', number_format((float) $miner->base_monthly_return_rate * 100, 2, '.', '')) }}" required>
               @error('base_monthly_return_rate')<div class="invalid-feedback">{{ $message }}</div>@enderror
+              <div class="form-text">Starting investor reward percentage before level, team, and profile-power bonuses are added.</div>
             </div>
             <div class="col-md-6 d-flex align-items-end">
               <div class="w-100 rounded border p-3 bg-light">
@@ -479,5 +482,4 @@
   });
 </script>
 @endpush
-
 
