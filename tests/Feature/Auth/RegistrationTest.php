@@ -2,6 +2,7 @@
 
 use App\Models\FriendInvitation;
 use App\Models\User;
+use App\Notifications\ActivityFeedNotification;
 use App\Notifications\InvitationAwareVerifyEmail;
 use Illuminate\Support\Facades\Notification;
 
@@ -13,6 +14,10 @@ test('registration screen can be rendered', function () {
 
 test('new users can register', function () {
     Notification::fake();
+
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
 
     $response = $this->post('/register', [
         'name' => 'Test User',
@@ -31,6 +36,15 @@ test('new users can register', function () {
     expect($user->shareholder?->package_name)->toBe('Starter Free');
     expect($user->investments->first()?->package?->slug)->toBe('starter-free');
     Notification::assertSentTo($user, InvitationAwareVerifyEmail::class);
+    Notification::assertSentTo($admin, ActivityFeedNotification::class, function ($notification, array $channels) use ($user) {
+        $payload = $notification->toArray($user);
+
+        return in_array('database', $channels, true)
+            && in_array('mail', $channels, true)
+            && ($payload['subject'] ?? null) === 'New user registration received'
+            && ($payload['context_value'] ?? null) === 'test@example.com'
+            && ($payload['related_user_id'] ?? null) === $user->id;
+    });
     $response->assertRedirect(route('verification.notice', absolute: false));
 });
 

@@ -49,6 +49,8 @@ class RegisteredUserController extends Controller
             'investment_id' => $starterInvestment->id,
         ]));
 
+        MiningPlatform::notifyAdminsOfNewRegistration($user);
+
         event(new Registered($user));
 
         Auth::login($user);

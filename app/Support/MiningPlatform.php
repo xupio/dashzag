@@ -334,6 +334,30 @@ class MiningPlatform
                 ]));
             });
     }
+
+    public static function notifyAdminsOfNewRegistration(User $registeredUser): void
+    {
+        User::query()
+            ->where('role', 'admin')
+            ->whereNotNull('email_verified_at')
+            ->orderBy('id')
+            ->get()
+            ->each(function (User $admin) use ($registeredUser) {
+                $admin->notify(new ActivityFeedNotification([
+                    'category' => 'admin',
+                    'status' => 'info',
+                    'subject' => 'New user registration received',
+                    'message' => $registeredUser->name.' just created a ZagChain account.',
+                    'context_label' => 'New account',
+                    'context_value' => $registeredUser->email,
+                    'status_line' => 'Account type: '.ucfirst((string) $registeredUser->account_type),
+                    'notes_line' => 'Review the admin users page or activity feed for the latest onboarding activity.',
+                    'related_user_id' => $registeredUser->id,
+                    'force_mail' => true,
+                ]));
+            });
+    }
+
     public static function notificationDefaultPreferences(): array
     {
         return [
