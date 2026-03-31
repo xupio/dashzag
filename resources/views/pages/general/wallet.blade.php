@@ -86,6 +86,73 @@
   </div>
 </div>
 
+@if (($packageWalletBreakdown ?? collect())->isNotEmpty())
+<div class="row mb-4">
+  <div class="col-12 stretch-card">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
+            <h5 class="mb-1">Package unlock schedule</h5>
+            <p class="text-secondary mb-0">Track each package's first unlock date, current status, and profit split.</p>
+          </div>
+          <span class="badge bg-primary">{{ count($packageWalletBreakdown) }} packages</span>
+        </div>
+        <div class="row g-3">
+          @foreach ($packageWalletBreakdown as $packageWallet)
+            <div class="col-xl-6">
+              <div class="border rounded p-3 h-100 bg-light">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <div>
+                    <div class="fw-semibold">{{ $packageWallet['package_name'] }}</div>
+                    <div class="small text-secondary">Subscribed: {{ $packageWallet['subscribed_at']?->format('M d, Y') ?? '—' }}</div>
+                  </div>
+                  <span class="badge {{ $packageWallet['is_unlocked'] ? 'bg-success' : 'bg-warning text-dark' }}">
+                    {{ $packageWallet['is_unlocked'] ? 'Unlocked' : 'Locked' }}
+                  </span>
+                </div>
+                <div class="small text-secondary mb-2">
+                  First unlock date: {{ $packageWallet['unlock_date']?->format('M d, Y') ?? '—' }}
+                  @unless ($packageWallet['is_unlocked'])
+                    | {{ $packageWallet['days_remaining'] }} day{{ $packageWallet['days_remaining'] === 1 ? '' : 's' }} remaining
+                  @endunless
+                </div>
+                <div class="row g-2">
+                  <div class="col-sm-6">
+                    <div class="border rounded bg-white p-2">
+                      <div class="text-secondary small">Available</div>
+                      <div class="fw-semibold">${{ number_format($packageWallet['available_amount'], 2) }}</div>
+                    </div>
+                  </div>
+                  <div class="col-sm-6">
+                    <div class="border rounded bg-white p-2">
+                      <div class="text-secondary small">Locked</div>
+                      <div class="fw-semibold">${{ number_format($packageWallet['locked_amount'], 2) }}</div>
+                    </div>
+                  </div>
+                  <div class="col-sm-6">
+                    <div class="border rounded bg-white p-2">
+                      <div class="text-secondary small">Projected preview</div>
+                      <div class="fw-semibold">${{ number_format($packageWallet['projected_amount'], 2) }}</div>
+                    </div>
+                  </div>
+                  <div class="col-sm-6">
+                    <div class="border rounded bg-white p-2">
+                      <div class="text-secondary small">Daily / monthly cap</div>
+                      <div class="fw-semibold">${{ number_format($packageWallet['daily_cap'], 2) }} / ${{ number_format($packageWallet['monthly_cap'], 2) }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          @endforeach
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+@endif
+
 <div class="row">
   <div class="col-xl-4 grid-margin stretch-card">
     <div class="card">
