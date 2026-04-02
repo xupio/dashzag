@@ -52,7 +52,10 @@ class ActivityFeedNotification extends Notification
             $message->line($data['notes_line']);
         }
 
-        return $message->action('Open ZagChain Dashboard', route('dashboard'));
+        return $message->action(
+            $data['action_text'] ?? 'Open ZagChain Dashboard',
+            $data['action_url'] ?? route('dashboard')
+        );
     }
 
     public function toArray(object $notifiable): array
@@ -70,6 +73,8 @@ class ActivityFeedNotification extends Notification
             'amount_label' => null,
             'investment_id' => null,
             'related_user_id' => null,
+            'action_text' => null,
+            'action_url' => null,
         ], $this->payload, [
             'category' => $this->categoryFor($notifiable),
         ]);

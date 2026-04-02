@@ -272,7 +272,14 @@
                         </div>
                         <div class="modal-footer justify-content-between">
                           <div class="text-secondary small">Opening this message confirms it automatically.</div>
-                          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+                          <div class="d-flex gap-2 flex-wrap">
+                            @if (! empty($data['action_url']))
+                              <a href="{{ $data['action_url'] }}" class="btn btn-outline-primary">
+                                {{ $data['action_text'] ?? 'Open' }}
+                              </a>
+                            @endif
+                            <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+                          </div>
                         </div>
                       </div>
                     </div>

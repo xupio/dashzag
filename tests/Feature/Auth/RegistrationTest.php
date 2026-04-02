@@ -38,12 +38,16 @@ test('new users can register', function () {
     Notification::assertSentTo($user, InvitationAwareVerifyEmail::class);
     Notification::assertSentTo($admin, ActivityFeedNotification::class, function ($notification, array $channels) use ($user) {
         $payload = $notification->toArray($user);
+        $mailMessage = $notification->toMail($user);
 
         return in_array('database', $channels, true)
             && in_array('mail', $channels, true)
             && ($payload['subject'] ?? null) === 'New user registration received'
             && ($payload['context_value'] ?? null) === 'test@example.com'
-            && ($payload['related_user_id'] ?? null) === $user->id;
+            && ($payload['related_user_id'] ?? null) === $user->id
+            && ($payload['action_text'] ?? null) === 'Open Admin Users'
+            && str_contains((string) ($payload['action_url'] ?? ''), urlencode('test@example.com'))
+            && $mailMessage->actionText === 'Open Admin Users';
     });
     $response->assertRedirect(route('verification.notice', absolute: false));
 });

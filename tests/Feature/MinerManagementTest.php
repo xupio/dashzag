@@ -116,7 +116,77 @@ test('automatic snapshot generates daily per share earnings for active investors
     expect((float) $log->net_profit_usd)->toBeGreaterThan(0);
     expect((float) $log->revenue_per_share_usd)->toBeGreaterThan(0);
     expect($earning)->not->toBeNull();
-    expect((float) $earning->amount)->toBe(round((float) $log->revenue_per_share_usd * (float) $investment->shares_owned, 2));
+    $expectedAmount = round(min(
+        round((float) $log->revenue_per_share_usd * (float) $investment->shares_owned, 2),
+        round(
+            MiningPlatform::investmentBaseDailyShareCap($investment)
+            * MiningPlatform::dailySharePerformanceFactorForLog($log),
+            2
+        )
+    ), 2);
+
+    expect((float) $earning->amount)->toBe($expectedAmount);
+});
+
+test('daily share amounts visibly change across stronger and weaker miner days while staying inside the package cap', function () {
+    $investor = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'shareholder',
+    ]);
+
+    $miner = Miner::where('slug', 'alpha-one')->firstOrFail();
+    $package = $miner->packages()->where('slug', 'scale-1000')->firstOrFail();
+
+    $investment = UserInvestment::create([
+        'user_id' => $investor->id,
+        'miner_id' => $miner->id,
+        'package_id' => $package->id,
+        'shareholder_id' => null,
+        'amount' => 1000,
+        'shares_owned' => 10,
+        'monthly_return_rate' => $package->monthly_return_rate,
+        'level_bonus_rate' => 0,
+        'team_bonus_rate' => 0,
+        'status' => 'active',
+        'subscribed_at' => now(),
+    ]);
+
+    $weakerLog = MiningPlatform::savePerformanceLog($miner, [
+        'logged_on' => '2026-03-28',
+        'revenue_usd' => 1180,
+        'electricity_cost_usd' => 260,
+        'maintenance_cost_usd' => 80,
+        'hashrate_th' => 440,
+        'uptime_percentage' => 95.8,
+    ], 'manual');
+
+    $strongerLog = MiningPlatform::savePerformanceLog($miner, [
+        'logged_on' => '2026-03-29',
+        'revenue_usd' => 1420,
+        'electricity_cost_usd' => 245,
+        'maintenance_cost_usd' => 72,
+        'hashrate_th' => 488,
+        'uptime_percentage' => 98.7,
+    ], 'manual');
+
+    $weakerAmount = (float) Earning::query()
+        ->where('investment_id', $investment->id)
+        ->whereDate('earned_on', '2026-03-28')
+        ->where('source', 'mining_daily_share')
+        ->value('amount');
+
+    $strongerAmount = (float) Earning::query()
+        ->where('investment_id', $investment->id)
+        ->whereDate('earned_on', '2026-03-29')
+        ->where('source', 'mining_daily_share')
+        ->value('amount');
+
+    $dailyCap = MiningPlatform::investmentBaseDailyShareCap($investment);
+
+    expect($strongerAmount)->toBeGreaterThan($weakerAmount);
+    expect($strongerAmount)->toBeLessThanOrEqual($dailyCap);
+    expect($weakerAmount)->toBeLessThanOrEqual($dailyCap);
+    expect($weakerLog->revenue_per_share_usd)->not->toBe($strongerLog->revenue_per_share_usd);
 });
 
 test('admin can import miner performance logs from csv', function () {

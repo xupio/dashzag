@@ -353,6 +353,8 @@ class MiningPlatform
                     'status_line' => 'Account type: '.ucfirst((string) $registeredUser->account_type),
                     'notes_line' => 'Review the admin users page or activity feed for the latest onboarding activity.',
                     'related_user_id' => $registeredUser->id,
+                    'action_text' => 'Open Admin Users',
+                    'action_url' => route('dashboard.users', ['search' => $registeredUser->email]),
                     'force_mail' => true,
                 ]));
             });
@@ -2249,6 +2251,7 @@ class MiningPlatform
     public static function distributeDailyPerformanceEarnings(MinerPerformanceLog $log): Collection
     {
         $log->loadMissing('miner');
+        $dailySharePerformanceFactor = self::dailySharePerformanceFactorForLog($log);
 
         return UserInvestment::query()
             ->with(['user', 'package'])
@@ -2256,11 +2259,12 @@ class MiningPlatform
             ->where('status', 'active')
             ->where('amount', '>', 0)
             ->get()
-            ->map(function (UserInvestment $investment) use ($log) {
+            ->map(function (UserInvestment $investment) use ($log, $dailySharePerformanceFactor) {
                 $rawAmount = round((float) $investment->shares_owned * (float) $log->revenue_per_share_usd, 2);
                 $packageDailyCap = self::investmentBaseDailyShareCap($investment);
+                $performanceAdjustedCap = round($packageDailyCap * $dailySharePerformanceFactor, 2);
                 $amount = $packageDailyCap > 0
-                    ? round(min($rawAmount, $packageDailyCap), 2)
+                    ? round(min($rawAmount, $performanceAdjustedCap), 2)
                     : $rawAmount;
                 $isUnlocked = self::investmentHasCompletedInitialCycle($investment, $log->logged_on);
 
@@ -2280,14 +2284,36 @@ class MiningPlatform
                     'amount' => $amount,
                     'status' => $isUnlocked ? 'available' : 'pending',
                     'notes' => $isUnlocked
-                        ? 'Daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share, capped by the package base monthly return path.'
-                        : 'Locked daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share, capped by the package base monthly return path. It unlocks after the first 30-day cycle.',
+                        ? 'Daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share, performance-adjusted by the miner\'s daily hashrate and revenue strength within the package base monthly return path.'
+                        : 'Locked daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share, performance-adjusted by the miner\'s daily hashrate and revenue strength within the package base monthly return path. It unlocks after the first 30-day cycle.',
                 ]);
 
                 $earning->save();
 
                 return $earning;
                 });
+    }
+
+    public static function dailySharePerformanceFactorForLog(MinerPerformanceLog $log): float
+    {
+        $baselineLogs = MinerPerformanceLog::query()
+            ->where('miner_id', $log->miner_id)
+            ->whereDate('logged_on', '<=', $log->logged_on->toDateString())
+            ->orderByDesc('logged_on')
+            ->limit(30)
+            ->get(['hashrate_th', 'revenue_per_share_usd']);
+
+        $peakHashrate = max((float) $log->hashrate_th, (float) $baselineLogs->max('hashrate_th'));
+        $peakRevenuePerShare = max((float) $log->revenue_per_share_usd, (float) $baselineLogs->max('revenue_per_share_usd'));
+
+        if ($peakHashrate <= 0 || $peakRevenuePerShare <= 0) {
+            return 1.0;
+        }
+
+        $hashrateRatio = min(max((float) $log->hashrate_th / $peakHashrate, 0), 1);
+        $revenueRatio = min(max((float) $log->revenue_per_share_usd / $peakRevenuePerShare, 0), 1);
+
+        return round(max((float) (($hashrateRatio + $revenueRatio) / 2), 0.65), 4);
     }
 
     public static function investmentBaseDailyShareCap(UserInvestment $investment): float
