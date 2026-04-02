@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\FriendInvitation;
+use App\Models\PayoutRequest;
+use App\Models\Earning;
 use App\Models\InvestmentPackage;
 use App\Models\Miner;
 use App\Models\User;
@@ -234,5 +236,93 @@ test('admin can filter users by unlocked reward cap', function () {
     $response->assertSee($rewardCapUser->name);
     $response->assertSee('6% cap');
     $response->assertDontSee('Plain Shareholder');
+});
+
+test('admin users page shows investor audit snapshot details', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $miner = Miner::query()->where('slug', 'alpha-one')->firstOrFail();
+    $package = InvestmentPackage::query()->where('slug', 'scale-1000')->firstOrFail();
+
+    $user = User::factory()->create([
+        'name' => 'Audit Investor',
+        'email' => 'audit-investor@example.com',
+        'email_verified_at' => now(),
+        'account_type' => 'shareholder',
+    ]);
+
+    $investment = UserInvestment::query()->create([
+        'user_id' => $user->id,
+        'miner_id' => $miner->id,
+        'package_id' => $package->id,
+        'amount' => 1000,
+        'shares_owned' => 10,
+        'monthly_return_rate' => $package->monthly_return_rate,
+        'level_bonus_rate' => 0,
+        'team_bonus_rate' => 0,
+        'status' => 'active',
+        'subscribed_at' => now()->subDays(10),
+    ]);
+
+    Earning::query()->create([
+        'user_id' => $user->id,
+        'investment_id' => $investment->id,
+        'earned_on' => now()->toDateString(),
+        'amount' => 12.5,
+        'source' => 'mining_daily_share',
+        'status' => 'available',
+        'notes' => 'Available audit earning.',
+    ]);
+
+    Earning::query()->create([
+        'user_id' => $user->id,
+        'investment_id' => $investment->id,
+        'earned_on' => now()->toDateString(),
+        'amount' => 8.75,
+        'source' => 'mining_daily_share',
+        'status' => 'pending',
+        'notes' => 'Locked audit earning.',
+    ]);
+
+    Earning::query()->create([
+        'user_id' => $user->id,
+        'investment_id' => $investment->id,
+        'earned_on' => now()->subDay()->toDateString(),
+        'amount' => 45,
+        'source' => 'mining_return',
+        'status' => 'paid',
+        'notes' => 'Paid audit earning.',
+    ]);
+
+    PayoutRequest::query()->create([
+        'user_id' => $user->id,
+        'amount' => 45,
+        'fee_amount' => 0,
+        'net_amount' => 45,
+        'fee_rate' => 0,
+        'method' => 'btc_wallet',
+        'destination' => 'bc1auditwallet',
+        'status' => 'paid',
+        'requested_at' => now()->subDay(),
+        'approved_at' => now()->subDay(),
+        'processed_at' => now()->subHours(12),
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('dashboard.users', [
+        'search' => 'audit-investor@example.com',
+    ]));
+
+    $response->assertOk();
+    $response->assertSee('Audit snapshot');
+    $response->assertSee('Subscribed:');
+    $response->assertSee('Next unlock:');
+    $response->assertSee('Days left:');
+    $response->assertSee('Locked:');
+    $response->assertSee('Paid:');
+    $response->assertSee('$12.50');
+    $response->assertSee('$8.75');
+    $response->assertSee('$45.00');
 });
 

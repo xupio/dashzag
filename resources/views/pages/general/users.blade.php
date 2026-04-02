@@ -119,6 +119,7 @@
                 <th>Verification</th>
                 <th>Level</th>
                 <th>Account type</th>
+                <th>Audit snapshot</th>
                 <th>Reward caps</th>
                 <th>Total invested</th>
                 <th>Available earnings</th>
@@ -128,6 +129,7 @@
             </thead>
             <tbody>
               @foreach ($users as $listedUser)
+                @php($audit = $userAuditStats[$listedUser->id] ?? null)
                 <tr>
                   <td>
                     <div class="fw-semibold">{{ $listedUser->name }}</div>
@@ -137,6 +139,16 @@
                   <td><span class="badge {{ $listedUser->email_verified_at ? 'bg-success' : 'bg-warning text-dark' }}">{{ $listedUser->email_verified_at ? 'Verified' : 'Pending' }}</span></td>
                   <td>{{ $listedUser->userLevel?->name ?? 'Starter' }}</td>
                   <td class="text-capitalize">{{ $listedUser->account_type }}</td>
+                  <td>
+                    <div class="small">
+                      <div><span class="text-secondary">Subscribed:</span> {{ $audit['first_paid_subscription_at']?->format('M d, Y') ?? '—' }}</div>
+                      <div><span class="text-secondary">Next unlock:</span> {{ $audit['next_unlock_date']?->format('M d, Y') ?? 'Unlocked' }}</div>
+                      <div><span class="text-secondary">Days left:</span> {{ $audit['days_to_unlock'] ?? 0 }}</div>
+                      <div><span class="text-secondary">Locked:</span> ${{ number_format((float) ($audit['locked_amount'] ?? 0), 2) }}</div>
+                      <div><span class="text-secondary">Paid:</span> ${{ number_format((float) ($audit['paid_amount'] ?? 0), 2) }}</div>
+                      <div><span class="text-secondary">Last payout:</span> {{ $audit['last_paid_payout_at'] ? $audit['last_paid_payout_at']->format('M d, Y') : '—' }}{{ $audit['last_paid_payout_amount'] ? ' / $'.number_format((float) $audit['last_paid_payout_amount'], 2) : '' }}</div>
+                    </div>
+                  </td>
                   <td>
                     @php($caps = $userRewardCaps[$listedUser->id] ?? [])
                     @if (! empty($caps))

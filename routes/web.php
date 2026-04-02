@@ -2577,7 +2577,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 ];
             };
 
-            $usersQuery = User::with(['userLevel', 'investments.package', 'earnings', 'friendInvitations', 'sponsoredUsers.investments'])
+            $usersQuery = User::with(['userLevel', 'investments.package', 'earnings', 'friendInvitations', 'sponsoredUsers.investments', 'payoutRequests'])
                 ->when($search !== '', function ($query) use ($search) {
                     $query->where(function ($nested) use ($search) {
                         $nested->where('name', 'like', "%$search%")
@@ -2609,6 +2609,46 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
 
                 return [$user->id => $badges];
             });
+            $userAuditStats = $users->mapWithKeys(function (User $user) {
+                $activePaidInvestments = $user->investments
+                    ->where('status', 'active')
+                    ->filter(fn ($investment) => (float) $investment->amount > 0)
+                    ->sortBy('subscribed_at')
+                    ->values();
+
+                $firstPaidInvestment = $activePaidInvestments->first();
+                $upcomingUnlocks = $activePaidInvestments
+                    ->map(function ($investment) {
+                        $unlockDate = optional($investment->subscribed_at)?->copy()->addDays(30);
+
+                        return [
+                            'investment' => $investment,
+                            'unlock_date' => $unlockDate,
+                            'days_remaining' => $unlockDate ? max(now()->startOfDay()->diffInDays($unlockDate->copy()->startOfDay(), false), 0) : null,
+                            'is_unlocked' => $unlockDate ? $unlockDate->lte(now()) : false,
+                        ];
+                    })
+                    ->filter(fn (array $entry) => $entry['unlock_date'] !== null)
+                    ->sortBy('unlock_date')
+                    ->values();
+
+                $nextUnlock = $upcomingUnlocks->first(fn (array $entry) => ! $entry['is_unlocked']);
+                $lastPaidPayout = $user->payoutRequests
+                    ->where('status', 'paid')
+                    ->sortByDesc('processed_at')
+                    ->first();
+
+                return [$user->id => [
+                    'first_paid_subscription_at' => $firstPaidInvestment?->subscribed_at,
+                    'next_unlock_date' => $nextUnlock['unlock_date'] ?? null,
+                    'days_to_unlock' => $nextUnlock['days_remaining'] ?? null,
+                    'available_amount' => round((float) $user->earnings->where('status', 'available')->where('source', '!=', 'projected_return')->sum('amount'), 2),
+                    'locked_amount' => round((float) $user->earnings->whereIn('status', ['pending', 'payout_pending'])->where('source', '!=', 'projected_return')->sum('amount'), 2),
+                    'paid_amount' => round((float) $user->earnings->where('status', 'paid')->sum('amount'), 2),
+                    'last_paid_payout_at' => $lastPaidPayout?->processed_at,
+                    'last_paid_payout_amount' => $lastPaidPayout ? (float) $lastPaidPayout->amount : null,
+                ]];
+            });
 
             return view('pages.general.users', [
                 'users' => $users,
@@ -2625,6 +2665,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 ],
                 'rewardCapBreakdown' => $rewardCapBreakdown,
                 'userRewardCaps' => $userRewardCaps,
+                'userAuditStats' => $userAuditStats,
             ]);
         })->name('dashboard.users');
 
@@ -4773,7 +4814,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
 
 
 
