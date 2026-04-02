@@ -2534,10 +2534,16 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             $accountType = $request->query('account_type');
             $verification = $request->query('verification');
             $rewardCap = (string) $request->query('reward_cap', 'all');
+            $auditFilter = (string) $request->query('audit_filter', 'all');
             $allowedRewardCaps = ['all', 'basic', 'growth', 'scale'];
+            $allowedAuditFilters = ['all', 'locked_balance', 'unlocking_soon'];
 
             if (! in_array($rewardCap, $allowedRewardCaps, true)) {
                 $rewardCap = 'all';
+            }
+
+            if (! in_array($auditFilter, $allowedAuditFilters, true)) {
+                $auditFilter = 'all';
             }
 
             $rewardCapMeta = [
@@ -2590,9 +2596,6 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 ->when($verification === 'unverified', fn ($query) => $query->whereNull('email_verified_at'));
 
             $baseUsers = $usersQuery->orderBy('created_at')->get();
-            $users = $baseUsers
-                ->filter(fn (User $user) => $rewardCap === 'all' || (($resolveRewardCaps($user)[$rewardCap]['unlocked'] ?? false) === true))
-                ->values();
             $allUsers = User::query()->get();
             $rewardCapBreakdown = collect($rewardCapMeta)->map(function (array $meta, string $key) use ($baseUsers, $resolveRewardCaps) {
                 return [
@@ -2601,15 +2604,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                     'count' => $baseUsers->filter(fn (User $user) => ($resolveRewardCaps($user)[$key]['unlocked'] ?? false) === true)->count(),
                 ];
             });
-            $userRewardCaps = $users->mapWithKeys(function (User $user) use ($resolveRewardCaps) {
-                $badges = collect($resolveRewardCaps($user))
-                    ->filter(fn (array $cap) => $cap['unlocked'])
-                    ->values()
-                    ->all();
-
-                return [$user->id => $badges];
-            });
-            $userAuditStats = $users->mapWithKeys(function (User $user) {
+            $baseUserAuditStats = $baseUsers->mapWithKeys(function (User $user) {
                 $activePaidInvestments = $user->investments
                     ->where('status', 'active')
                     ->filter(fn ($investment) => (float) $investment->amount > 0)
@@ -2649,6 +2644,30 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                     'last_paid_payout_amount' => $lastPaidPayout ? (float) $lastPaidPayout->amount : null,
                 ]];
             });
+            $users = $baseUsers
+                ->filter(function (User $user) use ($rewardCap, $resolveRewardCaps, $auditFilter, $baseUserAuditStats) {
+                    if ($rewardCap !== 'all' && (($resolveRewardCaps($user)[$rewardCap]['unlocked'] ?? false) !== true)) {
+                        return false;
+                    }
+
+                    $audit = $baseUserAuditStats[$user->id] ?? null;
+
+                    return match ($auditFilter) {
+                        'locked_balance' => (float) ($audit['locked_amount'] ?? 0) > 0,
+                        'unlocking_soon' => ($audit['days_to_unlock'] ?? null) !== null && (int) $audit['days_to_unlock'] <= 7,
+                        default => true,
+                    };
+                })
+                ->values();
+            $userRewardCaps = $users->mapWithKeys(function (User $user) use ($resolveRewardCaps) {
+                $badges = collect($resolveRewardCaps($user))
+                    ->filter(fn (array $cap) => $cap['unlocked'])
+                    ->values()
+                    ->all();
+
+                return [$user->id => $badges];
+            });
+            $userAuditStats = $users->mapWithKeys(fn (User $user) => [$user->id => $baseUserAuditStats[$user->id] ?? []]);
 
             return view('pages.general.users', [
                 'users' => $users,
@@ -2657,6 +2676,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'selectedAccountType' => $accountType,
                 'selectedVerification' => $verification,
                 'selectedRewardCap' => $rewardCap,
+                'selectedAuditFilter' => $auditFilter,
                 'userBreakdown' => [
                     'admins' => $allUsers->where('role', 'admin')->count(),
                     'users' => $allUsers->where('role', 'user')->count(),
@@ -4814,8 +4834,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
-
 
 
 

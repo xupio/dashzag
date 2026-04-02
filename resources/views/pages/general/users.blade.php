@@ -9,7 +9,7 @@
         <p class="text-secondary mb-0">Manage registered users, monitor their level and investment totals, and update admin access.</p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <a href="{{ route('dashboard.users.export', ['search' => $search, 'role' => $selectedRole, 'account_type' => $selectedAccountType, 'verification' => $selectedVerification, 'reward_cap' => $selectedRewardCap]) }}" class="btn btn-outline-success btn-icon-text">
+        <a href="{{ route('dashboard.users.export', ['search' => $search, 'role' => $selectedRole, 'account_type' => $selectedAccountType, 'verification' => $selectedVerification, 'reward_cap' => $selectedRewardCap, 'audit_filter' => $selectedAuditFilter]) }}" class="btn btn-outline-success btn-icon-text">
           <i data-lucide="download" class="btn-icon-prepend"></i> Export CSV
         </a>
         <a href="{{ route('dashboard.operations') }}" class="btn btn-outline-primary btn-icon-text">
@@ -87,6 +87,14 @@
               <option value="basic" @selected($selectedRewardCap === 'basic')>4% cap</option>
               <option value="growth" @selected($selectedRewardCap === 'growth')>6% cap</option>
               <option value="scale" @selected($selectedRewardCap === 'scale')>7% cap</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Audit filter</label>
+            <select name="audit_filter" class="form-select">
+              <option value="all" @selected($selectedAuditFilter === 'all')>All users</option>
+              <option value="locked_balance" @selected($selectedAuditFilter === 'locked_balance')>Locked balance</option>
+              <option value="unlocking_soon" @selected($selectedAuditFilter === 'unlocking_soon')>Unlocking soon</option>
             </select>
           </div>
           <div class="col-md-1 d-flex gap-2">

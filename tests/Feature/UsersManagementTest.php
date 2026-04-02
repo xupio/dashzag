@@ -328,3 +328,78 @@ test('admin users page shows investor audit snapshot details', function () {
     $response->assertSee('Open investor report');
 });
 
+test('admin can filter users with locked balances and upcoming unlocks', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $miner = Miner::query()->where('slug', 'alpha-one')->firstOrFail();
+    $package = InvestmentPackage::query()->where('slug', 'growth-500')->firstOrFail();
+
+    $lockedUser = User::factory()->create([
+        'name' => 'Locked User',
+        'email' => 'locked-user@example.com',
+        'email_verified_at' => now(),
+        'account_type' => 'shareholder',
+    ]);
+
+    $lockedInvestment = UserInvestment::query()->create([
+        'user_id' => $lockedUser->id,
+        'miner_id' => $miner->id,
+        'package_id' => $package->id,
+        'amount' => 500,
+        'shares_owned' => 5,
+        'monthly_return_rate' => $package->monthly_return_rate,
+        'level_bonus_rate' => 0,
+        'team_bonus_rate' => 0,
+        'status' => 'active',
+        'subscribed_at' => now()->subDays(25),
+    ]);
+
+    Earning::query()->create([
+        'user_id' => $lockedUser->id,
+        'investment_id' => $lockedInvestment->id,
+        'earned_on' => now()->toDateString(),
+        'amount' => 6.5,
+        'source' => 'mining_daily_share',
+        'status' => 'pending',
+        'notes' => 'Locked test earning.',
+    ]);
+
+    $matureUser = User::factory()->create([
+        'name' => 'Mature User',
+        'email' => 'mature-user@example.com',
+        'email_verified_at' => now(),
+        'account_type' => 'shareholder',
+    ]);
+
+    UserInvestment::query()->create([
+        'user_id' => $matureUser->id,
+        'miner_id' => $miner->id,
+        'package_id' => $package->id,
+        'amount' => 500,
+        'shares_owned' => 5,
+        'monthly_return_rate' => $package->monthly_return_rate,
+        'level_bonus_rate' => 0,
+        'team_bonus_rate' => 0,
+        'status' => 'active',
+        'subscribed_at' => now()->subDays(45),
+    ]);
+
+    $lockedResponse = $this->actingAs($admin)->get(route('dashboard.users', [
+        'audit_filter' => 'locked_balance',
+    ]));
+
+    $lockedResponse->assertOk();
+    $lockedResponse->assertSee('Locked User');
+    $lockedResponse->assertDontSee('Mature User');
+
+    $unlockingSoonResponse = $this->actingAs($admin)->get(route('dashboard.users', [
+        'audit_filter' => 'unlocking_soon',
+    ]));
+
+    $unlockingSoonResponse->assertOk();
+    $unlockingSoonResponse->assertSee('Locked User');
+    $unlockingSoonResponse->assertDontSee('Mature User');
+});
+
