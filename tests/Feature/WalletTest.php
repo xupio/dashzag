@@ -193,6 +193,48 @@ test('wallet page can filter earnings history by source', function () {
     $response->assertDontSee('Monthly mining return.');
 });
 
+test('wallet earnings history can be exported as csv with the active source filter', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'shareholder',
+    ]);
+
+    Earning::create([
+        'user_id' => $user->id,
+        'investment_id' => null,
+        'earned_on' => now()->toDateString(),
+        'amount' => 11.25,
+        'source' => 'mining_daily_share',
+        'status' => 'available',
+        'notes' => 'Daily miner share payout.',
+    ]);
+
+    Earning::create([
+        'user_id' => $user->id,
+        'investment_id' => null,
+        'earned_on' => now()->toDateString(),
+        'amount' => 20,
+        'source' => 'mining_return',
+        'status' => 'available',
+        'notes' => 'Monthly mining return.',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.wallet.export', [
+        'source' => 'miner_daily_share',
+    ]));
+
+    $response->assertOk();
+    $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    $csv = $response->streamedContent();
+
+    expect($csv)->toContain('Section,Label,Value');
+    expect($csv)->toContain('Summary,Filter,"Miner daily share"');
+    expect($csv)->toContain('Mining Daily Share');
+    expect($csv)->toContain('Daily miner share payout.');
+    expect($csv)->not->toContain('Monthly mining return.');
+});
+
 test('verified user can request a payout from available balance', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),

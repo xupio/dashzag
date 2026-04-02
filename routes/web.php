@@ -1426,6 +1426,79 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
         ]);
     })->name('dashboard.wallet');
 
+    Route::get('/dashboard/wallet/export', function (Request $request) {
+        MiningPlatform::ensureDefaults();
+
+        $source = $request->query('source', 'all');
+        $sourceMap = [
+            'all' => [
+                'label' => 'All earnings',
+                'sources' => null,
+            ],
+            'miner_daily_share' => [
+                'label' => 'Miner daily share',
+                'sources' => ['mining_daily_share'],
+            ],
+            'monthly_return' => [
+                'label' => 'Monthly return',
+                'sources' => ['mining_return'],
+            ],
+            'direct_referral' => [
+                'label' => 'Direct referral rewards',
+                'sources' => ['referral_registration', 'referral_subscription'],
+            ],
+            'mlm_network' => [
+                'label' => 'MLM network rewards',
+                'sources' => [
+                    'team_subscription_bonus',
+                    'team_downline_bonus',
+                    'team_level_3_bonus',
+                    'team_level_4_bonus',
+                    'team_level_5_bonus',
+                ],
+            ],
+        ];
+
+        if (! array_key_exists($source, $sourceMap)) {
+            $source = 'all';
+        }
+
+        $user = $request->user()->load(['earnings.investment.package', 'earnings.investment.miner']);
+        MiningPlatform::syncMiningDailyShareUnlocks($user);
+        $user->load(['earnings.investment.package', 'earnings.investment.miner']);
+
+        $earnings = $source === 'all'
+            ? $user->earnings
+            : $user->earnings->whereIn('source', $sourceMap[$source]['sources'])->values();
+
+        $filename = 'earnings-history-'.$source.'-'.now()->format('Ymd_His').'.csv';
+
+        return response()->streamDownload(function () use ($user, $earnings, $sourceMap, $source) {
+            $handle = fopen('php://output', 'w');
+
+            fputcsv($handle, ['Section', 'Label', 'Value']);
+            fputcsv($handle, ['Summary', 'User', $user->email]);
+            fputcsv($handle, ['Summary', 'Filter', $sourceMap[$source]['label']]);
+            fputcsv($handle, ['Summary', 'Entries', $earnings->count()]);
+            fputcsv($handle, []);
+            fputcsv($handle, ['Date', 'Source', 'Investment', 'Miner', 'Status', 'Amount', 'Notes']);
+
+            foreach ($earnings as $earning) {
+                fputcsv($handle, [
+                    optional($earning->earned_on)->format('Y-m-d'),
+                    str($earning->source)->replace('_', ' ')->title(),
+                    $earning->investment?->package?->name ?? '',
+                    $earning->investment?->miner?->name ?? '',
+                    str($earning->status)->replace('_', ' ')->title(),
+                    number_format((float) $earning->amount, 2, '.', ''),
+                    $earning->notes ?? '',
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);
+    })->name('dashboard.wallet.export');
+
     Route::post('/dashboard/wallet/request', function (Request $request) {
         MiningPlatform::ensureDefaults();
 
@@ -4834,7 +4907,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
 
 
 

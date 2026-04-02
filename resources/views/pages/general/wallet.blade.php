@@ -29,6 +29,9 @@
             <i data-lucide="briefcase-business" class="btn-icon-prepend"></i> Operations
           </a>
         @endif
+        <a href="{{ route('dashboard.wallet.export', ['source' => $activeSource === 'all' ? null : $activeSource]) }}" class="btn btn-outline-success btn-icon-text">
+          <i data-lucide="download" class="btn-icon-prepend"></i> Export earnings CSV
+        </a>
         <a href="{{ route('dashboard') }}" class="btn btn-outline-primary btn-icon-text">
           <i data-lucide="layout-dashboard" class="btn-icon-prepend"></i> Dashboard
         </a>
@@ -190,7 +193,12 @@
             <h5 class="mb-1">Earnings history</h5>
             <p class="text-secondary mb-0">Every projected, referral, or unlocked wallet transaction for this user.</p>
           </div>
-          <span class="badge bg-primary">{{ $earnings->count() }} entries</span>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <a href="{{ route('dashboard.wallet.export', ['source' => $activeSource === 'all' ? null : $activeSource]) }}" class="btn btn-sm btn-outline-success">
+              Export CSV
+            </a>
+            <span class="badge bg-primary">{{ $earnings->count() }} entries</span>
+          </div>
         </div>
         <div class="d-flex flex-wrap gap-2 mb-3">
           @foreach ($walletSourceOptions as $sourceKey => $sourceOption)
