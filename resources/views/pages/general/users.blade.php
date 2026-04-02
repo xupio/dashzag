@@ -124,6 +124,7 @@
                 <th>Total invested</th>
                 <th>Available earnings</th>
                 <th>Joined</th>
+                <th>Actions</th>
                 <th>Update role</th>
               </tr>
             </thead>
@@ -164,6 +165,18 @@
                   <td>${{ number_format((float) $listedUser->investments->where('status', 'active')->sum('amount'), 2) }}</td>
                   <td>${{ number_format((float) $listedUser->earnings->where('status', 'available')->sum('amount'), 2) }}</td>
                   <td>{{ $listedUser->created_at?->format('M d, Y') }}</td>
+                  <td>
+                    <div class="d-flex flex-column gap-2">
+                      <a href="{{ route('dashboard.users', ['search' => $listedUser->email]) }}" class="btn btn-sm btn-outline-primary">
+                        Open audit
+                      </a>
+                      @if ($listedUser->account_type === 'shareholder')
+                        <a href="{{ route('dashboard.shareholders', ['search' => $listedUser->email]) }}" class="btn btn-sm btn-outline-info">
+                          Open investor report
+                        </a>
+                      @endif
+                    </div>
+                  </td>
                   <td>
                     <form method="POST" action="{{ route('dashboard.users.role', $listedUser) }}" class="d-flex gap-2 align-items-center">
                       @csrf

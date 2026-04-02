@@ -324,5 +324,7 @@ test('admin users page shows investor audit snapshot details', function () {
     $response->assertSee('$12.50');
     $response->assertSee('$8.75');
     $response->assertSee('$45.00');
+    $response->assertSee('Open audit');
+    $response->assertSee('Open investor report');
 });
 
