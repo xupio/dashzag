@@ -403,3 +403,62 @@ test('admin can filter users with locked balances and upcoming unlocks', functio
     $unlockingSoonResponse->assertDontSee('Mature User');
 });
 
+test('admin users export includes audit columns and respects audit filters', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $miner = Miner::query()->where('slug', 'alpha-one')->firstOrFail();
+    $package = InvestmentPackage::query()->where('slug', 'growth-500')->firstOrFail();
+
+    $lockedUser = User::factory()->create([
+        'name' => 'Locked Export User',
+        'email' => 'locked-export@example.com',
+        'email_verified_at' => now(),
+        'account_type' => 'shareholder',
+    ]);
+
+    $investment = UserInvestment::query()->create([
+        'user_id' => $lockedUser->id,
+        'miner_id' => $miner->id,
+        'package_id' => $package->id,
+        'amount' => 500,
+        'shares_owned' => 5,
+        'monthly_return_rate' => $package->monthly_return_rate,
+        'level_bonus_rate' => 0,
+        'team_bonus_rate' => 0,
+        'status' => 'active',
+        'subscribed_at' => now()->subDays(25),
+    ]);
+
+    Earning::query()->create([
+        'user_id' => $lockedUser->id,
+        'investment_id' => $investment->id,
+        'earned_on' => now()->toDateString(),
+        'amount' => 9.50,
+        'source' => 'mining_daily_share',
+        'status' => 'pending',
+        'notes' => 'Locked export earning.',
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('dashboard.users.export', [
+        'audit_filter' => 'locked_balance',
+        'search' => 'locked-export@example.com',
+    ]));
+
+    $response->assertOk();
+    $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    $csv = $response->streamedContent();
+
+    expect($csv)->toContain('Locked Balance');
+    expect($csv)->toContain('Paid Earnings');
+    expect($csv)->toContain('First Paid Subscription');
+    expect($csv)->toContain('Next Unlock');
+    expect($csv)->toContain('Days To Unlock');
+    expect($csv)->toContain('Last Paid Payout');
+    expect($csv)->toContain('"Audit filter",locked_balance');
+    expect($csv)->toContain('locked-export@example.com');
+    expect($csv)->toContain('9.50');
+});
+

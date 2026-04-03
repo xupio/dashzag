@@ -2770,10 +2770,16 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             $accountType = $request->query('account_type');
             $verification = $request->query('verification');
             $rewardCap = (string) $request->query('reward_cap', 'all');
+            $auditFilter = (string) $request->query('audit_filter', 'all');
             $allowedRewardCaps = ['all', 'basic', 'growth', 'scale'];
+            $allowedAuditFilters = ['all', 'locked_balance', 'unlocking_soon'];
 
             if (! in_array($rewardCap, $allowedRewardCaps, true)) {
                 $rewardCap = 'all';
+            }
+
+            if (! in_array($auditFilter, $allowedAuditFilters, true)) {
+                $auditFilter = 'all';
             }
 
             $rewardCapCache = [];
@@ -2793,7 +2799,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 ];
             };
 
-            $users = User::with(['userLevel', 'investments.package', 'earnings', 'friendInvitations', 'sponsoredUsers.investments'])
+            $users = User::with(['userLevel', 'investments.package', 'earnings', 'friendInvitations', 'sponsoredUsers.investments', 'payoutRequests'])
                 ->when($search !== '', function ($query) use ($search) {
                     $query->where(function ($nested) use ($search) {
                         $nested->where('name', 'like', "%$search%")
@@ -2806,12 +2812,42 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 ->when($verification === 'unverified', fn ($query) => $query->whereNull('email_verified_at'))
                 ->orderBy('created_at')
                 ->get()
-                ->filter(fn (User $user) => $rewardCap === 'all' || (($resolveRewardCaps($user)[$rewardCap] ?? false) === true))
+                ->filter(function (User $user) use ($rewardCap, $resolveRewardCaps, $auditFilter) {
+                    if ($rewardCap !== 'all' && (($resolveRewardCaps($user)[$rewardCap] ?? false) !== true)) {
+                        return false;
+                    }
+
+                    $activePaidInvestments = $user->investments
+                        ->where('status', 'active')
+                        ->filter(fn ($investment) => (float) $investment->amount > 0)
+                        ->sortBy('subscribed_at')
+                        ->values();
+                    $nextUnlock = $activePaidInvestments
+                        ->map(function ($investment) {
+                            $unlockDate = optional($investment->subscribed_at)?->copy()->addDays(30);
+
+                            return [
+                                'unlock_date' => $unlockDate,
+                                'days_remaining' => $unlockDate ? max(now()->startOfDay()->diffInDays($unlockDate->copy()->startOfDay(), false), 0) : null,
+                                'is_unlocked' => $unlockDate ? $unlockDate->lte(now()) : false,
+                            ];
+                        })
+                        ->filter(fn (array $entry) => $entry['unlock_date'] !== null)
+                        ->sortBy('unlock_date')
+                        ->first(fn (array $entry) => ! $entry['is_unlocked']);
+                    $lockedAmount = round((float) $user->earnings->whereIn('status', ['pending', 'payout_pending'])->where('source', '!=', 'projected_return')->sum('amount'), 2);
+
+                    return match ($auditFilter) {
+                        'locked_balance' => $lockedAmount > 0,
+                        'unlocking_soon' => ($nextUnlock['days_remaining'] ?? null) !== null && (int) $nextUnlock['days_remaining'] <= 7,
+                        default => true,
+                    };
+                })
                 ->values();
 
             $filename = 'users-report-'.now()->format('Ymd-His').'.csv';
 
-            return response()->streamDownload(function () use ($users, $search, $role, $accountType, $verification, $rewardCap, $resolveRewardCaps) {
+            return response()->streamDownload(function () use ($users, $search, $role, $accountType, $verification, $rewardCap, $auditFilter, $resolveRewardCaps) {
                 $handle = fopen('php://output', 'w');
                 fputcsv($handle, ['Filter', 'Value']);
                 fputcsv($handle, ['Search', $search !== '' ? $search : 'all']);
@@ -2819,8 +2855,9 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 fputcsv($handle, ['Account type', $accountType ?: 'all']);
                 fputcsv($handle, ['Verification', $verification ?: 'all']);
                 fputcsv($handle, ['Reward cap', $rewardCap ?: 'all']);
+                fputcsv($handle, ['Audit filter', $auditFilter ?: 'all']);
                 fputcsv($handle, []);
-                fputcsv($handle, ['Name', 'Email', 'Role', 'Verification', 'Level', 'Account Type', 'Reward Caps', 'Total Invested', 'Available Earnings', 'Joined']);
+                fputcsv($handle, ['Name', 'Email', 'Role', 'Verification', 'Level', 'Account Type', 'Reward Caps', 'Total Invested', 'Available Earnings', 'Locked Balance', 'Paid Earnings', 'First Paid Subscription', 'Next Unlock', 'Days To Unlock', 'Last Paid Payout', 'Joined']);
 
                 foreach ($users as $listedUser) {
                     $caps = collect($resolveRewardCaps($listedUser))
@@ -2834,6 +2871,30 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                         })
                         ->implode(', ');
 
+                    $activePaidInvestments = $listedUser->investments
+                        ->where('status', 'active')
+                        ->filter(fn ($investment) => (float) $investment->amount > 0)
+                        ->sortBy('subscribed_at')
+                        ->values();
+                    $firstPaidInvestment = $activePaidInvestments->first();
+                    $nextUnlock = $activePaidInvestments
+                        ->map(function ($investment) {
+                            $unlockDate = optional($investment->subscribed_at)?->copy()->addDays(30);
+
+                            return [
+                                'unlock_date' => $unlockDate,
+                                'days_remaining' => $unlockDate ? max(now()->startOfDay()->diffInDays($unlockDate->copy()->startOfDay(), false), 0) : null,
+                                'is_unlocked' => $unlockDate ? $unlockDate->lte(now()) : false,
+                            ];
+                        })
+                        ->filter(fn (array $entry) => $entry['unlock_date'] !== null)
+                        ->sortBy('unlock_date')
+                        ->first(fn (array $entry) => ! $entry['is_unlocked']);
+                    $lastPaidPayout = $listedUser->payoutRequests
+                        ->where('status', 'paid')
+                        ->sortByDesc('processed_at')
+                        ->first();
+
                     fputcsv($handle, [
                         $listedUser->name,
                         $listedUser->email,
@@ -2844,6 +2905,12 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                         $caps !== '' ? $caps : '—',
                         number_format((float) $listedUser->investments->where('status', 'active')->sum('amount'), 2, '.', ''),
                         number_format((float) $listedUser->earnings->where('status', 'available')->sum('amount'), 2, '.', ''),
+                        number_format((float) $listedUser->earnings->whereIn('status', ['pending', 'payout_pending'])->where('source', '!=', 'projected_return')->sum('amount'), 2, '.', ''),
+                        number_format((float) $listedUser->earnings->where('status', 'paid')->sum('amount'), 2, '.', ''),
+                        optional($firstPaidInvestment?->subscribed_at)->format('Y-m-d'),
+                        optional($nextUnlock['unlock_date'] ?? null)?->format('Y-m-d') ?: '',
+                        $nextUnlock['days_remaining'] ?? '',
+                        $lastPaidPayout ? $lastPaidPayout->processed_at?->format('Y-m-d').' $'.number_format((float) $lastPaidPayout->amount, 2, '.', '') : '',
                         optional($listedUser->created_at)->format('Y-m-d H:i:s'),
                     ]);
                 }
@@ -4907,10 +4974,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
-
-
-
 
 
 
