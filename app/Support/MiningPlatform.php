@@ -360,6 +360,77 @@ class MiningPlatform
             });
     }
 
+    public static function kycSummary(User $user): array
+    {
+        $status = $user->kyc_status ?: 'not_submitted';
+        $reviewer = $user->relationLoaded('kycReviewer') ? $user->kycReviewer : $user->kycReviewer()->first();
+
+        return [
+            'status' => $status,
+            'label' => $user->kycStatusLabel(),
+            'badge_class' => match ($status) {
+                'approved' => 'bg-success',
+                'pending' => 'bg-warning text-dark',
+                'rejected' => 'bg-danger',
+                default => 'bg-secondary',
+            },
+            'can_request_payout' => $status === 'approved',
+            'is_limited' => $status !== 'approved',
+            'show_prompt' => in_array($status, ['not_submitted', 'rejected'], true),
+            'submitted_at' => $user->kyc_submitted_at,
+            'reviewed_at' => $user->kyc_reviewed_at,
+            'admin_notes' => $user->kyc_admin_notes,
+            'reviewer_label' => $reviewer?->adminLabel(),
+            'proof_name' => $user->kyc_proof_original_name,
+        ];
+    }
+
+    public static function notifyAdminsOfKycSubmission(User $user): void
+    {
+        User::query()
+            ->where('role', 'admin')
+            ->whereNotNull('email_verified_at')
+            ->orderBy('id')
+            ->get()
+            ->each(function (User $admin) use ($user) {
+                $admin->notify(new ActivityFeedNotification([
+                    'category' => 'admin',
+                    'status' => 'warning',
+                    'subject' => 'KYC proof uploaded',
+                    'message' => $user->name.' uploaded a legal verification proof and is waiting for review.',
+                    'context_label' => 'Account',
+                    'context_value' => $user->email,
+                    'status_line' => 'Current KYC status: Pending review',
+                    'notes_line' => 'Review the proof before the investor can request the first withdrawal.',
+                    'related_user_id' => $user->id,
+                    'action_text' => 'Open Admin Users',
+                    'action_url' => route('dashboard.users', ['search' => $user->email]),
+                    'force_mail' => true,
+                ]));
+            });
+    }
+
+    public static function notifyUserOfKycReview(User $user): void
+    {
+        $summary = self::kycSummary($user);
+        $approved = $summary['status'] === 'approved';
+
+        $user->notify(new ActivityFeedNotification([
+            'category' => 'account',
+            'status' => $approved ? 'success' : 'warning',
+            'subject' => $approved ? 'KYC verification approved' : 'KYC verification needs attention',
+            'message' => $approved
+                ? 'Your legal verification was approved. Withdrawals are now available from your wallet.'
+                : 'Your legal verification was reviewed but still needs changes before withdrawals can be enabled.',
+            'context_label' => 'KYC status',
+            'context_value' => $summary['label'],
+            'notes_line' => $summary['admin_notes'] ?: null,
+            'action_text' => 'Open Profile',
+            'action_url' => route('dashboard.profile'),
+            'force_mail' => true,
+        ]));
+    }
+
     public static function notificationDefaultPreferences(): array
     {
         return [

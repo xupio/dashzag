@@ -15,9 +15,14 @@
         <p class="text-secondary mb-0">Monitor available balance, locked profits, and every mining-related earning entry.</p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <button type="button" class="btn btn-success btn-icon-text" data-bs-toggle="modal" data-bs-target="#payoutRequestModal" @disabled(count($payoutMethods) === 0)>
+        <button type="button" class="btn btn-success btn-icon-text" data-bs-toggle="modal" data-bs-target="#payoutRequestModal" @disabled(count($payoutMethods) === 0 || !($kycSummary['can_request_payout'] ?? false))>
           <i data-lucide="landmark" class="btn-icon-prepend"></i> Request payout
         </button>
+        @if (!($kycSummary['can_request_payout'] ?? false))
+          <button type="button" class="btn btn-warning btn-icon-text" data-bs-toggle="modal" data-bs-target="#kycUploadModal">
+            <i data-lucide="shield-check" class="btn-icon-prepend"></i> Complete KYC
+          </button>
+        @endif
         <form method="POST" action="{{ route('dashboard.wallet.generate') }}">
           @csrf
           <button type="submit" class="btn btn-primary btn-icon-text">
@@ -43,15 +48,27 @@
 @if (session('wallet_success'))
   <div class="alert alert-success">{{ session('wallet_success') }}</div>
 @endif
+@if (session('kyc_success'))
+  <div class="alert alert-success">{{ session('kyc_success') }}</div>
+@endif
 
 <div class="row mb-4">
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Available balance</p><h4 class="mb-0">${{ number_format($wallet['available'], 2) }}</h4></div></div></div>
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Locked balance</p><h4 class="mb-0">${{ number_format($wallet['pending'], 2) }}</h4></div></div></div>
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Paid out</p><h4 class="mb-0">${{ number_format($wallet['paid'], 2) }}</h4></div></div></div>
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Confirmed earnings</p><h4 class="mb-0">${{ number_format($wallet['total'], 2) }}</h4></div></div></div>
-</div>
+  </div>
 
-<div class="row mb-4">
+  @if (($kycSummary['is_limited'] ?? false) && !$user->isAdmin())
+    <div class="row mb-4">
+      <div class="col-12">
+        @include('pages.general.partials.kyc-status-card', ['kycSummary' => $kycSummary])
+        @include('pages.general.partials.kyc-upload-modal', ['kycSummary' => $kycSummary])
+      </div>
+    </div>
+  @endif
+
+  <div class="row mb-4">
   <div class="col-md-4 grid-margin stretch-card">
     <div class="card border-warning">
       <div class="card-body">
@@ -179,11 +196,14 @@
             </div>
           </div>
         @endif
-        <div class="alert alert-light border mb-0">
-          Only your available earnings can be withdrawn from this wallet. All mining profit stays locked until each paid package completes its first full 30-day cycle from the subscription date. Projected monthly return entries are preview values only and may still change before the cycle ends. Your asset value, share amount, and invested capital stay locked in your packages and are not part of payout requests.{{ count($payoutMethods) === 0 ? ' Payout requests are currently disabled by the admin team.' : '' }}
+          <div class="alert alert-light border mb-0">
+            Only your available earnings can be withdrawn from this wallet. All mining profit stays locked until each paid package completes its first full 30-day cycle from the subscription date. Projected monthly return entries are preview values only and may still change before the cycle ends. Your asset value, share amount, and invested capital stay locked in your packages and are not part of payout requests.{{ count($payoutMethods) === 0 ? ' Payout requests are currently disabled by the admin team.' : '' }}
+            @if (!($kycSummary['can_request_payout'] ?? false))
+              Your first withdrawal also requires approved legal verification, so payout requests stay disabled until the admin team reviews your KYC proof.
+            @endif
+          </div>
         </div>
       </div>
-    </div>
   </div>
   <div class="col-xl-8 grid-margin stretch-card">
     <div class="card">
@@ -340,17 +360,20 @@
             <div class="form-text" id="payoutDestinationHelp">{{ $defaultPayoutDestination ? 'Your saved withdrawal wallet was loaded from your profile. You can still change it for this payout request.' : ($defaultPayoutMethod['placeholder'] ?? 'No payout method is currently available.') }}</div>
             @error('destination')<div class="invalid-feedback">{{ $message }}</div>@enderror
           </div>
-          <div class="border rounded p-3 bg-light mb-3">
+            <div class="border rounded p-3 bg-light mb-3">
             <div class="fw-semibold mb-2">Method rules</div>
             <div class="text-secondary small" id="payoutInstructionText">{{ $defaultPayoutMethod['instruction'] ?? 'No payout method is currently available.' }}</div>
             <div class="text-secondary small mt-2" id="payoutProcessingText">Processing time: {{ $defaultPayoutMethod['processing_time'] ?? '—' }}</div>
             <div class="text-secondary small mt-1" id="payoutMinimumText">Minimum: ${{ number_format((float) ($defaultPayoutMethod['minimum_amount'] ?? 0), 2) }}</div>
             <div class="text-secondary small mt-1" id="payoutFeeText">Fees: ${{ number_format((float) ($defaultPayoutMethod['fixed_fee'] ?? 0), 2) }} fixed + {{ number_format((float) (($defaultPayoutMethod['percentage_fee_rate'] ?? 0) * 100), 2) }}%</div>
             <div class="fw-semibold mt-3" id="payoutNetEstimateText">Estimated net: $0.00</div>
-            <div class="alert alert-warning mt-3 mb-0 py-2 px-3 small">
-              Payout requests use earnings only. Package capital, miner assets, and purchased shares cannot be withdrawn here.
+              <div class="alert alert-warning mt-3 mb-0 py-2 px-3 small">
+                Payout requests use earnings only. Package capital, miner assets, and purchased shares cannot be withdrawn here.
+                @if (!($kycSummary['can_request_payout'] ?? false))
+                  KYC approval is also required before the first withdrawal can be submitted.
+                @endif
+              </div>
             </div>
-          </div>
           <div class="mb-0">
             <label class="form-label">Notes</label>
             <textarea name="notes" rows="3" class="form-control @error('notes') is-invalid @enderror">{{ old('notes') }}</textarea>

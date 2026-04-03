@@ -27,6 +27,9 @@
       'success' => 'border-success-subtle',
   ];
 @endphp
+@if (session('kyc_success'))
+  <div class="alert alert-success">{{ session('kyc_success') }}</div>
+@endif
 <div class="d-flex justify-content-between align-items-center flex-wrap grid-margin gap-3">
   <div>
     <h4 class="mb-1">{{ $miner->name }} Overview</h4>
@@ -41,6 +44,30 @@
     <a href="{{ route('dashboard.profile') }}" class="btn btn-outline-primary btn-sm">Personal profile</a>
   </div>
 </div>
+
+@if (($kycSummary['is_limited'] ?? false) && !($dashboardViewer?->isAdmin() ?? false))
+  <div class="row mb-4">
+    <div class="col-12">
+      @include('pages.general.partials.kyc-status-card', ['kycSummary' => $kycSummary])
+    </div>
+  </div>
+  @include('pages.general.partials.kyc-upload-modal', ['kycSummary' => $kycSummary])
+  @if ($kycSummary['show_prompt'] ?? false)
+    <script>
+      document.addEventListener('DOMContentLoaded', function () {
+        var modalElement = document.getElementById('kycUploadModal');
+        if (!modalElement || !window.bootstrap) {
+          return;
+        }
+
+        if (!window.sessionStorage.getItem('zagchain-kyc-prompt-seen')) {
+          new bootstrap.Modal(modalElement).show();
+          window.sessionStorage.setItem('zagchain-kyc-prompt-seen', '1');
+        }
+      });
+    </script>
+  @endif
+@endif
 
 <div class="modal fade" id="systemPresentationModal" tabindex="-1" aria-labelledby="systemPresentationModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">

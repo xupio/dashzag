@@ -251,6 +251,7 @@ Route::get('/dashboard', function (Request $request) {
 
     return view('dashboard', [
         'user' => $user,
+        'kycSummary' => MiningPlatform::kycSummary($user),
         'miners' => $miners,
         'miner' => $miner,
         'level' => $level,
@@ -601,6 +602,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
 
         return view('pages.general.profile', [
             'user' => $user,
+            'kycSummary' => MiningPlatform::kycSummary($user),
             'level' => $level,
             'displayTierName' => $displayTierName,
             'starterPackage' => MiningPlatform::freeStarterPackage(),
@@ -1409,10 +1411,11 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             ? $earnings
             : $earnings->whereIn('source', $sourceMap[$source]['sources'])->values();
 
-        return view('pages.general.wallet', [
-            'user' => $user,
-            'wallet' => $wallet,
-            'earnings' => $filteredEarnings,
+      return view('pages.general.wallet', [
+          'user' => $user,
+          'kycSummary' => MiningPlatform::kycSummary($user),
+          'wallet' => $wallet,
+          'earnings' => $filteredEarnings,
             'walletSourceBreakdown' => $walletSourceBreakdown,
             'walletSourceOptions' => $sourceMap,
             'activeSource' => $source,
@@ -1502,8 +1505,14 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
     Route::post('/dashboard/wallet/request', function (Request $request) {
         MiningPlatform::ensureDefaults();
 
-        $user = $request->user()->load('earnings');
-        $wallet = MiningPlatform::walletSummary($user);
+      $user = $request->user()->load('earnings');
+      $wallet = MiningPlatform::walletSummary($user);
+
+      if (! $user->hasApprovedKyc()) {
+          return back()->withErrors([
+              'kyc_proof' => 'Complete and pass legal verification before requesting the first withdrawal.',
+          ])->withInput();
+      }
 
         $validated = $request->validate([
             'amount' => ['required', 'numeric', 'min:1'],
@@ -1536,7 +1545,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
 
         $user->notify(new PayoutStatusNotification($payoutRequest, 'submitted'));
 
-        return redirect()->route('dashboard.wallet')->with('wallet_success', 'Your payout request has been submitted successfully.');
+      return redirect()->route('dashboard.wallet')->with('wallet_success', 'Your payout request has been submitted successfully.');
     })->middleware('throttle:5,1')->name('dashboard.wallet.request');
 
     Route::post('/dashboard/wallet/generate', function () {
@@ -1548,9 +1557,56 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
         return redirect()
             ->route('dashboard.wallet')
             ->with('wallet_success', $generated->count() > 0
-                ? $generated->count().' monthly earning entries are now available in your wallet.'
-                : 'No monthly return is available yet. Each paid package must complete a full 30-day cycle before the mining return unlocks.');
+              ? $generated->count().' monthly earning entries are now available in your wallet.'
+              : 'No monthly return is available yet. Each paid package must complete a full 30-day cycle before the mining return unlocks.');
     })->name('dashboard.wallet.generate');
+
+    Route::post('/dashboard/kyc', function (Request $request) {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'kyc_proof' => [
+                'required',
+                'file',
+                'mimes:jpg,jpeg,png,pdf',
+                'max:5120',
+                new AllowedFileSignature([
+                    'application/pdf',
+                    'image/jpeg',
+                    'image/png',
+                ]),
+            ],
+            'kyc_notes' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        if ($user->kyc_proof_path) {
+            Storage::disk('public')->delete($user->kyc_proof_path);
+        }
+
+        $storedPath = $validated['kyc_proof']->store('kyc-proofs', 'public');
+
+        $user->forceFill([
+            'kyc_status' => 'pending',
+            'kyc_proof_path' => $storedPath,
+            'kyc_proof_original_name' => $validated['kyc_proof']->getClientOriginalName(),
+            'kyc_submitted_at' => now(),
+            'kyc_reviewed_at' => null,
+            'kyc_reviewer_user_id' => null,
+            'kyc_admin_notes' => $validated['kyc_notes'] ?? null,
+        ])->save();
+
+        MiningPlatform::notifyAdminsOfKycSubmission($user);
+
+        return back()->with('kyc_success', 'Your legal verification proof was uploaded and is now waiting for admin review.');
+    })->middleware('throttle:6,1')->name('dashboard.kyc.submit');
+
+    Route::get('/dashboard/kyc/proof', function (Request $request) {
+        $user = $request->user();
+
+        abort_unless($user->kyc_proof_path, 404);
+
+        return Storage::disk('public')->response($user->kyc_proof_path, $user->kyc_proof_original_name ?? basename($user->kyc_proof_path));
+    })->name('dashboard.kyc.proof');
 
     Route::middleware('admin')->group(function () {
         Route::get('/dashboard/miners', function () {
@@ -2603,21 +2659,27 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             MiningPlatform::ensureDefaults();
 
             $search = trim((string) $request->query('search', ''));
-            $role = $request->query('role');
-            $accountType = $request->query('account_type');
-            $verification = $request->query('verification');
-            $rewardCap = (string) $request->query('reward_cap', 'all');
-            $auditFilter = (string) $request->query('audit_filter', 'all');
-            $allowedRewardCaps = ['all', 'basic', 'growth', 'scale'];
-            $allowedAuditFilters = ['all', 'locked_balance', 'unlocking_soon'];
+        $role = $request->query('role');
+        $accountType = $request->query('account_type');
+        $verification = $request->query('verification');
+        $rewardCap = (string) $request->query('reward_cap', 'all');
+        $auditFilter = (string) $request->query('audit_filter', 'all');
+        $kycStatus = (string) $request->query('kyc_status', 'all');
+        $allowedRewardCaps = ['all', 'basic', 'growth', 'scale'];
+        $allowedAuditFilters = ['all', 'locked_balance', 'unlocking_soon'];
+        $allowedKycStatuses = ['all', 'not_submitted', 'pending', 'approved', 'rejected'];
 
             if (! in_array($rewardCap, $allowedRewardCaps, true)) {
                 $rewardCap = 'all';
             }
 
-            if (! in_array($auditFilter, $allowedAuditFilters, true)) {
-                $auditFilter = 'all';
-            }
+        if (! in_array($auditFilter, $allowedAuditFilters, true)) {
+            $auditFilter = 'all';
+        }
+
+        if (! in_array($kycStatus, $allowedKycStatuses, true)) {
+            $kycStatus = 'all';
+        }
 
             $rewardCapMeta = [
                 'basic' => ['label' => 'Basic 100', 'short' => '4% cap'],
@@ -2656,23 +2718,41 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 ];
             };
 
-            $usersQuery = User::with(['userLevel', 'investments.package', 'earnings', 'friendInvitations', 'sponsoredUsers.investments', 'payoutRequests'])
+        $usersQuery = User::with(['userLevel', 'investments.package', 'earnings', 'friendInvitations', 'sponsoredUsers.investments', 'payoutRequests'])
                 ->when($search !== '', function ($query) use ($search) {
                     $query->where(function ($nested) use ($search) {
                         $nested->where('name', 'like', "%$search%")
                             ->orWhere('email', 'like', "%$search%");
                     });
                 })
-                ->when($role, fn ($query) => $query->where('role', $role))
-                ->when($accountType, fn ($query) => $query->where('account_type', $accountType))
-                ->when($verification === 'verified', fn ($query) => $query->whereNotNull('email_verified_at'))
-                ->when($verification === 'unverified', fn ($query) => $query->whereNull('email_verified_at'));
+            ->when($role, fn ($query) => $query->where('role', $role))
+            ->when($accountType, fn ($query) => $query->where('account_type', $accountType))
+            ->when($verification === 'verified', fn ($query) => $query->whereNotNull('email_verified_at'))
+            ->when($verification === 'unverified', fn ($query) => $query->whereNull('email_verified_at'))
+            ->when($kycStatus !== 'all', fn ($query) => $query->where('kyc_status', $kycStatus));
 
-            $baseUsers = $usersQuery->orderBy('created_at')->get();
-            $allUsers = User::query()->get();
-            $rewardCapBreakdown = collect($rewardCapMeta)->map(function (array $meta, string $key) use ($baseUsers, $resolveRewardCaps) {
-                return [
-                    'label' => $meta['label'],
+              $baseUsers = $usersQuery->orderBy('created_at')->get();
+              $allUsers = User::query()->get();
+              $kycBreakdown = collect([
+                  'pending' => [
+                      'label' => 'Pending KYC',
+                      'short' => 'Waiting for review',
+                      'count' => $baseUsers->where('kyc_status', 'pending')->count(),
+                  ],
+                  'rejected' => [
+                      'label' => 'Rejected KYC',
+                      'short' => 'Needs a new upload',
+                      'count' => $baseUsers->where('kyc_status', 'rejected')->count(),
+                  ],
+                  'not_submitted' => [
+                      'label' => 'No KYC Uploaded',
+                      'short' => 'Still missing proof',
+                      'count' => $baseUsers->where('kyc_status', 'not_submitted')->count(),
+                  ],
+              ]);
+              $rewardCapBreakdown = collect($rewardCapMeta)->map(function (array $meta, string $key) use ($baseUsers, $resolveRewardCaps) {
+                  return [
+                      'label' => $meta['label'],
                     'short' => $meta['short'],
                     'count' => $baseUsers->filter(fn (User $user) => ($resolveRewardCaps($user)[$key]['unlocked'] ?? false) === true)->count(),
                 ];
@@ -2750,15 +2830,17 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'selectedVerification' => $verification,
                 'selectedRewardCap' => $rewardCap,
                 'selectedAuditFilter' => $auditFilter,
+                'selectedKycStatus' => $kycStatus,
                 'userBreakdown' => [
                     'admins' => $allUsers->where('role', 'admin')->count(),
                     'users' => $allUsers->where('role', 'user')->count(),
                     'verified' => $allUsers->whereNotNull('email_verified_at')->count(),
                     'shareholders' => $allUsers->where('account_type', 'shareholder')->count(),
-                ],
-                'rewardCapBreakdown' => $rewardCapBreakdown,
-                'userRewardCaps' => $userRewardCaps,
-                'userAuditStats' => $userAuditStats,
+                  ],
+                  'kycBreakdown' => $kycBreakdown,
+                  'rewardCapBreakdown' => $rewardCapBreakdown,
+                  'userRewardCaps' => $userRewardCaps,
+                  'userAuditStats' => $userAuditStats,
             ]);
         })->name('dashboard.users');
 
@@ -2771,8 +2853,10 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             $verification = $request->query('verification');
             $rewardCap = (string) $request->query('reward_cap', 'all');
             $auditFilter = (string) $request->query('audit_filter', 'all');
+            $kycStatus = (string) $request->query('kyc_status', 'all');
             $allowedRewardCaps = ['all', 'basic', 'growth', 'scale'];
             $allowedAuditFilters = ['all', 'locked_balance', 'unlocking_soon'];
+            $allowedKycStatuses = ['all', 'not_submitted', 'pending', 'approved', 'rejected'];
 
             if (! in_array($rewardCap, $allowedRewardCaps, true)) {
                 $rewardCap = 'all';
@@ -2780,6 +2864,10 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
 
             if (! in_array($auditFilter, $allowedAuditFilters, true)) {
                 $auditFilter = 'all';
+            }
+
+            if (! in_array($kycStatus, $allowedKycStatuses, true)) {
+                $kycStatus = 'all';
             }
 
             $rewardCapCache = [];
@@ -2810,6 +2898,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 ->when($accountType, fn ($query) => $query->where('account_type', $accountType))
                 ->when($verification === 'verified', fn ($query) => $query->whereNotNull('email_verified_at'))
                 ->when($verification === 'unverified', fn ($query) => $query->whereNull('email_verified_at'))
+                ->when($kycStatus !== 'all', fn ($query) => $query->where('kyc_status', $kycStatus))
                 ->orderBy('created_at')
                 ->get()
                 ->filter(function (User $user) use ($rewardCap, $resolveRewardCaps, $auditFilter) {
@@ -2847,17 +2936,18 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
 
             $filename = 'users-report-'.now()->format('Ymd-His').'.csv';
 
-            return response()->streamDownload(function () use ($users, $search, $role, $accountType, $verification, $rewardCap, $auditFilter, $resolveRewardCaps) {
+            return response()->streamDownload(function () use ($users, $search, $role, $accountType, $verification, $rewardCap, $auditFilter, $kycStatus, $resolveRewardCaps) {
                 $handle = fopen('php://output', 'w');
                 fputcsv($handle, ['Filter', 'Value']);
                 fputcsv($handle, ['Search', $search !== '' ? $search : 'all']);
                 fputcsv($handle, ['Role', $role ?: 'all']);
                 fputcsv($handle, ['Account type', $accountType ?: 'all']);
                 fputcsv($handle, ['Verification', $verification ?: 'all']);
+                fputcsv($handle, ['KYC status', $kycStatus ?: 'all']);
                 fputcsv($handle, ['Reward cap', $rewardCap ?: 'all']);
                 fputcsv($handle, ['Audit filter', $auditFilter ?: 'all']);
                 fputcsv($handle, []);
-                fputcsv($handle, ['Name', 'Email', 'Role', 'Verification', 'Level', 'Account Type', 'Reward Caps', 'Total Invested', 'Available Earnings', 'Locked Balance', 'Paid Earnings', 'First Paid Subscription', 'Next Unlock', 'Days To Unlock', 'Last Paid Payout', 'Joined']);
+                fputcsv($handle, ['Name', 'Email', 'Role', 'Verification', 'KYC Status', 'Level', 'Account Type', 'Reward Caps', 'Total Invested', 'Available Earnings', 'Locked Balance', 'Paid Earnings', 'First Paid Subscription', 'Next Unlock', 'Days To Unlock', 'Last Paid Payout', 'Joined']);
 
                 foreach ($users as $listedUser) {
                     $caps = collect($resolveRewardCaps($listedUser))
@@ -2897,10 +2987,11 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
 
                     fputcsv($handle, [
                         $listedUser->name,
-                        $listedUser->email,
-                        $listedUser->role,
-                        $listedUser->email_verified_at ? 'verified' : 'pending',
-                        $listedUser->userLevel?->name ?? 'Starter',
+                            $listedUser->email,
+                            $listedUser->role,
+                            $listedUser->email_verified_at ? 'verified' : 'pending',
+                            $listedUser->kyc_status,
+                            $listedUser->userLevel?->name ?? 'Starter',
                         $listedUser->account_type,
                         $caps !== '' ? $caps : '—',
                         number_format((float) $listedUser->investments->where('status', 'active')->sum('amount'), 2, '.', ''),
@@ -3020,6 +3111,66 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
 
             return redirect()->route('dashboard.users')->with('users_success', $user->email.' role updated to '.$validated['role'].'.');
         })->name('dashboard.users.role');
+
+        Route::get('/dashboard/users/{user}/kyc-proof', function (User $user) {
+            abort_unless($user->kyc_proof_path, 404);
+
+            return Storage::disk('public')->response($user->kyc_proof_path, $user->kyc_proof_original_name ?? basename($user->kyc_proof_path));
+        })->name('dashboard.users.kyc-proof');
+
+        Route::post('/dashboard/users/{user}/kyc/approve', function (Request $request, User $user) {
+            $validated = $request->validate([
+                'kyc_admin_notes' => ['nullable', 'string', 'max:1000'],
+            ]);
+
+            abort_unless($user->kyc_proof_path, 404);
+
+            $user->forceFill([
+                'kyc_status' => 'approved',
+                'kyc_reviewed_at' => now(),
+                'kyc_reviewer_user_id' => $request->user()->id,
+                'kyc_admin_notes' => $validated['kyc_admin_notes'] ?? null,
+            ])->save();
+
+            MiningPlatform::logAdminActivity(
+                $request->user(),
+                'kyc.approve',
+                'Approved legal verification for '.$user->email,
+                $user,
+                ['kyc_status' => 'approved']
+            );
+
+            MiningPlatform::notifyUserOfKycReview($user);
+
+            return redirect()->route('dashboard.users', ['search' => $user->email])->with('users_success', 'KYC approved for '.$user->email.'.');
+        })->name('dashboard.users.kyc.approve');
+
+        Route::post('/dashboard/users/{user}/kyc/reject', function (Request $request, User $user) {
+            $validated = $request->validate([
+                'kyc_admin_notes' => ['required', 'string', 'max:1000'],
+            ]);
+
+            abort_unless($user->kyc_proof_path, 404);
+
+            $user->forceFill([
+                'kyc_status' => 'rejected',
+                'kyc_reviewed_at' => now(),
+                'kyc_reviewer_user_id' => $request->user()->id,
+                'kyc_admin_notes' => $validated['kyc_admin_notes'],
+            ])->save();
+
+            MiningPlatform::logAdminActivity(
+                $request->user(),
+                'kyc.reject',
+                'Rejected legal verification for '.$user->email,
+                $user,
+                ['kyc_status' => 'rejected']
+            );
+
+            MiningPlatform::notifyUserOfKycReview($user);
+
+            return redirect()->route('dashboard.users', ['search' => $user->email])->with('users_success', 'KYC rejected for '.$user->email.'.');
+        })->name('dashboard.users.kyc.reject');
 
         Route::get('/dashboard/operations', function (Request $request) {
             MiningPlatform::ensureDefaults();
@@ -4974,15 +5125,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
-
-
-
-
-
-
-
-
 
 
 

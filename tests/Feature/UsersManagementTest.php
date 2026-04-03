@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\UserInvestment;
 use App\Models\UserLevel;
 use App\Support\MiningPlatform;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     MiningPlatform::ensureDefaults();
@@ -460,5 +461,82 @@ test('admin users export includes audit columns and respects audit filters', fun
     expect($csv)->toContain('"Audit filter",locked_balance');
     expect($csv)->toContain('locked-export@example.com');
     expect($csv)->toContain('9.50');
+});
+
+test('admin can approve pending kyc from users page', function () {
+    Storage::fake('public');
+
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    Storage::disk('public')->put('kyc-proofs/pending-proof.pdf', 'pending-proof');
+
+    $user = User::factory()->create([
+        'name' => 'Pending Kyc User',
+        'email' => 'pending-kyc@example.com',
+        'email_verified_at' => now(),
+        'kyc_status' => 'pending',
+        'kyc_proof_path' => 'kyc-proofs/pending-proof.pdf',
+        'kyc_proof_original_name' => 'pending-proof.pdf',
+        'kyc_submitted_at' => now()->subHour(),
+    ]);
+
+    $response = $this->actingAs($admin)->post(route('dashboard.users.kyc.approve', $user), [
+        'kyc_admin_notes' => 'Checked legal responsibility proof.',
+    ]);
+
+    $response->assertRedirect(route('dashboard.users', ['search' => $user->email]));
+
+    $user->refresh();
+
+    expect($user->kyc_status)->toBe('approved');
+    expect($user->kyc_reviewer_user_id)->toBe($admin->id);
+    expect($user->kyc_reviewed_at)->not->toBeNull();
+});
+
+test('admin users page shows kyc queue cards and can filter pending kyc users', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    User::factory()->create([
+        'name' => 'Pending Queue User',
+        'email' => 'pending-queue@example.com',
+        'email_verified_at' => now(),
+        'kyc_status' => 'pending',
+        'kyc_submitted_at' => now()->subHour(),
+    ]);
+
+    User::factory()->create([
+        'name' => 'Rejected Queue User',
+        'email' => 'rejected-queue@example.com',
+        'email_verified_at' => now(),
+        'kyc_status' => 'rejected',
+        'kyc_reviewed_at' => now()->subHour(),
+    ]);
+
+    User::factory()->create([
+        'name' => 'Missing Queue User',
+        'email' => 'missing-queue@example.com',
+        'email_verified_at' => now(),
+        'kyc_status' => 'not_submitted',
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('dashboard.users'));
+
+    $response->assertOk();
+    $response->assertSee('Pending KYC');
+    $response->assertSee('Rejected KYC');
+    $response->assertSee('No KYC Uploaded');
+
+    $filteredResponse = $this->actingAs($admin)->get(route('dashboard.users', [
+        'kyc_status' => 'pending',
+    ]));
+
+    $filteredResponse->assertOk();
+    $filteredResponse->assertSee('Pending Queue User');
+    $filteredResponse->assertDontSee('Rejected Queue User');
+    $filteredResponse->assertDontSee('Missing Queue User');
 });
 

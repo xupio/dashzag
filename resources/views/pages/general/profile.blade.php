@@ -5,6 +5,9 @@
 @endpush
 
 @section('content')
+@if (session('kyc_success'))
+  <div class="alert alert-success">{{ session('kyc_success') }}</div>
+@endif
 <div class="row">
   <div class="col-12 grid-margin">
     <div class="card overflow-hidden">
@@ -535,6 +538,13 @@
       </div>
     </div>
   </div>
+
+  @if (($kycSummary['is_limited'] ?? false) && !$user->isAdmin())
+    <div class="col-12 grid-margin stretch-card">
+      @include('pages.general.partials.kyc-status-card', ['kycSummary' => $kycSummary])
+      @include('pages.general.partials.kyc-upload-modal', ['kycSummary' => $kycSummary])
+    </div>
+  @endif
 
   <div class="col-12 grid-margin stretch-card">
     <div class="card rounded w-100">

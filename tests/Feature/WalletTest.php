@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Middleware\EnsureSingleDeviceSession;
 use App\Models\AdminActivityLog;
 use App\Models\Earning;
 use App\Models\InvestmentOrder;
 use App\Models\PayoutRequest;
 use App\Models\User;
+use App\Models\UserInvestment;
 use App\Notifications\PayoutStatusNotification;
 use App\Support\MiningPlatform;
 use Illuminate\Http\UploadedFile;
@@ -100,11 +102,17 @@ function activateGrowthInvestment($test, User $user, ?User $admin = null): void
     $test->actingAs($admin)
         ->post(route('dashboard.operations.investment-orders.approve', $order->fresh()))
         ->assertRedirect(route('dashboard.operations'));
+
+    UserInvestment::query()
+        ->where('user_id', $user->id)
+        ->where('status', 'active')
+        ->update(['subscribed_at' => now()->subDays(31)]);
 }
 
 beforeEach(function () {
     Notification::fake();
     Storage::fake('public');
+    $this->withoutMiddleware(EnsureSingleDeviceSession::class);
     MiningPlatform::ensureDefaults();
 });
 
@@ -239,6 +247,8 @@ test('verified user can request a payout from available balance', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),
         'account_type' => 'user',
+        'kyc_status' => 'approved',
+        'kyc_reviewed_at' => now(),
     ]);
 
     activateGrowthInvestment($this, $user);
@@ -296,6 +306,35 @@ test('wallet page reflects admin managed payout methods', function () {
     $response->assertDontSee('Bank Transfer');
 });
 
+test('user cannot request a payout before kyc approval', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+        'kyc_status' => 'pending',
+        'kyc_submitted_at' => now(),
+    ]);
+
+    Earning::create([
+        'user_id' => $user->id,
+        'investment_id' => null,
+        'earned_on' => now()->toDateString(),
+        'amount' => 30,
+        'source' => 'mining_return',
+        'status' => 'available',
+        'notes' => 'Manual available earning for KYC gate test.',
+    ]);
+
+    $response = $this->actingAs($user)->from(route('dashboard.wallet'))->post(route('dashboard.wallet.request'), [
+        'amount' => 20,
+        'method' => 'btc_wallet',
+        'destination' => 'bc1-kyc-gated-wallet',
+    ]);
+
+    $response->assertRedirect(route('dashboard.wallet'));
+    $response->assertSessionHasErrors('kyc_proof');
+    expect(PayoutRequest::count())->toBe(0);
+});
+
 test('wallet page prefills saved payout destinations from account settings', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),
@@ -330,6 +369,8 @@ test('disabled payout methods cannot be requested', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),
         'account_type' => 'user',
+        'kyc_status' => 'approved',
+        'kyc_reviewed_at' => now(),
     ]);
 
     $this->actingAs($admin)->post(route('dashboard.settings.update'), walletSettingsPayload([
@@ -358,6 +399,8 @@ test('payout request stores fee and net amount based on method rules', function 
     $user = User::factory()->create([
         'email_verified_at' => now(),
         'account_type' => 'user',
+        'kyc_status' => 'approved',
+        'kyc_reviewed_at' => now(),
     ]);
 
     $this->actingAs($admin)->post(route('dashboard.settings.update'), walletSettingsPayload([
@@ -389,6 +432,8 @@ test('payout request enforces method minimum amount', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),
         'account_type' => 'user',
+        'kyc_status' => 'approved',
+        'kyc_reviewed_at' => now(),
     ]);
 
     $this->actingAs($admin)->post(route('dashboard.settings.update'), walletSettingsPayload([
@@ -416,6 +461,8 @@ test('users receive payout notifications for submit approve and pay events', fun
     $user = User::factory()->create([
         'email_verified_at' => now(),
         'account_type' => 'user',
+        'kyc_status' => 'approved',
+        'kyc_reviewed_at' => now(),
     ]);
 
     activateGrowthInvestment($this, $user, $admin);
@@ -429,8 +476,9 @@ test('users receive payout notifications for submit approve and pay events', fun
 
     $payoutRequest = PayoutRequest::firstOrFail();
 
-    Notification::assertSentTo($user, PayoutStatusNotification::class, function ($notification) {
-        return $notification->toMail(User::factory()->make(['name' => 'Temp']))->subject === 'Payout Request Submitted';
+    Notification::assertSentTo($user, PayoutStatusNotification::class, function ($notification, $channels) use ($user) {
+        return in_array('database', $channels, true)
+            && ($notification->toArray($user)['status'] ?? null) === 'submitted';
     });
 
     Notification::fake();
@@ -438,8 +486,9 @@ test('users receive payout notifications for submit approve and pay events', fun
         'admin_notes' => 'Reviewed and approved.',
     ])->assertRedirect(route('dashboard.operations'));
 
-    Notification::assertSentTo($user, PayoutStatusNotification::class, function ($notification) {
-        return $notification->toMail(User::factory()->make(['name' => 'Temp']))->subject === 'Payout Request Approved';
+    Notification::assertSentTo($user, PayoutStatusNotification::class, function ($notification, $channels) use ($user) {
+        return in_array('database', $channels, true)
+            && ($notification->toArray($user)['status'] ?? null) === 'approved';
     });
 
     Notification::fake();
@@ -448,8 +497,9 @@ test('users receive payout notifications for submit approve and pay events', fun
         'admin_notes' => 'Treasury transfer completed.',
     ])->assertRedirect(route('dashboard.operations'));
 
-    Notification::assertSentTo($user, PayoutStatusNotification::class, function ($notification) {
-        return $notification->toMail(User::factory()->make(['name' => 'Temp']))->subject === 'Payout Request Paid';
+    Notification::assertSentTo($user, PayoutStatusNotification::class, function ($notification, $channels) use ($user) {
+        return in_array('database', $channels, true)
+            && ($notification->toArray($user)['status'] ?? null) === 'paid';
     });
 });
 
@@ -461,6 +511,8 @@ test('admin can approve and pay payout requests with audit details', function ()
     $user = User::factory()->create([
         'email_verified_at' => now(),
         'account_type' => 'user',
+        'kyc_status' => 'approved',
+        'kyc_reviewed_at' => now(),
     ]);
 
     activateGrowthInvestment($this, $user, $admin);

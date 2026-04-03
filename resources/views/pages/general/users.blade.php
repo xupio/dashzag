@@ -9,7 +9,7 @@
         <p class="text-secondary mb-0">Manage registered users, monitor their level and investment totals, and update admin access.</p>
       </div>
       <div class="d-flex gap-2 flex-wrap">
-        <a href="{{ route('dashboard.users.export', ['search' => $search, 'role' => $selectedRole, 'account_type' => $selectedAccountType, 'verification' => $selectedVerification, 'reward_cap' => $selectedRewardCap, 'audit_filter' => $selectedAuditFilter]) }}" class="btn btn-outline-success btn-icon-text">
+        <a href="{{ route('dashboard.users.export', ['search' => $search, 'role' => $selectedRole, 'account_type' => $selectedAccountType, 'verification' => $selectedVerification, 'reward_cap' => $selectedRewardCap, 'audit_filter' => $selectedAuditFilter, 'kyc_status' => $selectedKycStatus]) }}" class="btn btn-outline-success btn-icon-text">
           <i data-lucide="download" class="btn-icon-prepend"></i> Export CSV
         </a>
         <a href="{{ route('dashboard.operations') }}" class="btn btn-outline-primary btn-icon-text">
@@ -32,11 +32,27 @@
 </div>
 
 <div class="row mb-4">
+  @foreach ($kycBreakdown as $kycKey => $kycCard)
+    <div class="col-md-4 grid-margin stretch-card">
+      <div class="card">
+        <div class="card-body">
+          <a href="{{ route('dashboard.users', array_filter(['search' => $search, 'role' => $selectedRole, 'account_type' => $selectedAccountType, 'verification' => $selectedVerification, 'reward_cap' => $selectedRewardCap, 'audit_filter' => $selectedAuditFilter, 'kyc_status' => $kycKey])) }}" class="text-decoration-none">
+            <p class="text-secondary mb-1">{{ $kycCard['label'] }}</p>
+            <h5 class="mb-1">{{ $kycCard['count'] }}</h5>
+            <div class="small {{ $selectedKycStatus === $kycKey ? 'text-primary fw-semibold' : 'text-secondary' }}">{{ $kycCard['short'] }}</div>
+          </a>
+        </div>
+      </div>
+    </div>
+  @endforeach
+</div>
+
+<div class="row mb-4">
   @foreach ($rewardCapBreakdown as $capKey => $cap)
     <div class="col-md-4 grid-margin stretch-card">
       <div class="card">
         <div class="card-body">
-          <a href="{{ route('dashboard.users', array_filter(['search' => $search, 'role' => $selectedRole, 'account_type' => $selectedAccountType, 'verification' => $selectedVerification, 'reward_cap' => $capKey])) }}" class="text-decoration-none">
+          <a href="{{ route('dashboard.users', array_filter(['search' => $search, 'role' => $selectedRole, 'account_type' => $selectedAccountType, 'verification' => $selectedVerification, 'reward_cap' => $capKey, 'kyc_status' => $selectedKycStatus])) }}" class="text-decoration-none">
             <p class="text-secondary mb-1">{{ $cap['label'] }}</p>
             <h5 class="mb-1">{{ $cap['count'] }}</h5>
             <div class="small {{ $selectedRewardCap === $capKey ? 'text-primary fw-semibold' : 'text-secondary' }}">{{ $cap['short'] }}</div>
@@ -97,6 +113,16 @@
               <option value="unlocking_soon" @selected($selectedAuditFilter === 'unlocking_soon')>Unlocking soon</option>
             </select>
           </div>
+          <div class="col-md-2">
+            <label class="form-label">KYC</label>
+            <select name="kyc_status" class="form-select">
+              <option value="all" @selected($selectedKycStatus === 'all')>All statuses</option>
+              <option value="not_submitted" @selected($selectedKycStatus === 'not_submitted')>Not submitted</option>
+              <option value="pending" @selected($selectedKycStatus === 'pending')>Pending</option>
+              <option value="approved" @selected($selectedKycStatus === 'approved')>Approved</option>
+              <option value="rejected" @selected($selectedKycStatus === 'rejected')>Rejected</option>
+            </select>
+          </div>
           <div class="col-md-1 d-flex gap-2">
             <button type="submit" class="btn btn-primary">Apply</button>
           </div>
@@ -125,6 +151,7 @@
                 <th>User</th>
                 <th>Role</th>
                 <th>Verification</th>
+                <th>KYC</th>
                 <th>Level</th>
                 <th>Account type</th>
                 <th>Audit snapshot</th>
@@ -146,6 +173,19 @@
                   </td>
                   <td><span class="badge {{ $listedUser->role === 'admin' ? 'bg-danger' : 'bg-secondary' }}">{{ ucfirst($listedUser->role) }}</span></td>
                   <td><span class="badge {{ $listedUser->email_verified_at ? 'bg-success' : 'bg-warning text-dark' }}">{{ $listedUser->email_verified_at ? 'Verified' : 'Pending' }}</span></td>
+                  <td>
+                    @php($kyc = $listedUser->kyc_status)
+                    <div class="d-flex flex-column gap-1">
+                      <span class="badge {{ match($kyc){ 'approved' => 'bg-success', 'pending' => 'bg-warning text-dark', 'rejected' => 'bg-danger', default => 'bg-secondary' } }}">{{ $listedUser->kycStatusLabel() }}</span>
+                      <div class="small text-secondary">
+                        @if ($listedUser->kyc_submitted_at)
+                          Submitted {{ $listedUser->kyc_submitted_at->format('M d, Y') }}
+                        @else
+                          Waiting for upload
+                        @endif
+                      </div>
+                    </div>
+                  </td>
                   <td>{{ $listedUser->userLevel?->name ?? 'Starter' }}</td>
                   <td class="text-capitalize">{{ $listedUser->account_type }}</td>
                   <td>
@@ -178,10 +218,27 @@
                       <a href="{{ route('dashboard.users', ['search' => $listedUser->email]) }}" class="btn btn-sm btn-outline-primary">
                         Open audit
                       </a>
+                      @if ($listedUser->kyc_proof_path)
+                        <a href="{{ route('dashboard.users.kyc-proof', $listedUser) }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                          Open KYC proof
+                        </a>
+                      @endif
                       @if ($listedUser->account_type === 'shareholder')
                         <a href="{{ route('dashboard.shareholders', ['search' => $listedUser->email]) }}" class="btn btn-sm btn-outline-info">
                           Open investor report
                         </a>
+                      @endif
+                      @if ($listedUser->kyc_status === 'pending')
+                        <form method="POST" action="{{ route('dashboard.users.kyc.approve', $listedUser) }}" class="d-flex flex-column gap-2">
+                          @csrf
+                          <input type="text" name="kyc_admin_notes" class="form-control form-control-sm" placeholder="Optional approval note">
+                          <button type="submit" class="btn btn-sm btn-success">Approve KYC</button>
+                        </form>
+                        <form method="POST" action="{{ route('dashboard.users.kyc.reject', $listedUser) }}" class="d-flex flex-column gap-2">
+                          @csrf
+                          <textarea name="kyc_admin_notes" rows="2" class="form-control form-control-sm" placeholder="Reason for rejection" required></textarea>
+                          <button type="submit" class="btn btn-sm btn-outline-danger">Reject KYC</button>
+                        </form>
                       @endif
                     </div>
                   </td>

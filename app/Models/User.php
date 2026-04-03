@@ -23,6 +23,13 @@ class User extends Authenticatable implements MustVerifyEmail
         'email',
         'is_email_visible',
         'profile_photo_path',
+        'kyc_status',
+        'kyc_proof_path',
+        'kyc_proof_original_name',
+        'kyc_submitted_at',
+        'kyc_reviewed_at',
+        'kyc_reviewer_user_id',
+        'kyc_admin_notes',
         'admin_two_factor_secret',
         'admin_two_factor_confirmed_at',
         'btc_wallet_address',
@@ -49,6 +56,7 @@ class User extends Authenticatable implements MustVerifyEmail
 
     protected $attributes = [
         'is_email_visible' => false,
+        'kyc_status' => 'not_submitted',
     ];
 
     public function isAdmin(): bool
@@ -59,6 +67,31 @@ class User extends Authenticatable implements MustVerifyEmail
     public function adminLabel(): string
     {
         return 'Admin #'.$this->id;
+    }
+
+    public function kycReviewer(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'kyc_reviewer_user_id');
+    }
+
+    public function hasApprovedKyc(): bool
+    {
+        return $this->kyc_status === 'approved';
+    }
+
+    public function hasPendingKycReview(): bool
+    {
+        return $this->kyc_status === 'pending';
+    }
+
+    public function kycStatusLabel(): string
+    {
+        return match ($this->kyc_status) {
+            'approved' => 'Approved',
+            'pending' => 'Pending review',
+            'rejected' => 'Rejected',
+            default => 'Not submitted',
+        };
     }
 
     public static function defaultNotificationPreferences(): array
@@ -244,6 +277,8 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'is_email_visible' => 'boolean',
+            'kyc_submitted_at' => 'datetime',
+            'kyc_reviewed_at' => 'datetime',
             'admin_two_factor_confirmed_at' => 'datetime',
             'password' => 'hashed',
             'notification_preferences' => 'array',
