@@ -115,6 +115,27 @@ test('user can invite a friend with uppercase email and it is normalized to lowe
     });
 });
 
+test('user invite phone is trimmed before storing', function () {
+    Mail::fake();
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $this->actingAs($user)->post(route('dashboard.friends.invite'), [
+        'name' => 'Phone Friend',
+        'email' => 'phone-friend@example.com',
+        'phone' => '  +971 50 123 4567  ',
+        'country' => 'United Arab Emirates',
+    ])->assertRedirect(route('dashboard.friends'));
+
+    $this->assertDatabaseHas('friend_invitations', [
+        'user_id' => $user->id,
+        'email' => 'phone-friend@example.com',
+        'phone' => '+971 50 123 4567',
+    ]);
+});
+
 test('user must choose a valid country when inviting a friend', function () {
     Mail::fake();
 

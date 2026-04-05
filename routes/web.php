@@ -1539,7 +1539,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             $user,
             (float) $validated['amount'],
             $validated['method'],
-            $validated['destination'],
+            trim((string) $validated['destination']),
             $validated['notes'] ?? null,
         );
 
@@ -4711,6 +4711,9 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
 
         $request->merge([
             'email' => strtolower(trim((string) $request->input('email'))),
+            'phone' => filled($request->input('phone'))
+                ? trim((string) $request->input('phone'))
+                : null,
         ]);
 
         $validated = $request->validate([
@@ -5129,8 +5132,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
-
 
 
 

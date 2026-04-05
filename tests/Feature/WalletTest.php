@@ -349,6 +349,28 @@ test('wallet page prefills saved payout destinations from account settings', fun
     $response->assertSee('Your selected wallet');
 });
 
+test('payout destination is trimmed before storing the request', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+        'kyc_status' => 'approved',
+        'kyc_reviewed_at' => now(),
+    ]);
+
+    activateGrowthInvestment($this, $user);
+    $this->actingAs($user)->post(route('dashboard.wallet.generate'));
+
+    $this->actingAs($user)->post(route('dashboard.wallet.request'), [
+        'amount' => 30,
+        'method' => 'btc_wallet',
+        'destination' => '  bc1-trimmed-wallet-address  ',
+    ])->assertRedirect(route('dashboard.wallet'));
+
+    $payoutRequest = PayoutRequest::latest('id')->firstOrFail();
+
+    expect($payoutRequest->destination)->toBe('bc1-trimmed-wallet-address');
+});
+
 test('wallet page explains that only available earnings are withdrawable', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),
