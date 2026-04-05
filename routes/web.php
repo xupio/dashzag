@@ -4709,9 +4709,13 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             'United States',
         ];
 
+        $request->merge([
+            'email' => strtolower(trim((string) $request->input('email'))),
+        ]);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'string', 'lowercase', 'email', 'max:255'],
+            'email' => ['required', 'string', 'email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
             'country' => ['required', 'string', Rule::in($friendInvitationCountries)],
         ]);
@@ -5125,7 +5129,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
 
 
 
