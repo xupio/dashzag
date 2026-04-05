@@ -52,6 +52,24 @@ test('new users can register', function () {
     $response->assertRedirect(route('verification.notice', absolute: false));
 });
 
+test('new users can register with uppercase email and it is normalized', function () {
+    Notification::fake();
+
+    $response = $this->post('/register', [
+        'name' => 'Uppercase User',
+        'email' => 'Upper.User@Example.COM',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+    ]);
+
+    $user = User::where('email', 'upper.user@example.com')->first();
+
+    $this->assertAuthenticated();
+    expect($user)->not->toBeNull();
+    expect($user?->email)->toBe('upper.user@example.com');
+    $response->assertRedirect(route('verification.notice', absolute: false));
+});
+
 test('invited users still receive verification email on registration', function () {
     Notification::fake();
 

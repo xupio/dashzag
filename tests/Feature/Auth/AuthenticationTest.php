@@ -23,6 +23,21 @@ test('users can authenticate using the login screen', function () {
     $response->assertRedirect(route('dashboard', absolute: false));
 });
 
+test('users can authenticate with uppercase email input', function () {
+    $user = User::factory()->create([
+        'email' => 'login-user@example.com',
+    ]);
+
+    $response = $this->post('/login', [
+        'email' => 'Login-User@Example.COM',
+        'password' => 'password',
+    ]);
+
+    $this->assertAuthenticated();
+    expect($user->fresh()->active_session_token)->not->toBeNull();
+    $response->assertRedirect(route('dashboard', absolute: false));
+});
+
 test('users can not authenticate with invalid password', function () {
     $user = User::factory()->create();
 

@@ -7,6 +7,7 @@ use App\Support\AdminTwoFactor;
 use App\Support\MiningPlatform;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -287,5 +288,12 @@ class User extends Authenticatable implements MustVerifyEmail
             'friend_invitation_emails_sent_on' => 'date',
             'friend_invitation_emails_sent_count' => 'integer',
         ];
+    }
+
+    protected function email(): Attribute
+    {
+        return Attribute::make(
+            set: fn ($value) => strtolower(trim((string) $value)),
+        );
     }
 }
