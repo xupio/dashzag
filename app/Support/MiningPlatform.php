@@ -2361,8 +2361,8 @@ class MiningPlatform
                     'amount' => $amount,
                     'status' => $isUnlocked ? 'available' : 'pending',
                     'notes' => $isUnlocked
-                        ? 'Daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share, performance-adjusted by the miner\'s daily hashrate, BTC price, and revenue strength within the package base monthly return path.'
-                        : 'Locked daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share, performance-adjusted by the miner\'s daily hashrate, BTC price, and revenue strength within the package base monthly return path. It unlocks after the first 30-day cycle.',
+                        ? 'Daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' credited $'.number_format($amount, 2).' after applying the miner\'s daily hashrate, BTC price, revenue strength, and the package daily cap.'
+                        : 'Locked daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' credited $'.number_format($amount, 2).' after applying the miner\'s daily hashrate, BTC price, revenue strength, and the package daily cap. It unlocks after the first 30-day cycle.',
                 ]);
 
                 $earning->save();
