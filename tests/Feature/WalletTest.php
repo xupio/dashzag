@@ -168,6 +168,48 @@ test('wallet page shows earnings source breakdown', function () {
     $response->assertSee('25.00');
     $response->assertSee('7.50');
 });
+
+test('wallet page explains why mining daily share amounts were credited', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'shareholder',
+    ]);
+
+    $miner = \App\Models\Miner::where('slug', 'alpha-one')->firstOrFail();
+    $package = $miner->packages()->where('slug', 'scale-1000')->firstOrFail();
+
+    $investment = UserInvestment::create([
+        'user_id' => $user->id,
+        'miner_id' => $miner->id,
+        'package_id' => $package->id,
+        'shareholder_id' => null,
+        'amount' => 1000,
+        'shares_owned' => 10,
+        'monthly_return_rate' => $package->monthly_return_rate,
+        'level_bonus_rate' => 0,
+        'team_bonus_rate' => 0,
+        'status' => 'active',
+        'subscribed_at' => now(),
+    ]);
+
+    Earning::create([
+        'user_id' => $user->id,
+        'investment_id' => $investment->id,
+        'earned_on' => now()->toDateString(),
+        'amount' => 1.25,
+        'source' => 'mining_daily_share',
+        'status' => 'pending',
+        'notes' => 'Locked daily miner distribution from Alpha One.',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.wallet'));
+
+    $response->assertOk();
+    $response->assertSee('Why this amount: credited $1.25');
+    $response->assertSee('against a daily cap of');
+    $response->assertSee('Still locked until the first 30-day cycle finishes.');
+});
+
 test('wallet page can filter earnings history by source', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),

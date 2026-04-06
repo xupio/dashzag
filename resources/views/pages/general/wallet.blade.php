@@ -2,6 +2,7 @@
   $payoutMethods = $payoutMethods ?? [];
   $defaultPayoutMethod = $defaultPayoutMethod ?? null;
   $defaultPayoutDestination = $defaultPayoutMethod ? $user->payoutDestinationFor($defaultPayoutMethod['key']) : null;
+  $dailyCapByInvestmentId = $dailyCapByInvestmentId ?? collect();
 @endphp
 
 @extends('layout.master')
@@ -247,6 +248,18 @@
               </thead>
               <tbody>
                 @foreach ($earnings as $earning)
+                  @php
+                    $whyAmountText = null;
+                    if ($earning->source === 'mining_daily_share') {
+                      $dailyCap = (float) ($dailyCapByInvestmentId[$earning->investment_id] ?? 0);
+                      $statusReason = in_array($earning->status, ['pending', 'payout_pending'], true)
+                        ? 'Still locked until the first 30-day cycle finishes.'
+                        : 'Already unlocked for the wallet.';
+                      $whyAmountText = 'Why this amount: credited $'.number_format((float) $earning->amount, 2)
+                        .($dailyCap > 0 ? ' against a daily cap of $'.number_format($dailyCap, 2).'. ' : '. ')
+                        .$statusReason;
+                    }
+                  @endphp
                   <tr>
                     <td>{{ $earning->earned_on?->format('M d, Y') }}</td>
                     <td>{{ str($earning->source)->replace('_', ' ')->title() }}</td>
@@ -257,7 +270,12 @@
                       </span>
                     </td>
                     <td>${{ number_format((float) $earning->amount, 2) }}</td>
-                    <td>{{ $earning->notes ?: '—' }}</td>
+                    <td>
+                      <div>{{ $earning->notes ?: '—' }}</div>
+                      @if ($whyAmountText)
+                        <div class="text-secondary small mt-1">{{ $whyAmountText }}</div>
+                      @endif
+                    </td>
                   </tr>
                 @endforeach
               </tbody>

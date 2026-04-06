@@ -1381,6 +1381,11 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 ];
             })
             ->values();
+        $dailyCapByInvestmentId = $activeInvestments
+            ->where('amount', '>', 0)
+            ->mapWithKeys(fn ($investment) => [
+                $investment->id => MiningPlatform::investmentBaseDailyShareCap($investment),
+            ]);
 
         $walletSourceBreakdown = [
             'miner_daily_share' => [
@@ -1424,6 +1429,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             'expectedMonthlyEarnings' => $expectedMonthlyEarnings,
             'miningProfitCaps' => $miningProfitCaps,
             'packageWalletBreakdown' => $packageWalletBreakdown,
+            'dailyCapByInvestmentId' => $dailyCapByInvestmentId,
             'payoutMethods' => MiningPlatform::activePayoutMethods(),
             'defaultPayoutMethod' => collect(MiningPlatform::activePayoutMethods())->first(),
         ]);
@@ -5136,7 +5142,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
 
 
 
