@@ -4296,6 +4296,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'electricity_cost_usd' => ['nullable', 'numeric', 'min:0'],
                 'maintenance_cost_usd' => ['nullable', 'numeric', 'min:0'],
                 'hashrate_th' => ['required', 'numeric', 'min:0'],
+                'btc_price_usd' => ['nullable', 'numeric', 'min:0'],
                 'uptime_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
                 'notes' => ['nullable', 'string'],
             ]);
@@ -4316,13 +4317,14 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
 
             return response()->streamDownload(function () use ($miner) {
                 $handle = fopen('php://output', 'w');
-                fputcsv($handle, ['logged_on', 'revenue_usd', 'electricity_cost_usd', 'maintenance_cost_usd', 'hashrate_th', 'uptime_percentage', 'notes']);
+                fputcsv($handle, ['logged_on', 'revenue_usd', 'electricity_cost_usd', 'maintenance_cost_usd', 'hashrate_th', 'btc_price_usd', 'uptime_percentage', 'notes']);
                 fputcsv($handle, [
                     now()->toDateString(),
                     number_format((float) $miner->daily_output_usd, 2, '.', ''),
                     number_format((float) ((float) $miner->daily_output_usd * 0.18), 2, '.', ''),
                     number_format((float) ((float) $miner->daily_output_usd * 0.06), 2, '.', ''),
                     '500.00',
+                    '85000.00',
                     '99.50',
                     'Example imported performance row',
                 ]);
@@ -4390,6 +4392,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                     'electricity_cost_usd' => isset($mappedRow['electricity_cost_usd']) && $mappedRow['electricity_cost_usd'] !== '' ? (float) $mappedRow['electricity_cost_usd'] : null,
                     'maintenance_cost_usd' => isset($mappedRow['maintenance_cost_usd']) && $mappedRow['maintenance_cost_usd'] !== '' ? (float) $mappedRow['maintenance_cost_usd'] : null,
                     'hashrate_th' => (float) ($mappedRow['hashrate_th'] ?? 0),
+                    'btc_price_usd' => isset($mappedRow['btc_price_usd']) && $mappedRow['btc_price_usd'] !== '' ? (float) $mappedRow['btc_price_usd'] : null,
                     'uptime_percentage' => (float) ($mappedRow['uptime_percentage'] ?? 0),
                     'notes' => $mappedRow['notes'] ?? 'Imported from CSV upload.',
                 ], 'manual');
@@ -4442,6 +4445,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'electricity_cost_usd' => (float) $sourceLog->electricity_cost_usd,
                 'maintenance_cost_usd' => (float) $sourceLog->maintenance_cost_usd,
                 'hashrate_th' => (float) $sourceLog->hashrate_th,
+                'btc_price_usd' => (float) $sourceLog->btc_price_usd,
                 'uptime_percentage' => (float) $sourceLog->uptime_percentage,
                 'notes' => trim(($sourceLog->notes ? $sourceLog->notes.' ' : '').'Copied forward from '.$sourceLog->logged_on?->format('Y-m-d').'.'),
             ], 'manual');
@@ -5132,7 +5136,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
 
 
 

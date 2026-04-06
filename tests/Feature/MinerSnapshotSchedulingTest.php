@@ -54,6 +54,7 @@ test('daily miner snapshot command generates logs and earnings without duplicate
     expect($log)->not->toBeNull();
     expect($log->source)->toBe('automatic');
     expect((float) $log->net_profit_usd)->toBeGreaterThan(0);
+    expect((float) $log->btc_price_usd)->toBeGreaterThan(0);
     expect($earning)->toHaveCount(1);
     $expectedAmount = round(min(
         round((float) $log->revenue_per_share_usd, 2),

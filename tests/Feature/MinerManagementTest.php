@@ -52,6 +52,7 @@ test('admin can update a secondary miner performance log with financial fields',
         'electricity_cost_usd' => 250.25,
         'maintenance_cost_usd' => 80.10,
         'hashrate_th' => 512.45,
+        'btc_price_usd' => 87450.25,
         'uptime_percentage' => 99.10,
         'notes' => 'Strong mining day.',
     ]);
@@ -66,6 +67,7 @@ test('admin can update a secondary miner performance log with financial fields',
     expect((float) $log->electricity_cost_usd)->toBe(250.25);
     expect((float) $log->maintenance_cost_usd)->toBe(80.10);
     expect((float) $log->net_profit_usd)->toBe(round(1999.99 - 250.25 - 80.10, 2));
+    expect((float) $log->btc_price_usd)->toBe(87450.25);
     expect($log->source)->toBe('manual');
     expect($log->notes)->toBe('Strong mining day.');
 });
@@ -157,6 +159,7 @@ test('daily share amounts visibly change across stronger and weaker miner days w
         'electricity_cost_usd' => 260,
         'maintenance_cost_usd' => 80,
         'hashrate_th' => 440,
+        'btc_price_usd' => 81200,
         'uptime_percentage' => 95.8,
     ], 'manual');
 
@@ -166,6 +169,7 @@ test('daily share amounts visibly change across stronger and weaker miner days w
         'electricity_cost_usd' => 245,
         'maintenance_cost_usd' => 72,
         'hashrate_th' => 488,
+        'btc_price_usd' => 90500,
         'uptime_percentage' => 98.7,
     ], 'manual');
 
@@ -195,9 +199,9 @@ test('admin can import miner performance logs from csv', function () {
     ]);
 
     $csv = implode("\n", [
-        'logged_on,revenue_usd,electricity_cost_usd,maintenance_cost_usd,hashrate_th,uptime_percentage,notes',
-        '2026-03-10,1550.75,220.10,70.25,498.40,98.50,Imported row one',
-        '2026-03-11,1625.25,230.00,72.50,503.10,99.10,Imported row two',
+        'logged_on,revenue_usd,electricity_cost_usd,maintenance_cost_usd,hashrate_th,btc_price_usd,uptime_percentage,notes',
+        '2026-03-10,1550.75,220.10,70.25,498.40,86250.00,98.50,Imported row one',
+        '2026-03-11,1625.25,230.00,72.50,503.10,87125.00,99.10,Imported row two',
     ]);
 
     $response = $this->actingAs($user)->post(route('dashboard.miner.logs.import'), [
@@ -211,6 +215,7 @@ test('admin can import miner performance logs from csv', function () {
 
     expect((float) $miner->performanceLogs()->whereDate('logged_on', '2026-03-10')->firstOrFail()->revenue_usd)->toBe(1550.75);
     expect((float) $miner->performanceLogs()->whereDate('logged_on', '2026-03-11')->firstOrFail()->net_profit_usd)->toBe(round(1625.25 - 230.00 - 72.50, 2));
+    expect((float) $miner->performanceLogs()->whereDate('logged_on', '2026-03-11')->firstOrFail()->btc_price_usd)->toBe(87125.00);
 });
 
 test('admin can download miner performance csv template', function () {
@@ -222,7 +227,7 @@ test('admin can download miner performance csv template', function () {
 
     $response->assertOk();
     $response->assertHeader('content-type', 'text/csv; charset=UTF-8');
-    expect($response->streamedContent())->toContain('logged_on,revenue_usd,electricity_cost_usd,maintenance_cost_usd,hashrate_th,uptime_percentage,notes');
+    expect($response->streamedContent())->toContain('logged_on,revenue_usd,electricity_cost_usd,maintenance_cost_usd,hashrate_th,btc_price_usd,uptime_percentage,notes');
 });
 
 test('admin can copy previous miner performance log forward', function () {
@@ -238,6 +243,7 @@ test('admin can copy previous miner performance log forward', function () {
         'electricity_cost_usd' => 220.20,
         'maintenance_cost_usd' => 60.30,
         'hashrate_th' => 490.10,
+        'btc_price_usd' => 88310.55,
         'uptime_percentage' => 98.25,
         'notes' => 'Original source row.',
     ], 'manual');
@@ -256,6 +262,7 @@ test('admin can copy previous miner performance log forward', function () {
 
     expect((float) $copiedLog->revenue_usd)->toBe(1400.50);
     expect((float) $copiedLog->hashrate_th)->toBe(490.10);
+    expect((float) $copiedLog->btc_price_usd)->toBe(88310.55);
     expect($copiedLog->notes)->toContain('Copied forward from 2026-03-19.');
 });
 

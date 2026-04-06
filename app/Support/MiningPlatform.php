@@ -2246,7 +2246,10 @@ class MiningPlatform
         $uptime = round(min(99.95, max(90, 95 + (($seed % 420) / 100))), 2);
         $hashrateBase = max(((float) $miner->total_shares * 0.48), 1);
         $hashrateMultiplier = 0.92 + (((($seed >> 4)) % 18) / 100);
-        $marketMultiplier = 0.94 + (((($seed >> 9)) % 15) / 100);
+        $btcPriceBase = self::defaultBtcReferencePrice();
+        $btcPriceMultiplier = 0.93 + (((($seed >> 9)) % 17) / 100);
+        $btcPrice = round($btcPriceBase * $btcPriceMultiplier, 2);
+        $marketMultiplier = round(0.92 + ((($btcPrice / $btcPriceBase) - 1) * 1.45), 4);
         $dailyOutput = max((float) $miner->daily_output_usd, 0);
         $revenue = round($dailyOutput * ($uptime / 100) * $marketMultiplier, 2);
         $electricityRate = 0.16 + (((($seed >> 13)) % 5) / 100);
@@ -2264,12 +2267,13 @@ class MiningPlatform
             'maintenance_cost_usd' => $maintenanceCost,
             'net_profit_usd' => $netProfit,
             'hashrate_th' => round($hashrateBase * $hashrateMultiplier, 2),
+            'btc_price_usd' => $btcPrice,
             'uptime_percentage' => $uptime,
             'active_shares' => $activeShares,
             'revenue_per_share_usd' => $revenuePerShare,
             'source' => 'automatic',
             'auto_generated_at' => now(),
-            'notes' => 'Automatic daily miner snapshot generated from baseline output, uptime, and operating cost formulas.',
+            'notes' => 'Automatic daily miner snapshot generated from baseline output, BTC market price, uptime, and operating cost formulas.',
         ];
     }
 
@@ -2281,6 +2285,7 @@ class MiningPlatform
         $maintenanceCost = round((float) ($attributes['maintenance_cost_usd'] ?? ($revenue * 0.06)), 2);
         $netProfit = round(max((float) ($attributes['net_profit_usd'] ?? ($revenue - $electricityCost - $maintenanceCost)), 0), 2);
         $activeShares = max((int) ($attributes['active_shares'] ?? self::totalSharesSold($miner)), 0);
+        $btcPrice = round((float) ($attributes['btc_price_usd'] ?? self::defaultBtcReferencePrice()), 2);
         $revenuePerShare = $activeShares > 0
             ? round((float) ($attributes['revenue_per_share_usd'] ?? ($netProfit / $activeShares)), 4)
             : 0;
@@ -2299,6 +2304,7 @@ class MiningPlatform
             'maintenance_cost_usd' => $maintenanceCost,
             'net_profit_usd' => $netProfit,
             'hashrate_th' => round((float) ($attributes['hashrate_th'] ?? 0), 2),
+            'btc_price_usd' => $btcPrice,
             'uptime_percentage' => round((float) ($attributes['uptime_percentage'] ?? 0), 2),
             'active_shares' => $activeShares,
             'revenue_per_share_usd' => $revenuePerShare,
@@ -2355,8 +2361,8 @@ class MiningPlatform
                     'amount' => $amount,
                     'status' => $isUnlocked ? 'available' : 'pending',
                     'notes' => $isUnlocked
-                        ? 'Daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share, performance-adjusted by the miner\'s daily hashrate and revenue strength within the package base monthly return path.'
-                        : 'Locked daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share, performance-adjusted by the miner\'s daily hashrate and revenue strength within the package base monthly return path. It unlocks after the first 30-day cycle.',
+                        ? 'Daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share, performance-adjusted by the miner\'s daily hashrate, BTC price, and revenue strength within the package base monthly return path.'
+                        : 'Locked daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' at $'.number_format((float) $log->revenue_per_share_usd, 4).' per share, performance-adjusted by the miner\'s daily hashrate, BTC price, and revenue strength within the package base monthly return path. It unlocks after the first 30-day cycle.',
                 ]);
 
                 $earning->save();
@@ -2372,19 +2378,21 @@ class MiningPlatform
             ->whereDate('logged_on', '<=', $log->logged_on->toDateString())
             ->orderByDesc('logged_on')
             ->limit(30)
-            ->get(['hashrate_th', 'revenue_per_share_usd']);
+            ->get(['hashrate_th', 'revenue_per_share_usd', 'btc_price_usd']);
 
-        $peakHashrate = max((float) $log->hashrate_th, (float) $baselineLogs->max('hashrate_th'));
-        $peakRevenuePerShare = max((float) $log->revenue_per_share_usd, (float) $baselineLogs->max('revenue_per_share_usd'));
+        $averageHashrate = max((float) $baselineLogs->avg('hashrate_th'), (float) $log->hashrate_th, 1);
+        $averageRevenuePerShare = max((float) $baselineLogs->avg('revenue_per_share_usd'), (float) $log->revenue_per_share_usd, 0.0001);
+        $averageBtcPrice = max((float) $baselineLogs->avg('btc_price_usd'), (float) $log->btc_price_usd, self::defaultBtcReferencePrice());
 
-        if ($peakHashrate <= 0 || $peakRevenuePerShare <= 0) {
+        if ($averageHashrate <= 0 || $averageRevenuePerShare <= 0 || $averageBtcPrice <= 0) {
             return 1.0;
         }
 
-        $hashrateRatio = min(max((float) $log->hashrate_th / $peakHashrate, 0), 1);
-        $revenueRatio = min(max((float) $log->revenue_per_share_usd / $peakRevenuePerShare, 0), 1);
+        $hashrateRatio = min(max((float) $log->hashrate_th / $averageHashrate, 0.82), 1.08);
+        $revenueRatio = min(max((float) $log->revenue_per_share_usd / $averageRevenuePerShare, 0.78), 1.12);
+        $btcRatio = min(max((float) $log->btc_price_usd / $averageBtcPrice, 0.88), 1.10);
 
-        return round(max((float) (($hashrateRatio + $revenueRatio) / 2), 0.65), 4);
+        return round(min(max((float) (($revenueRatio * 0.5) + ($hashrateRatio * 0.3) + ($btcRatio * 0.2)), 0.72), 1.0), 4);
     }
 
     public static function investmentBaseDailyShareCap(UserInvestment $investment): float
@@ -3052,6 +3060,7 @@ class MiningPlatform
             $electricityCost = round($revenue * 0.18, 2);
             $maintenanceCost = round($revenue * 0.06, 2);
             $netProfit = round(max($revenue - $electricityCost - $maintenanceCost, 0), 2);
+            $btcPrice = round(self::defaultBtcReferencePrice() * (0.95 + ($offset * 0.015)), 2);
             $activeShares = max(self::totalSharesSold($miner), 0);
             $revenuePerShare = $activeShares > 0 ? round($netProfit / $activeShares, 4) : 0;
 
@@ -3063,17 +3072,23 @@ class MiningPlatform
                     'maintenance_cost_usd' => $maintenanceCost,
                     'net_profit_usd' => $netProfit,
                     'hashrate_th' => round($hashrateBase + ($offset * $hashrateStep), 2),
+                    'btc_price_usd' => $btcPrice,
                     'uptime_percentage' => round($uptimeBase + ($offset * $uptimeStep), 2),
                     'active_shares' => $activeShares,
                     'revenue_per_share_usd' => $revenuePerShare,
                     'source' => 'seeded',
                     'auto_generated_at' => now(),
-                    'notes' => 'Auto-generated baseline log for dashboard visibility.',
+                    'notes' => 'Auto-generated baseline log for dashboard visibility with BTC market movement.',
                     'updated_at' => now(),
                     'created_at' => now(),
                 ],
             );
         }
+    }
+
+    protected static function defaultBtcReferencePrice(): float
+    {
+        return 85000.0;
     }
 
     protected static function mapReferralTreeNodes(Collection $usersBySponsor, string|int $parentKey, int $depth, int $maxDepth): Collection

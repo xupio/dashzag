@@ -112,14 +112,18 @@
             <div class="small text-secondary">Projected revenue</div>
             <div class="fw-semibold">${{ number_format((float) ($automaticSnapshot['revenue_usd'] ?? 0), 2) }}</div>
           </div>
-          <div class="col-6">
-            <div class="small text-secondary">Hashrate</div>
-            <div class="fw-semibold">{{ number_format((float) ($automaticSnapshot['hashrate_th'] ?? 0), 2) }} TH/s</div>
-          </div>
-          <div class="col-6">
-            <div class="small text-secondary">Uptime</div>
-            <div class="fw-semibold">{{ number_format((float) ($automaticSnapshot['uptime_percentage'] ?? 0), 2) }}%</div>
-          </div>
+            <div class="col-6">
+              <div class="small text-secondary">Hashrate</div>
+              <div class="fw-semibold">{{ number_format((float) ($automaticSnapshot['hashrate_th'] ?? 0), 2) }} TH/s</div>
+            </div>
+            <div class="col-6">
+              <div class="small text-secondary">BTC price</div>
+              <div class="fw-semibold">${{ number_format((float) ($automaticSnapshot['btc_price_usd'] ?? 0), 2) }}</div>
+            </div>
+            <div class="col-6">
+              <div class="small text-secondary">Uptime</div>
+              <div class="fw-semibold">{{ number_format((float) ($automaticSnapshot['uptime_percentage'] ?? 0), 2) }}%</div>
+            </div>
           <div class="col-6">
             <div class="small text-secondary">Active shares</div>
             <div class="fw-semibold">{{ number_format((int) ($automaticSnapshot['active_shares'] ?? 0)) }}</div>
@@ -355,18 +359,25 @@
                 @error('maintenance_cost_usd')<div class="invalid-feedback">{{ $message }}</div>@enderror
               </div>
             </div>
-            <div class="row g-3 mt-0">
-              <div class="col-md-6">
-                <label class="form-label">Hashrate (TH/s)</label>
-                <input type="number" step="0.01" min="0" name="hashrate_th" class="form-control @error('hashrate_th') is-invalid @enderror" value="{{ old('hashrate_th', $automaticSnapshot['hashrate_th'] ?? 500) }}" required>
-                @error('hashrate_th')<div class="invalid-feedback">{{ $message }}</div>@enderror
+              <div class="row g-3 mt-0">
+                <div class="col-md-6">
+                  <label class="form-label">Hashrate (TH/s)</label>
+                  <input type="number" step="0.01" min="0" name="hashrate_th" class="form-control @error('hashrate_th') is-invalid @enderror" value="{{ old('hashrate_th', $automaticSnapshot['hashrate_th'] ?? 500) }}" required>
+                  @error('hashrate_th')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">BTC price (USD)</label>
+                  <input type="number" step="0.01" min="0" name="btc_price_usd" class="form-control @error('btc_price_usd') is-invalid @enderror" value="{{ old('btc_price_usd', $automaticSnapshot['btc_price_usd'] ?? 85000) }}">
+                  @error('btc_price_usd')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
               </div>
-              <div class="col-md-6">
-                <label class="form-label">Uptime %</label>
-                <input type="number" step="0.01" min="0" max="100" name="uptime_percentage" class="form-control @error('uptime_percentage') is-invalid @enderror" value="{{ old('uptime_percentage', $automaticSnapshot['uptime_percentage'] ?? 99.50) }}" required>
-                @error('uptime_percentage')<div class="invalid-feedback">{{ $message }}</div>@enderror
+              <div class="row g-3 mt-0">
+                <div class="col-md-6">
+                  <label class="form-label">Uptime %</label>
+                  <input type="number" step="0.01" min="0" max="100" name="uptime_percentage" class="form-control @error('uptime_percentage') is-invalid @enderror" value="{{ old('uptime_percentage', $automaticSnapshot['uptime_percentage'] ?? 99.50) }}" required>
+                  @error('uptime_percentage')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                </div>
               </div>
-            </div>
             <div class="mb-3 mt-3">
               <label class="form-label">Notes</label>
               <textarea name="notes" rows="3" class="form-control @error('notes') is-invalid @enderror">{{ old('notes') }}</textarea>
@@ -406,11 +417,11 @@
             </div>
             <span class="badge bg-info-subtle text-info">Bulk import</span>
           </div>
-          <div class="border rounded p-3 bg-light mb-3">
-            <div class="fw-semibold mb-1">Expected columns</div>
-            <div class="text-secondary small"><code>logged_on</code>, <code>revenue_usd</code>, <code>hashrate_th</code>, <code>uptime_percentage</code></div>
-            <div class="text-secondary small mt-1">Optional: <code>electricity_cost_usd</code>, <code>maintenance_cost_usd</code>, <code>notes</code></div>
-          </div>
+            <div class="border rounded p-3 bg-light mb-3">
+              <div class="fw-semibold mb-1">Expected columns</div>
+              <div class="text-secondary small"><code>logged_on</code>, <code>revenue_usd</code>, <code>hashrate_th</code>, <code>uptime_percentage</code></div>
+              <div class="text-secondary small mt-1">Optional: <code>electricity_cost_usd</code>, <code>maintenance_cost_usd</code>, <code>btc_price_usd</code>, <code>notes</code></div>
+            </div>
           <form method="POST" action="{{ route('dashboard.miner.logs.import') }}" enctype="multipart/form-data">
             @csrf
             <input type="hidden" name="miner_slug" value="{{ $miner->slug }}">
@@ -449,6 +460,7 @@
                 <th>Net profit</th>
                 <th>Per share</th>
                 <th>Hashrate</th>
+                <th>BTC price</th>
                 <th>Uptime</th>
                 <th>Notes</th>
               </tr>
@@ -463,12 +475,13 @@
                     ${{ number_format((float) $log->electricity_cost_usd, 2) }} elec<br>
                     ${{ number_format((float) $log->maintenance_cost_usd, 2) }} maint
                   </td>
-                  <td>${{ number_format((float) $log->net_profit_usd, 2) }}</td>
-                  <td>${{ number_format((float) $log->revenue_per_share_usd, 4) }}</td>
-                  <td>{{ number_format((float) $log->hashrate_th, 2) }} TH/s</td>
-                  <td>{{ number_format((float) $log->uptime_percentage, 2) }}%</td>
-                  <td>{{ $log->notes ?: '—' }}</td>
-                </tr>
+                    <td>${{ number_format((float) $log->net_profit_usd, 2) }}</td>
+                    <td>${{ number_format((float) $log->revenue_per_share_usd, 4) }}</td>
+                    <td>{{ number_format((float) $log->hashrate_th, 2) }} TH/s</td>
+                    <td>${{ number_format((float) $log->btc_price_usd, 2) }}</td>
+                    <td>{{ number_format((float) $log->uptime_percentage, 2) }}%</td>
+                    <td>{{ $log->notes ?: '—' }}</td>
+                  </tr>
               @endforeach
             </tbody>
           </table>
