@@ -138,6 +138,7 @@ test('daily share amounts visibly change across stronger and weaker miner days w
 
     $miner = Miner::where('slug', 'alpha-one')->firstOrFail();
     $package = $miner->packages()->where('slug', 'scale-1000')->firstOrFail();
+    $package->update(['monthly_return_rate' => 0.04]);
 
     $investment = UserInvestment::create([
         'user_id' => $investor->id,
@@ -146,12 +147,32 @@ test('daily share amounts visibly change across stronger and weaker miner days w
         'shareholder_id' => null,
         'amount' => 1000,
         'shares_owned' => 10,
-        'monthly_return_rate' => $package->monthly_return_rate,
+        'monthly_return_rate' => 0.04,
         'level_bonus_rate' => 0,
         'team_bonus_rate' => 0,
         'status' => 'active',
         'subscribed_at' => now(),
     ]);
+
+    MiningPlatform::savePerformanceLog($miner, [
+        'logged_on' => '2026-03-26',
+        'revenue_usd' => 1260,
+        'electricity_cost_usd' => 255,
+        'maintenance_cost_usd' => 78,
+        'hashrate_th' => 452,
+        'btc_price_usd' => 83800,
+        'uptime_percentage' => 96.4,
+    ], 'manual');
+
+    MiningPlatform::savePerformanceLog($miner, [
+        'logged_on' => '2026-03-27',
+        'revenue_usd' => 1330,
+        'electricity_cost_usd' => 250,
+        'maintenance_cost_usd' => 76,
+        'hashrate_th' => 468,
+        'btc_price_usd' => 85600,
+        'uptime_percentage' => 97.3,
+    ], 'manual');
 
     $weakerLog = MiningPlatform::savePerformanceLog($miner, [
         'logged_on' => '2026-03-28',
@@ -190,6 +211,7 @@ test('daily share amounts visibly change across stronger and weaker miner days w
     expect($strongerAmount)->toBeGreaterThan($weakerAmount);
     expect($strongerAmount)->toBeLessThanOrEqual($dailyCap);
     expect($weakerAmount)->toBeLessThanOrEqual($dailyCap);
+    expect($weakerAmount)->toBeLessThan($dailyCap);
     expect($weakerLog->revenue_per_share_usd)->not->toBe($strongerLog->revenue_per_share_usd);
 });
 

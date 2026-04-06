@@ -2380,19 +2380,21 @@ class MiningPlatform
             ->limit(30)
             ->get(['hashrate_th', 'revenue_per_share_usd', 'btc_price_usd']);
 
-        $averageHashrate = max((float) $baselineLogs->avg('hashrate_th'), (float) $log->hashrate_th, 1);
-        $averageRevenuePerShare = max((float) $baselineLogs->avg('revenue_per_share_usd'), (float) $log->revenue_per_share_usd, 0.0001);
-        $averageBtcPrice = max((float) $baselineLogs->avg('btc_price_usd'), (float) $log->btc_price_usd, self::defaultBtcReferencePrice());
+        $averageHashrate = max((float) $baselineLogs->avg('hashrate_th'), 1.0);
+        $averageRevenuePerShare = max((float) $baselineLogs->avg('revenue_per_share_usd'), 0.0001);
+        $averageBtcPrice = max((float) $baselineLogs->avg('btc_price_usd'), self::defaultBtcReferencePrice());
 
         if ($averageHashrate <= 0 || $averageRevenuePerShare <= 0 || $averageBtcPrice <= 0) {
             return 1.0;
         }
 
-        $hashrateRatio = min(max((float) $log->hashrate_th / $averageHashrate, 0.82), 1.08);
-        $revenueRatio = min(max((float) $log->revenue_per_share_usd / $averageRevenuePerShare, 0.78), 1.12);
-        $btcRatio = min(max((float) $log->btc_price_usd / $averageBtcPrice, 0.88), 1.10);
+        $hashrateScore = min(max((float) $log->hashrate_th / ($averageHashrate * 1.08), 0.60), 1.00);
+        $revenueScore = min(max((float) $log->revenue_per_share_usd / ($averageRevenuePerShare * 1.12), 0.55), 1.00);
+        $btcScore = min(max((float) $log->btc_price_usd / ($averageBtcPrice * 1.05), 0.70), 1.00);
 
-        return round(min(max((float) (($revenueRatio * 0.5) + ($hashrateRatio * 0.3) + ($btcRatio * 0.2)), 0.72), 1.0), 4);
+        $weightedScore = ($revenueScore * 0.60) + ($hashrateScore * 0.25) + ($btcScore * 0.15);
+
+        return round(min(max($weightedScore, 0.58), 1.00), 4);
     }
 
     public static function investmentBaseDailyShareCap(UserInvestment $investment): float
