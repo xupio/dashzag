@@ -40,6 +40,34 @@ test('admin can update a selected miner details', function () {
     expect((float) $miner->packages()->where('slug', 'growth-500')->firstOrFail()->monthly_return_rate)->toBe(0.1);
 });
 
+test('miner page shows the market signal summary for admins', function () {
+    $user = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $miner = Miner::where('slug', 'alpha-one')->firstOrFail();
+
+    MiningPlatform::savePerformanceLog($miner, [
+        'logged_on' => '2026-04-06',
+        'revenue_usd' => 1547,
+        'electricity_cost_usd' => 278.46,
+        'maintenance_cost_usd' => 92.82,
+        'hashrate_th' => 509,
+        'btc_price_usd' => 88400,
+        'uptime_percentage' => 99.1,
+    ], 'manual');
+
+    $response = $this->actingAs($user)->get(route('dashboard.miner', ['miner' => 'alpha-one']));
+
+    $response->assertOk();
+    $response->assertSee('Market signal summary');
+    $response->assertSee('Daily-share factor');
+    $response->assertSee('Hashrate signal');
+    $response->assertSee('BTC price signal');
+    $response->assertSee('Revenue/share signal');
+    $response->assertSee('Latest performance log');
+});
+
 test('admin can update a secondary miner performance log with financial fields', function () {
     $user = User::factory()->admin()->create([
         'email_verified_at' => now(),

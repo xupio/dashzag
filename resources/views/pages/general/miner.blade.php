@@ -182,6 +182,54 @@
 </div>
 @endif
 
+@if ($marketSignalSummary)
+<div class="row mb-4">
+  <div class="col-12 stretch-card">
+    <div class="card border-info">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
+            <h5 class="mb-1">Market signal summary</h5>
+            <p class="text-secondary mb-0">Quick view of the inputs that shape the daily mining-share factor for investors.</p>
+          </div>
+          <span class="badge bg-info-subtle text-info">{{ $marketSignalSummary['source_label'] }}</span>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-3">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">Daily-share factor</div>
+              <div class="fw-semibold fs-4">{{ number_format($marketSignalSummary['daily_share_factor'], 1) }}%</div>
+              <div class="small text-secondary">Applied before the package daily cap.</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">Hashrate signal</div>
+              <div class="fw-semibold">{{ number_format($marketSignalSummary['hashrate_now'], 2) }} TH/s</div>
+              <div class="small text-secondary">{{ number_format($marketSignalSummary['hashrate_vs_average'], 1) }}% of the recent 30-day average.</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">BTC price signal</div>
+              <div class="fw-semibold">${{ number_format($marketSignalSummary['btc_price_now'], 2) }}</div>
+              <div class="small text-secondary">{{ number_format($marketSignalSummary['btc_price_vs_average'], 1) }}% of the recent 30-day average.</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">Revenue/share signal</div>
+              <div class="fw-semibold">${{ number_format($marketSignalSummary['revenue_per_share_now'], 4) }}</div>
+              <div class="small text-secondary">{{ number_format($marketSignalSummary['revenue_per_share_vs_average'], 1) }}% of the recent 30-day average.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+@endif
+
 <div class="row">
   <div class="col-xl-7 grid-margin stretch-card">
     <div class="card">
