@@ -2402,10 +2402,13 @@ class MiningPlatform
 
         $normalizedFactor = min(max(($performanceFactor - 0.58) / 0.42, 0.0), 1.0);
         $minimumSpreadFactor = $packageDailyCap <= 0.75
-            ? 0.84
-            : ($packageDailyCap <= 1.50 ? 0.88 : 0.90);
+            ? 0.78
+            : ($packageDailyCap <= 1.50 ? 0.84 : 0.88);
+        $spreadCurve = $packageDailyCap <= 0.75
+            ? 1.8
+            : ($packageDailyCap <= 1.50 ? 1.35 : 1.15);
 
-        $spreadFactor = $minimumSpreadFactor + ($normalizedFactor * (1 - $minimumSpreadFactor));
+        $spreadFactor = $minimumSpreadFactor + (pow($normalizedFactor, $spreadCurve) * (1 - $minimumSpreadFactor));
         $effectiveCap = $packageDailyCap * $spreadFactor;
 
         return round(min($rawAmount, $effectiveCap), 2);
