@@ -15,6 +15,25 @@
             color: #ffffff;
         }
 
+        .legacy-how-step-icon {
+            width: 58px;
+            height: 58px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 138, 0, 0.12);
+            color: #ff8a00;
+            font-size: 22px;
+            margin-bottom: 18px;
+            box-shadow: 0 10px 24px rgba(255, 138, 0, 0.12);
+            border: 1px solid rgba(255, 138, 0, 0.18);
+        }
+
+        .legacy-how-step-icon i {
+            line-height: 1;
+        }
+
         @media (max-width: 991px) {
             .legacy-how-it-works-visual {
                 margin-top: 10px;
@@ -101,6 +120,7 @@
                 <div class="col-lg-6 col-md-6">
                     <div class="legacy-step-card">
                         <div class="legacy-step-number">1</div>
+                        <div class="legacy-how-step-icon"><i class="fas fa-user-plus"></i></div>
                         <h3>Create your account</h3>
                         <p>Sign up with your basic details. Registration stays simple so you can enter the platform quickly.</p>
                     </div>
@@ -108,6 +128,7 @@
                 <div class="col-lg-6 col-md-6">
                     <div class="legacy-step-card">
                         <div class="legacy-step-number">2</div>
+                        <div class="legacy-how-step-icon"><i class="fas fa-envelope-open"></i></div>
                         <h3>Verify your email</h3>
                         <p>Email verification protects your account and unlocks access to the main dashboard features.</p>
                     </div>
@@ -115,6 +136,7 @@
                 <div class="col-lg-6 col-md-6">
                     <div class="legacy-step-card">
                         <div class="legacy-step-number">3</div>
+                        <div class="legacy-how-step-icon"><i class="fas fa-money-bill-alt"></i></div>
                         <h3>Buy an investment package</h3>
                         <p>Your package creates your active position inside the platform. Different packages have different daily and monthly cap paths.</p>
                     </div>
@@ -122,6 +144,7 @@
                 <div class="col-lg-6 col-md-6">
                     <div class="legacy-step-card">
                         <div class="legacy-step-number">4</div>
+                        <div class="legacy-how-step-icon"><i class="fas fa-chart-line"></i></div>
                         <h3>See daily mining share</h3>
                         <p>Mining Daily Share appears in your wallet based on miner performance, BTC price movement, and your package cap rules.</p>
                     </div>
@@ -129,6 +152,7 @@
                 <div class="col-lg-6 col-md-6">
                     <div class="legacy-step-card">
                         <div class="legacy-step-number">5</div>
+                        <div class="legacy-how-step-icon"><i class="fas fa-lock"></i></div>
                         <h3>Wait through the first lock period</h3>
                         <p>New mining-share earnings stay locked during the first 30-day cycle. This helps the wallet show what is pending and what is available.</p>
                     </div>
@@ -136,6 +160,7 @@
                 <div class="col-lg-6 col-md-6">
                     <div class="legacy-step-card">
                         <div class="legacy-step-number">6</div>
+                        <div class="legacy-how-step-icon"><i class="fas fa-users"></i></div>
                         <h3>Grow with referrals and team bonuses</h3>
                         <p>If you invite others, you can also earn referral and team rewards in addition to your package activity.</p>
                     </div>
@@ -143,6 +168,7 @@
                 <div class="col-lg-6 col-md-6">
                     <div class="legacy-step-card">
                         <div class="legacy-step-number">7</div>
+                        <div class="legacy-how-step-icon"><i class="fas fa-id-card"></i></div>
                         <h3>Complete KYC before first withdrawal</h3>
                         <p>KYC is not required during registration, but it becomes required before your first payout request can be approved.</p>
                     </div>
@@ -150,6 +176,7 @@
                 <div class="col-lg-6 col-md-6">
                     <div class="legacy-step-card">
                         <div class="legacy-step-number">8</div>
+                        <div class="legacy-how-step-icon"><i class="fas fa-credit-card"></i></div>
                         <h3>Request payout from the wallet</h3>
                         <p>Once your earnings are available and your KYC is approved, you can submit a withdrawal request from the wallet page.</p>
                     </div>
@@ -269,6 +296,18 @@
                     <div class="legacy-highlight-item h-100">
                         <h4>Where can I see my earnings clearly?</h4>
                         <p>The wallet page shows available, locked, paid, and projected amounts, along with detailed earnings history and payout requests.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row justify-content-center mt-5">
+                <div class="col-xl-8 col-lg-10">
+                    <div class="legacy-explain-card text-center">
+                        <h3 class="mb-3">Ready to start your journey?</h3>
+                        <p class="mb-4">Create your account, explore the packages, and begin following your dashboard, wallet, and growth path inside ZagChain.</p>
+                        <div class="d-flex flex-wrap justify-content-center gap-3">
+                            <a href="{{ route('register') }}" class="submit-btn">Create account</a>
+                        </div>
                     </div>
                 </div>
             </div>
