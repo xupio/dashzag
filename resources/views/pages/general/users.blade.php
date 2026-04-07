@@ -107,12 +107,13 @@
           </div>
           <div class="col-md-2">
             <label class="form-label">Audit filter</label>
-            <select name="audit_filter" class="form-select">
-              <option value="all" @selected($selectedAuditFilter === 'all')>All users</option>
-              <option value="locked_balance" @selected($selectedAuditFilter === 'locked_balance')>Locked balance</option>
-              <option value="unlocking_soon" @selected($selectedAuditFilter === 'unlocking_soon')>Unlocking soon</option>
-            </select>
-          </div>
+              <select name="audit_filter" class="form-select">
+                <option value="all" @selected($selectedAuditFilter === 'all')>All users</option>
+                <option value="locked_balance" @selected($selectedAuditFilter === 'locked_balance')>Locked balance</option>
+                <option value="unlocking_soon" @selected($selectedAuditFilter === 'unlocking_soon')>Unlocking soon</option>
+                <option value="needs_attention" @selected($selectedAuditFilter === 'needs_attention')>Needs attention</option>
+              </select>
+            </div>
           <div class="col-md-2">
             <label class="form-label">KYC</label>
             <select name="kyc_status" class="form-select">

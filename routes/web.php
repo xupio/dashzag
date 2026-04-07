@@ -2672,7 +2672,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
         $auditFilter = (string) $request->query('audit_filter', 'all');
         $kycStatus = (string) $request->query('kyc_status', 'all');
         $allowedRewardCaps = ['all', 'basic', 'growth', 'scale'];
-        $allowedAuditFilters = ['all', 'locked_balance', 'unlocking_soon'];
+        $allowedAuditFilters = ['all', 'locked_balance', 'unlocking_soon', 'needs_attention'];
         $allowedKycStatuses = ['all', 'not_submitted', 'pending', 'approved', 'rejected'];
 
             if (! in_array($rewardCap, $allowedRewardCaps, true)) {
@@ -2816,6 +2816,8 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                     return match ($auditFilter) {
                         'locked_balance' => (float) ($audit['locked_amount'] ?? 0) > 0,
                         'unlocking_soon' => ($audit['days_to_unlock'] ?? null) !== null && (int) $audit['days_to_unlock'] <= 7,
+                        'needs_attention' => (float) ($audit['locked_amount'] ?? 0) > 0
+                            || in_array($user->kyc_status, ['not_submitted', 'pending', 'rejected'], true),
                         default => true,
                     };
                 })
@@ -5171,8 +5173,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
-
 
 
 

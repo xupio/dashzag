@@ -375,6 +375,8 @@ test('admin can filter users with locked balances and upcoming unlocks', functio
         'email' => 'mature-user@example.com',
         'email_verified_at' => now(),
         'account_type' => 'shareholder',
+        'kyc_status' => 'approved',
+        'kyc_reviewed_at' => now()->subDay(),
     ]);
 
     UserInvestment::query()->create([
@@ -405,6 +407,14 @@ test('admin can filter users with locked balances and upcoming unlocks', functio
     $unlockingSoonResponse->assertOk();
     $unlockingSoonResponse->assertSee('Locked User');
     $unlockingSoonResponse->assertDontSee('Mature User');
+
+    $needsAttentionResponse = $this->actingAs($admin)->get(route('dashboard.users', [
+        'audit_filter' => 'needs_attention',
+    ]));
+
+    $needsAttentionResponse->assertOk();
+    $needsAttentionResponse->assertSee('Locked User');
+    $needsAttentionResponse->assertDontSee('Mature User');
 });
 
 test('admin users export includes audit columns and respects audit filters', function () {
