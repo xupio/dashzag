@@ -120,7 +120,7 @@ Route::get('/about', function () use ($marketingPageData) {
 })->name('marketing.about');
 
 Route::get('/how-it-works', function () use ($marketingPageData) {
-    return view('marketing.about', $marketingPageData());
+    return view('marketing.how-it-works', $marketingPageData());
 })->name('marketing.how-it-works');
 
 Route::redirect('/packages', '/');
@@ -5173,7 +5173,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
 
 
 
