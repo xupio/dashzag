@@ -2796,9 +2796,11 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                     'first_paid_subscription_at' => $firstPaidInvestment?->subscribed_at,
                     'next_unlock_date' => $nextUnlock['unlock_date'] ?? null,
                     'days_to_unlock' => $nextUnlock['days_remaining'] ?? null,
+                    'projected_amount' => round((float) $user->earnings->where('source', 'projected_return')->sum('amount'), 2),
                     'available_amount' => round((float) $user->earnings->where('status', 'available')->where('source', '!=', 'projected_return')->sum('amount'), 2),
                     'locked_amount' => round((float) $user->earnings->whereIn('status', ['pending', 'payout_pending'])->where('source', '!=', 'projected_return')->sum('amount'), 2),
                     'paid_amount' => round((float) $user->earnings->where('status', 'paid')->sum('amount'), 2),
+                    'kyc_status_label' => $user->kycStatusLabel(),
                     'last_paid_payout_at' => $lastPaidPayout?->processed_at,
                     'last_paid_payout_amount' => $lastPaidPayout ? (float) $lastPaidPayout->amount : null,
                 ]];
@@ -4228,6 +4230,32 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             $sharesSold = MiningPlatform::totalSharesSold($miner);
             $automaticSnapshot = MiningPlatform::performanceSnapshotForDate($miner);
             $latestLog = $miner->performanceLogs->first();
+            $signalReferenceLog = $latestLog;
+            $marketSignalSummary = null;
+
+            if ($signalReferenceLog) {
+                $signalBaselineLogs = \App\Models\MinerPerformanceLog::query()
+                    ->where('miner_id', $miner->id)
+                    ->whereDate('logged_on', '<=', $signalReferenceLog->logged_on?->toDateString() ?? now()->toDateString())
+                    ->orderByDesc('logged_on')
+                    ->limit(30)
+                    ->get(['hashrate_th', 'btc_price_usd', 'revenue_per_share_usd']);
+
+                $averageHashrate = max((float) $signalBaselineLogs->avg('hashrate_th'), 1);
+                $averageBtcPrice = max((float) $signalBaselineLogs->avg('btc_price_usd'), 1);
+                $averageRevenuePerShare = max((float) $signalBaselineLogs->avg('revenue_per_share_usd'), 0.0001);
+
+                $marketSignalSummary = [
+                    'source_label' => 'Latest performance log',
+                    'daily_share_factor' => round(MiningPlatform::dailySharePerformanceFactorForLog($signalReferenceLog) * 100, 1),
+                    'hashrate_now' => round((float) $signalReferenceLog->hashrate_th, 2),
+                    'hashrate_vs_average' => round(((float) $signalReferenceLog->hashrate_th / $averageHashrate) * 100, 1),
+                    'btc_price_now' => round((float) $signalReferenceLog->btc_price_usd, 2),
+                    'btc_price_vs_average' => round(((float) $signalReferenceLog->btc_price_usd / $averageBtcPrice) * 100, 1),
+                    'revenue_per_share_now' => round((float) $signalReferenceLog->revenue_per_share_usd, 4),
+                    'revenue_per_share_vs_average' => round(((float) $signalReferenceLog->revenue_per_share_usd / $averageRevenuePerShare) * 100, 1),
+                ];
+            }
             $packageDailyCaps = $miner->packages
                 ->map(fn ($package) => [
                     'package_id' => $package->id,
@@ -4248,6 +4276,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'recentLogs' => $miner->performanceLogs,
                 'automaticSnapshot' => $automaticSnapshot,
                 'latestLog' => $latestLog,
+                'marketSignalSummary' => $marketSignalSummary,
                 'packageDailyCaps' => $packageDailyCaps,
             ]);
         })->name('dashboard.miner');
@@ -5142,8 +5171,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
-
 
 
 

@@ -320,8 +320,11 @@ test('admin users page shows investor audit snapshot details', function () {
     $response->assertSee('Subscribed:');
     $response->assertSee('Next unlock:');
     $response->assertSee('Days left:');
+    $response->assertSee('Projected:');
+    $response->assertSee('Available:');
     $response->assertSee('Locked:');
     $response->assertSee('Paid:');
+    $response->assertSee('KYC:');
     $response->assertSee('$12.50');
     $response->assertSee('$8.75');
     $response->assertSee('$45.00');

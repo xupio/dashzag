@@ -193,8 +193,11 @@
                       <div><span class="text-secondary">Subscribed:</span> {{ $audit['first_paid_subscription_at']?->format('M d, Y') ?? '—' }}</div>
                       <div><span class="text-secondary">Next unlock:</span> {{ $audit['next_unlock_date']?->format('M d, Y') ?? 'Unlocked' }}</div>
                       <div><span class="text-secondary">Days left:</span> {{ $audit['days_to_unlock'] ?? 0 }}</div>
+                      <div><span class="text-secondary">Projected:</span> ${{ number_format((float) ($audit['projected_amount'] ?? 0), 2) }}</div>
+                      <div><span class="text-secondary">Available:</span> ${{ number_format((float) ($audit['available_amount'] ?? 0), 2) }}</div>
                       <div><span class="text-secondary">Locked:</span> ${{ number_format((float) ($audit['locked_amount'] ?? 0), 2) }}</div>
                       <div><span class="text-secondary">Paid:</span> ${{ number_format((float) ($audit['paid_amount'] ?? 0), 2) }}</div>
+                      <div><span class="text-secondary">KYC:</span> {{ $audit['kyc_status_label'] ?? 'Not submitted' }}</div>
                       <div><span class="text-secondary">Last payout:</span> {{ $audit['last_paid_payout_at'] ? $audit['last_paid_payout_at']->format('M d, Y') : '—' }}{{ $audit['last_paid_payout_amount'] ? ' / $'.number_format((float) $audit['last_paid_payout_amount'], 2) : '' }}</div>
                     </div>
                   </td>
