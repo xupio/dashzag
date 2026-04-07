@@ -2339,10 +2339,7 @@ class MiningPlatform
             ->map(function (UserInvestment $investment) use ($log, $dailySharePerformanceFactor) {
                 $rawAmount = round((float) $investment->shares_owned * (float) $log->revenue_per_share_usd, 2);
                 $packageDailyCap = self::investmentBaseDailyShareCap($investment);
-                $performanceAdjustedCap = round($packageDailyCap * $dailySharePerformanceFactor, 2);
-                $amount = $packageDailyCap > 0
-                    ? round(min($rawAmount, $performanceAdjustedCap), 2)
-                    : $rawAmount;
+                $amount = self::dailyShareRoundedAmount($packageDailyCap, $dailySharePerformanceFactor, $rawAmount);
                 $isUnlocked = self::investmentHasCompletedInitialCycle($investment, $log->logged_on);
 
                 $earning = Earning::query()
@@ -2395,6 +2392,23 @@ class MiningPlatform
         $weightedScore = ($revenueScore * 0.60) + ($hashrateScore * 0.25) + ($btcScore * 0.15);
 
         return round(min(max($weightedScore, 0.58), 1.00), 4);
+    }
+
+    public static function dailyShareRoundedAmount(float $packageDailyCap, float $performanceFactor, float $rawAmount): float
+    {
+        if ($packageDailyCap <= 0) {
+            return round($rawAmount, 2);
+        }
+
+        $normalizedFactor = min(max(($performanceFactor - 0.58) / 0.42, 0.0), 1.0);
+        $minimumSpreadFactor = $packageDailyCap <= 0.75
+            ? 0.84
+            : ($packageDailyCap <= 1.50 ? 0.88 : 0.90);
+
+        $spreadFactor = $minimumSpreadFactor + ($normalizedFactor * (1 - $minimumSpreadFactor));
+        $effectiveCap = $packageDailyCap * $spreadFactor;
+
+        return round(min($rawAmount, $effectiveCap), 2);
     }
 
     public static function investmentBaseDailyShareCap(UserInvestment $investment): float

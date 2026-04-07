@@ -146,14 +146,11 @@ test('automatic snapshot generates daily per share earnings for active investors
     expect((float) $log->net_profit_usd)->toBeGreaterThan(0);
     expect((float) $log->revenue_per_share_usd)->toBeGreaterThan(0);
     expect($earning)->not->toBeNull();
-    $expectedAmount = round(min(
-        round((float) $log->revenue_per_share_usd * (float) $investment->shares_owned, 2),
-        round(
-            MiningPlatform::investmentBaseDailyShareCap($investment)
-            * MiningPlatform::dailySharePerformanceFactorForLog($log),
-            2
-        )
-    ), 2);
+    $expectedAmount = MiningPlatform::dailyShareRoundedAmount(
+        MiningPlatform::investmentBaseDailyShareCap($investment),
+        MiningPlatform::dailySharePerformanceFactorForLog($log),
+        round((float) $log->revenue_per_share_usd * (float) $investment->shares_owned, 2)
+    );
 
     expect((float) $earning->amount)->toBe($expectedAmount);
 });

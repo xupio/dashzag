@@ -56,14 +56,11 @@ test('daily miner snapshot command generates logs and earnings without duplicate
     expect((float) $log->net_profit_usd)->toBeGreaterThan(0);
     expect((float) $log->btc_price_usd)->toBeGreaterThan(0);
     expect($earning)->toHaveCount(1);
-    $expectedAmount = round(min(
-        round((float) $log->revenue_per_share_usd, 2),
-        round(
-            MiningPlatform::investmentBaseDailyShareCap($investment)
-            * MiningPlatform::dailySharePerformanceFactorForLog($log),
-            2
-        )
-    ), 2);
+    $expectedAmount = MiningPlatform::dailyShareRoundedAmount(
+        MiningPlatform::investmentBaseDailyShareCap($investment),
+        MiningPlatform::dailySharePerformanceFactorForLog($log),
+        round((float) $log->revenue_per_share_usd, 2)
+    );
 
     expect((float) $earning->first()->amount)->toBe($expectedAmount);
 });
