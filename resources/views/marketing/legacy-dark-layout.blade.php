@@ -215,6 +215,38 @@
                 display: none !important;
             }
         }
+        .legacy-footer-cta {
+            align-items: center;
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.18), rgba(9, 12, 47, 0.92));
+            border: 1px solid rgba(245, 158, 11, 0.22);
+            border-radius: 12px;
+            display: flex;
+            gap: 24px;
+            justify-content: space-between;
+            margin-bottom: 40px;
+            padding: 28px 32px;
+        }
+        .legacy-footer-cta h3 {
+            color: #fff;
+            font-size: 28px;
+            margin-bottom: 8px;
+        }
+        .legacy-footer-cta p {
+            color: rgba(255, 255, 255, 0.78);
+            margin-bottom: 0;
+        }
+        .legacy-footer-cta-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+        }
+        @media (max-width: 767px) {
+            .legacy-footer-cta {
+                align-items: flex-start;
+                flex-direction: column;
+                padding: 24px;
+            }
+        }
     </style>
     @stack('style')
 </head>
@@ -272,6 +304,7 @@
                                         </nav>
                                     </div>
                                     <div class="header-right-btn d-none d-lg-flex ml-20 gap-2">
+                                        <a href="{{ route('register') }}" class="btn header-btn">Register</a>
                                         <a href="{{ route('login') }}" class="btn header-btn">Login</a>
                                     </div>
                                 </div>
@@ -292,6 +325,16 @@
         <div class="footer-area footer-bg">
             <div class="container">
                 <div class="footer-top footer-padding">
+                    <div class="legacy-footer-cta">
+                        <div>
+                            <h3>Ready to start with ZagChain?</h3>
+                            <p>Create your account and understand the journey before your first investment step.</p>
+                        </div>
+                        <div class="legacy-footer-cta-actions">
+                            <a href="{{ route('register') }}" class="btn header-btn">Create Account</a>
+                            <a href="{{ route('marketing.how-it-works') }}" class="btn header-btn">How It Works</a>
+                        </div>
+                    </div>
                     <div class="footer-heading">
                         <div class="row justify-content-between">
                             <div class="col-xl-8 col-lg-8 col-md-8">

@@ -115,9 +115,7 @@ Route::get('/', function () use ($marketingPageData) {
     return view('marketing.home', $marketingPageData());
 })->name('landing');
 
-Route::get('/about', function () use ($marketingPageData) {
-    return view('marketing.about', $marketingPageData());
-})->name('marketing.about');
+Route::redirect('/about', '/how-it-works');
 
 Route::get('/how-it-works', function () use ($marketingPageData) {
     return view('marketing.how-it-works', $marketingPageData());
@@ -5173,7 +5171,6 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
 
 
 
