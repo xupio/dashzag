@@ -421,6 +421,8 @@ test('wallet page explains that only available earnings are withdrawable', funct
     $response = $this->actingAs($user)->get(route('dashboard.wallet'));
 
     $response->assertOk();
+    $response->assertSee('Mining share guide');
+    $response->assertSee('Daily share starts from miner performance using hashrate, BTC price, and revenue strength.');
     $response->assertSee('Only your available earnings can be withdrawn from this wallet.');
     $response->assertSee('Package capital, miner assets, and purchased shares cannot be withdrawn here.');
 });

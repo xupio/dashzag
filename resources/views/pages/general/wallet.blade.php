@@ -183,6 +183,12 @@
         <div class="border rounded p-3 mb-3 bg-light"><div class="text-secondary small">Active investments</div><div class="fw-semibold">{{ $activeInvestments->count() }}</div></div>
         <div class="border rounded p-3 mb-3 bg-light"><div class="text-secondary small">Expected monthly earnings</div><div class="fw-semibold">${{ number_format($expectedMonthlyEarnings, 2) }}</div></div>
         <div class="border rounded p-3 mb-3 bg-light"><div class="text-secondary small">Payout requests</div><div class="fw-semibold">{{ $payoutRequests->count() }}</div></div>
+        <div class="border rounded p-3 mb-3 bg-light">
+          <div class="fw-semibold mb-2">Mining share guide</div>
+          <div class="small text-secondary">1. Daily share starts from miner performance using hashrate, BTC price, and revenue strength.</div>
+          <div class="small text-secondary mt-2">2. Your package daily cap limits how much can be credited on any one day.</div>
+          <div class="small text-secondary mt-2">3. New paid packages keep mining profit locked until the first 30-day cycle finishes.</div>
+        </div>
         @if (($miningProfitCaps ?? collect())->isNotEmpty())
           <div class="border rounded p-3 mb-3 bg-light">
             <div class="fw-semibold mb-2">Mining profit caps</div>
