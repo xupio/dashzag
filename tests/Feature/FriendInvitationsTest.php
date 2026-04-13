@@ -10,6 +10,60 @@ beforeEach(function () {
     MiningPlatform::ensureDefaults();
 });
 
+test('friends page shows share and invite toolkit', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.friends'));
+
+    $response->assertOk();
+    $response->assertSee('Share & invite', false);
+    $response->assertSeeText('Copy how it works link');
+    $response->assertSeeText('Copy register link');
+    $response->assertSeeText('WhatsApp message');
+    $response->assertSeeText('Telegram message');
+    $response->assertSeeText('Referral performance');
+    $response->assertSeeText('Pending invitations');
+    $response->assertSeeText('Verified friends');
+    $response->assertSeeText('Registered users');
+    $response->assertSeeText('Active investors');
+    $response->assertSeeText('Next referral target');
+    $response->assertSeeText('Progress');
+    $response->assertSeeText('Best message tips');
+    $response->assertSeeText('Invite warm contacts first');
+    $response->assertSeeText('Send “How it works” before register');
+    $response->assertSeeText('Follow up after verification');
+});
+
+test('friends page shows follow up actions for verified and registered invitations', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    FriendInvitation::create([
+        'user_id' => $user->id,
+        'name' => 'Verified Friend',
+        'email' => 'verified-friend@example.com',
+        'verified_at' => now(),
+    ]);
+
+    FriendInvitation::create([
+        'user_id' => $user->id,
+        'name' => 'Registered Friend',
+        'email' => 'registered-friend@example.com',
+        'verified_at' => now()->subDay(),
+        'registered_at' => now(),
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.friends'));
+
+    $response->assertOk();
+    $response->assertSeeText('Copy follow-up');
+    $response->assertSeeText('Registered');
+    $response->assertSeeText('Verified');
+});
+
 test('user can resend email for pending friend invitation', function () {
     Mail::fake();
 

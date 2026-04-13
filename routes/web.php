@@ -15,6 +15,7 @@ use App\Models\Miner;
 use App\Models\MinerPerformanceLog;
 use App\Models\MockManagerScenario;
 use App\Models\PayoutRequest;
+use App\Models\ReferralCoachingNote;
 use App\Models\ReferralEvent;
 use App\Models\Shareholder;
 use App\Models\User;
@@ -2248,10 +2249,20 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
         Route::get('/dashboard/network-admin', function (Request $request) {
             MiningPlatform::ensureDefaults();
 
+            $referralFilter = (string) $request->query('referral_filter', 'all');
+            if (! in_array($referralFilter, ['all', 'needs_coaching'], true)) {
+                $referralFilter = 'all';
+            }
+            $referralSort = (string) $request->query('referral_sort', 'default');
+            if (! in_array($referralSort, ['default', 'urgency'], true)) {
+                $referralSort = 'default';
+            }
+
             $users = User::with([
                 'sponsor',
                 'userLevel',
                 'friendInvitations',
+                'referralCoachingNote.admin',
                 'investments.package',
                 'investments.miner',
                 'sponsoredUsers.investments',
@@ -2272,6 +2283,119 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 : MiningPlatform::referralTree($users, $treeDepth);
             $networkTreeSummary = MiningPlatform::referralTreeSummary($networkTree);
             $networkTreeChart = MiningPlatform::referralTreeChartPayload($networkTree, 'Network Admin');
+            $allInvitedEmails = $users
+                ->flatMap(fn (User $user) => $user->friendInvitations->pluck('email'))
+                ->filter()
+                ->unique()
+                ->values();
+            $activeInvestorEmails = UserInvestment::query()
+                ->where('status', 'active')
+                ->whereHas('user', fn ($query) => $query->whereIn('email', $allInvitedEmails))
+                ->with('user:id,email')
+                ->get()
+                ->pluck('user.email')
+                ->filter()
+                ->unique()
+                ->values();
+            $activeInvestorEmailLookup = $activeInvestorEmails->flip();
+            $referralAdminSummary = [
+                'total_invitations' => $users->sum(fn (User $user) => $user->friendInvitations->count()),
+                'verified_invitations' => $users->sum(fn (User $user) => $user->friendInvitations->whereNotNull('verified_at')->count()),
+                'registered_invitations' => $users->sum(fn (User $user) => $user->friendInvitations->whereNotNull('registered_at')->count()),
+                'active_investors' => $activeInvestorEmails->count(),
+            ];
+            $referralAdminSummary['verification_rate'] = $referralAdminSummary['total_invitations'] > 0
+                ? round(($referralAdminSummary['verified_invitations'] / $referralAdminSummary['total_invitations']) * 100)
+                : 0;
+            $referralAdminSummary['registration_rate'] = $referralAdminSummary['total_invitations'] > 0
+                ? round(($referralAdminSummary['registered_invitations'] / $referralAdminSummary['total_invitations']) * 100)
+                : 0;
+            $referralAdminSummary['investor_rate'] = $referralAdminSummary['total_invitations'] > 0
+                ? round(($referralAdminSummary['active_investors'] / $referralAdminSummary['total_invitations']) * 100)
+                : 0;
+            $topReferralPerformers = $users
+                ->map(function (User $user) use ($activeInvestorEmailLookup) {
+                    $invitedEmails = $user->friendInvitations->pluck('email')->filter()->unique()->values();
+                    $activeInvestorCount = $invitedEmails->filter(fn ($email) => $activeInvestorEmailLookup->has($email))->count();
+                    $totalInvitations = $user->friendInvitations->count();
+                    $verifiedInvitations = $user->friendInvitations->whereNotNull('verified_at')->count();
+                    $registeredInvitations = $user->friendInvitations->whereNotNull('registered_at')->count();
+                    $coachingNote = $user->referralCoachingNote;
+
+                    $recommendedAction = match (true) {
+                        $totalInvitations >= 3 && $verifiedInvitations === 0 => 'Review message quality',
+                        $verifiedInvitations > 0 && $registeredInvitations === 0 => 'Follow up manually',
+                        $registeredInvitations > 0 && $activeInvestorCount === 0 => 'Needs onboarding help',
+                        $activeInvestorCount > 0 => 'Healthy conversion flow',
+                        default => 'Monitor activity',
+                    };
+                    $urgencyScore = match (true) {
+                        in_array($coachingNote?->status, ['open', 'waiting'], true) && optional($coachingNote?->updated_at)?->lt(now()->subDays(7)) => 4,
+                        $recommendedAction === 'Needs onboarding help' => 3,
+                        $recommendedAction === 'Follow up manually' => 2,
+                        $recommendedAction === 'Review message quality' => 1,
+                        default => 0,
+                    };
+
+                    return [
+                        'user' => $user,
+                        'total_invitations' => $totalInvitations,
+                        'verified_invitations' => $verifiedInvitations,
+                        'registered_invitations' => $registeredInvitations,
+                        'active_investors' => $activeInvestorCount,
+                        'recommended_action' => $recommendedAction,
+                        'coaching_note' => $coachingNote,
+                        'urgency_score' => $urgencyScore,
+                    ];
+                })
+                ->filter(fn (array $row) => $row['total_invitations'] > 0)
+                ->when($referralFilter === 'needs_coaching', function ($collection) {
+                    return $collection->filter(fn (array $row) => $row['total_invitations'] >= 3 && $row['active_investors'] === 0);
+                })
+                ->when($referralSort === 'urgency',
+                    fn ($collection) => $collection->sort(function (array $left, array $right) {
+                        if ($left['urgency_score'] !== $right['urgency_score']) {
+                            return $right['urgency_score'] <=> $left['urgency_score'];
+                        }
+
+                        if ($left['total_invitations'] !== $right['total_invitations']) {
+                            return $right['total_invitations'] <=> $left['total_invitations'];
+                        }
+
+                        if ($left['verified_invitations'] !== $right['verified_invitations']) {
+                            return $right['verified_invitations'] <=> $left['verified_invitations'];
+                        }
+
+                        return $left['active_investors'] <=> $right['active_investors'];
+                    }),
+                    fn ($collection) => $collection->sort(function (array $left, array $right) {
+                        if ($left['active_investors'] !== $right['active_investors']) {
+                            return $right['active_investors'] <=> $left['active_investors'];
+                        }
+
+                        if ($left['registered_invitations'] !== $right['registered_invitations']) {
+                            return $right['registered_invitations'] <=> $left['registered_invitations'];
+                        }
+
+                        if ($left['verified_invitations'] !== $right['verified_invitations']) {
+                            return $right['verified_invitations'] <=> $left['verified_invitations'];
+                        }
+
+                        return $right['total_invitations'] <=> $left['total_invitations'];
+                    })
+                )
+                ->take(10)
+                ->values();
+            $coachingCases = $users
+                ->filter(fn (User $user) => $user->referralCoachingNote !== null)
+                ->values();
+            $coachingSummary = [
+                'total' => $coachingCases->count(),
+                'contacted_recently' => $coachingCases->filter(fn (User $user) => $user->referralCoachingNote?->status === 'contacted' && optional($user->referralCoachingNote?->updated_at)?->gte(now()->subDays(3)))->count(),
+                'waiting' => $coachingCases->filter(fn (User $user) => $user->referralCoachingNote?->status === 'waiting')->count(),
+                'stale_follow_up' => $coachingCases->filter(fn (User $user) => in_array($user->referralCoachingNote?->status, ['open', 'contacted', 'waiting'], true) && optional($user->referralCoachingNote?->updated_at)?->lt(now()->subDays(7)))->count(),
+                'improved' => $coachingCases->filter(fn (User $user) => $user->referralCoachingNote?->status === 'improved')->count(),
+            ];
 
             return view('pages.general.network-admin', [
                 'users' => $users,
@@ -2286,8 +2410,111 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                     ->latest()
                     ->limit(25)
                     ->get(),
+                'referralAdminSummary' => $referralAdminSummary,
+                'coachingSummary' => $coachingSummary,
+                'topReferralPerformers' => $topReferralPerformers,
+                'referralFilter' => $referralFilter,
+                'referralSort' => $referralSort,
             ]);
         })->name('dashboard.network-admin');
+
+        Route::post('/dashboard/network-admin/referral-coaching/{user}', function (Request $request, User $user) {
+            $validated = $request->validate([
+                'status' => ['required', 'string', 'in:open,contacted,waiting,improved'],
+                'note' => ['nullable', 'string', 'max:1000'],
+            ]);
+
+            ReferralCoachingNote::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'admin_user_id' => $request->user()->id,
+                    'status' => $validated['status'],
+                    'note' => filled($validated['note']) ? trim((string) $validated['note']) : null,
+                ],
+            );
+
+            return redirect()
+                ->route('dashboard.network-admin', $request->only(['referral_filter', 'tree_search', 'tree_focus', 'tree_depth']))
+                ->with('network_admin_success', 'Referral coaching note updated for '.$user->name.'.');
+        })->name('dashboard.network-admin.referral-coaching.update');
+
+        Route::get('/dashboard/network-admin/referral-coaching-export', function () {
+            MiningPlatform::ensureDefaults();
+
+            $users = User::with([
+                'friendInvitations',
+            ])->orderBy('name')->get();
+
+            $allInvitedEmails = $users
+                ->flatMap(fn (User $user) => $user->friendInvitations->pluck('email'))
+                ->filter()
+                ->unique()
+                ->values();
+
+            $activeInvestorEmails = UserInvestment::query()
+                ->where('status', 'active')
+                ->whereHas('user', fn ($query) => $query->whereIn('email', $allInvitedEmails))
+                ->with('user:id,email')
+                ->get()
+                ->pluck('user.email')
+                ->filter()
+                ->unique()
+                ->values()
+                ->flip();
+
+            $coachingRows = $users
+                ->map(function (User $user) use ($activeInvestorEmails) {
+                    $invitedEmails = $user->friendInvitations->pluck('email')->filter()->unique()->values();
+                    $activeInvestorCount = $invitedEmails->filter(fn ($email) => $activeInvestorEmails->has($email))->count();
+                    $totalInvitations = $user->friendInvitations->count();
+                    $verifiedInvitations = $user->friendInvitations->whereNotNull('verified_at')->count();
+                    $registeredInvitations = $user->friendInvitations->whereNotNull('registered_at')->count();
+
+                    $recommendedAction = match (true) {
+                        $totalInvitations >= 3 && $verifiedInvitations === 0 => 'Review message quality',
+                        $verifiedInvitations > 0 && $registeredInvitations === 0 => 'Follow up manually',
+                        $registeredInvitations > 0 && $activeInvestorCount === 0 => 'Needs onboarding help',
+                        default => 'Monitor activity',
+                    };
+
+                    return [
+                        'user' => $user,
+                        'total_invitations' => $totalInvitations,
+                        'verified_invitations' => $verifiedInvitations,
+                        'registered_invitations' => $registeredInvitations,
+                        'active_investors' => $activeInvestorCount,
+                        'recommended_action' => $recommendedAction,
+                    ];
+                })
+                ->filter(fn (array $row) => $row['total_invitations'] >= 3 && $row['active_investors'] === 0)
+                ->sortByDesc(fn (array $row) => [
+                    $row['registered_invitations'],
+                    $row['verified_invitations'],
+                    $row['total_invitations'],
+                ])
+                ->values();
+
+            $filename = 'referral-coaching-list-'.now()->format('Ymd-His').'.csv';
+
+            return response()->streamDownload(function () use ($coachingRows) {
+                $handle = fopen('php://output', 'w');
+                fputcsv($handle, ['Name', 'Email', 'Total invites', 'Verified', 'Registered', 'Active investors', 'Recommended action']);
+
+                foreach ($coachingRows as $row) {
+                    fputcsv($handle, [
+                        $row['user']->name,
+                        $row['user']->email,
+                        $row['total_invitations'],
+                        $row['verified_invitations'],
+                        $row['registered_invitations'],
+                        $row['active_investors'],
+                        $row['recommended_action'],
+                    ]);
+                }
+
+                fclose($handle);
+            }, $filename, ['Content-Type' => 'text/csv']);
+        })->name('dashboard.network-admin.referral-coaching-export');
 
         Route::get('/dashboard/network-admin/export', function (Request $request) {
             MiningPlatform::ensureDefaults();
@@ -4712,13 +4939,79 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             'United Kingdom',
             'United States',
         ];
+        $shareBaseUrl = rtrim((string) config('app.url'), '/');
+
+        if ($shareBaseUrl === '') {
+            $shareBaseUrl = rtrim(url('/'), '/');
+        }
+
+        $publicHowItWorksUrl = $shareBaseUrl.route('marketing.how-it-works', absolute: false);
+        $publicRegisterUrl = $shareBaseUrl.route('register', absolute: false);
+        $displayHowItWorksUrl = preg_replace('#^https?://#', '', $publicHowItWorksUrl);
+        $displayRegisterUrl = preg_replace('#^https?://#', '', $publicRegisterUrl);
+        $shareHeadline = 'Start simple. Track clearly. Grow with ZagChain.';
+        $shareSummary = 'Create your account, choose a package, follow your earnings in the dashboard, and complete KYC before your first withdrawal.';
+        $shareWhatsappText = $shareHeadline."\n\n".$shareSummary."\n\nHow it works: ".$publicHowItWorksUrl."\nRegister: ".$publicRegisterUrl;
+        $shareTelegramText = "I wanted to share ZagChain with you.\n\n".$shareSummary."\n\nHow it works: ".$publicHowItWorksUrl."\nRegister: ".$publicRegisterUrl;
+        $shareShortMessage = 'Take a look at ZagChain: '.$publicHowItWorksUrl.' If it fits your goals, you can register here: '.$publicRegisterUrl;
+        $friendInvitations = $user->friendInvitations()->latest()->get();
+        $invitedEmails = $friendInvitations->pluck('email')->filter()->unique()->values();
+        $activeInvestorEmails = UserInvestment::query()
+            ->where('status', 'active')
+            ->whereHas('user', fn ($query) => $query->whereIn('email', $invitedEmails))
+            ->with('user:id,email')
+            ->get()
+            ->pluck('user.email')
+            ->filter()
+            ->unique()
+            ->values();
+        $totalInvitations = $friendInvitations->count();
+        $verifiedInvitations = $friendInvitations->whereNotNull('verified_at')->count();
+        $registeredInvitations = $friendInvitations->whereNotNull('registered_at')->count();
+        $pendingInvitations = max($totalInvitations - $verifiedInvitations, 0);
+        $activeInvestorCount = $activeInvestorEmails->count();
+        $verificationRate = $totalInvitations > 0 ? round(($verifiedInvitations / $totalInvitations) * 100) : 0;
+        $registrationRate = $totalInvitations > 0 ? round(($registeredInvitations / $totalInvitations) * 100) : 0;
+        $investorRate = $totalInvitations > 0 ? round(($activeInvestorCount / $totalInvitations) * 100) : 0;
+        $milestoneTargets = collect([3, 5, 10, 20]);
+        $nextMilestone = $milestoneTargets->first(fn ($target) => $activeInvestorCount < $target) ?? $milestoneTargets->last();
+        $milestoneBase = $milestoneTargets
+            ->filter(fn ($target) => $target < $nextMilestone)
+            ->last() ?? 0;
+        $milestoneSpan = max($nextMilestone - $milestoneBase, 1);
+        $milestoneProgress = min(100, (int) round((max($activeInvestorCount - $milestoneBase, 0) / $milestoneSpan) * 100));
 
         return view('pages.general.friends', [
             'user' => $user,
-            'friendInvitations' => $user->friendInvitations,
+            'friendInvitations' => $friendInvitations,
             'friendInvitationCountries' => $friendInvitationCountries,
             'friendInvitationDailyEmailLimit' => $friendInvitationDailyEmailLimit,
             'friendInvitationEmailsRemaining' => max($friendInvitationDailyEmailLimit - $friendInvitationEmailsSentToday, 0),
+            'publicHowItWorksUrl' => $publicHowItWorksUrl,
+            'publicRegisterUrl' => $publicRegisterUrl,
+            'displayHowItWorksUrl' => $displayHowItWorksUrl,
+            'displayRegisterUrl' => $displayRegisterUrl,
+            'shareHeadline' => $shareHeadline,
+            'shareSummary' => $shareSummary,
+            'shareWhatsappText' => $shareWhatsappText,
+            'shareTelegramText' => $shareTelegramText,
+            'shareShortMessage' => $shareShortMessage,
+            'friendReferralMetrics' => [
+                'total' => $totalInvitations,
+                'pending' => $pendingInvitations,
+                'verified' => $verifiedInvitations,
+                'registered' => $registeredInvitations,
+                'active_investors' => $activeInvestorCount,
+                'verification_rate' => $verificationRate,
+                'registration_rate' => $registrationRate,
+                'investor_rate' => $investorRate,
+            ],
+            'friendReferralMilestone' => [
+                'current' => $activeInvestorCount,
+                'next_target' => $nextMilestone,
+                'remaining' => max($nextMilestone - $activeInvestorCount, 0),
+                'progress' => $milestoneProgress,
+            ],
         ]);
     })->name('dashboard.friends');
 
@@ -5171,6 +5464,3 @@ require __DIR__.'/auth.php';
 
 
 Route::redirect('/general/sell-products', '/dashboard/buy-shares');
-
-
-

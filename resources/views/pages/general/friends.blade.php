@@ -43,6 +43,227 @@
 @endif
 
 <div class="row">
+  <div class="col-12 grid-margin">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+          <div>
+            <h5 class="mb-1">Referral performance</h5>
+            <p class="text-secondary mb-0">See how many invitations are turning into verified and active investors.</p>
+          </div>
+          <span class="badge bg-primary">Conversion view</span>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6 col-xl-3">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="small text-secondary mb-2">Pending invitations</div>
+              <div class="h4 mb-1">{{ $friendReferralMetrics['pending'] }}</div>
+              <div class="small text-secondary">Still waiting for email verification or registration.</div>
+            </div>
+          </div>
+          <div class="col-md-6 col-xl-3">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="small text-secondary mb-2">Verified friends</div>
+              <div class="h4 mb-1">{{ $friendReferralMetrics['verified'] }}</div>
+              <div class="small text-secondary">{{ $friendReferralMetrics['verification_rate'] }}% of all invitations verified.</div>
+            </div>
+          </div>
+          <div class="col-md-6 col-xl-3">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="small text-secondary mb-2">Registered users</div>
+              <div class="h4 mb-1">{{ $friendReferralMetrics['registered'] }}</div>
+              <div class="small text-secondary">{{ $friendReferralMetrics['registration_rate'] }}% reached account creation.</div>
+            </div>
+          </div>
+          <div class="col-md-6 col-xl-3">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="small text-secondary mb-2">Active investors</div>
+              <div class="h4 mb-1">{{ $friendReferralMetrics['active_investors'] }}</div>
+              <div class="small text-secondary">{{ $friendReferralMetrics['investor_rate'] }}% became active investors.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert alert-info mt-3 mb-0">
+          <strong>Total invitations:</strong> {{ $friendReferralMetrics['total'] }}.
+          The stronger this conversion chain gets, the easier word-of-mouth growth becomes.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 grid-margin">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+          <div>
+            <h5 class="mb-1">Next referral target</h5>
+            <p class="text-secondary mb-0">A visible milestone helps users keep sharing with purpose.</p>
+          </div>
+          <span class="badge bg-dark">Momentum</span>
+        </div>
+
+        <div class="row g-3 align-items-center">
+          <div class="col-lg-4">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="small text-secondary mb-2">Active investors right now</div>
+              <div class="h3 mb-1">{{ $friendReferralMilestone['current'] }}</div>
+              <div class="small text-secondary">Current invited friends who became active investors.</div>
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="small text-secondary mb-2">Next target</div>
+              <div class="h3 mb-1">{{ $friendReferralMilestone['next_target'] }}</div>
+              <div class="small text-secondary">{{ $friendReferralMilestone['remaining'] }} more active investor{{ $friendReferralMilestone['remaining'] === 1 ? '' : 's' }} to reach the next milestone.</div>
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="small text-secondary mb-2">Progress</div>
+              <div class="progress mb-2" style="height: 10px;">
+                <div
+                  class="progress-bar bg-success"
+                  role="progressbar"
+                  style="width: {{ $friendReferralMilestone['progress'] }}%;"
+                  aria-valuenow="{{ $friendReferralMilestone['progress'] }}"
+                  aria-valuemin="0"
+                  aria-valuemax="100"
+                ></div>
+              </div>
+              <div class="small text-secondary">{{ $friendReferralMilestone['progress'] }}% of the current milestone reached.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert alert-success mt-3 mb-0">
+          <strong>Focus:</strong> help one more verified or registered friend become an active investor to keep this moving.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 grid-margin">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+          <div>
+            <h5 class="mb-1">Best message tips</h5>
+            <p class="text-secondary mb-0">A simple sharing flow usually converts better than sending the registration link too early.</p>
+          </div>
+          <span class="badge bg-success">Guide users clearly</span>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-lg-4">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="fw-semibold mb-2">1. Invite warm contacts first</div>
+              <div class="small text-secondary">Start with friends, relatives, or trusted contacts who already know you. Word-of-mouth works best when trust is already there.</div>
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="fw-semibold mb-2">2. Send “How it works” before register</div>
+              <div class="small text-secondary">Let them understand the concept first, then send the registration link only after they show real interest.</div>
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="fw-semibold mb-2">3. Follow up after verification</div>
+              <div class="small text-secondary">When a friend verifies or registers, send a short follow-up message and help them choose their next step inside ZagChain.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert alert-warning mt-3 mb-0">
+          <strong>Simple rule:</strong> explain first, register second, follow up third.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 grid-margin">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+          <div>
+            <h5 class="mb-1">Share & invite</h5>
+            <p class="text-secondary mb-0">Help friends understand ZagChain quickly with ready-made sharing tools.</p>
+          </div>
+          <span class="badge bg-warning text-dark">Word-of-mouth kit</span>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-lg-4">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="fw-semibold mb-2">Best page to share</div>
+              <div class="small text-secondary mb-2">Send new users to the public explanation page first.</div>
+              <div class="small fw-semibold text-break mb-3">{{ $displayHowItWorksUrl }}</div>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-copy-text="{{ $publicHowItWorksUrl }}">
+                Copy how it works link
+              </button>
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="fw-semibold mb-2">Registration link</div>
+              <div class="small text-secondary mb-2">Share this when someone is ready to join.</div>
+              <div class="small fw-semibold text-break mb-3">{{ $displayRegisterUrl }}</div>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-copy-text="{{ $publicRegisterUrl }}">
+                Copy register link
+              </button>
+            </div>
+          </div>
+          <div class="col-lg-4">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="fw-semibold mb-2">Short invite message</div>
+              <div class="small text-secondary mb-3">{{ $shareShortMessage }}</div>
+              <button type="button" class="btn btn-outline-primary btn-sm" data-copy-text="{{ $shareShortMessage }}">
+                Copy short message
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3 mt-1">
+          <div class="col-lg-6">
+            <div class="border rounded p-3 h-100">
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <div class="fw-semibold">WhatsApp message</div>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-outline-success btn-sm" data-copy-text="{{ $shareWhatsappText }}">
+                    Copy
+                  </button>
+                  <a href="https://wa.me/?text={{ urlencode($shareWhatsappText) }}" target="_blank" rel="noopener" class="btn btn-success btn-sm">
+                    Open WhatsApp
+                  </a>
+                </div>
+              </div>
+              <div class="small text-secondary" style="white-space: pre-line;">{{ $shareWhatsappText }}</div>
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="border rounded p-3 h-100">
+              <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                <div class="fw-semibold">Telegram message</div>
+                <div class="d-flex gap-2">
+                  <button type="button" class="btn btn-outline-info btn-sm" data-copy-text="{{ $shareTelegramText }}">
+                    Copy
+                  </button>
+                  <a href="https://t.me/share/url?url={{ urlencode($publicHowItWorksUrl) }}&text={{ urlencode($shareTelegramText) }}" target="_blank" rel="noopener" class="btn btn-info btn-sm text-white">
+                    Open Telegram
+                  </a>
+                </div>
+              </div>
+              <div class="small text-secondary" style="white-space: pre-line;">{{ $shareTelegramText }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="col-12 stretch-card">
     <div class="card">
       <div class="card-body">
@@ -79,6 +300,10 @@
               </thead>
               <tbody>
                 @foreach ($friendInvitations as $friendInvitation)
+                  @php
+                    $followUpVerificationMessage = 'Hi '.$friendInvitation->name.', thanks for verifying your email with ZagChain. When you are ready, here is the registration link: '.$publicRegisterUrl;
+                    $followUpRegistrationMessage = 'Hi '.$friendInvitation->name.', great to see you inside ZagChain. Start with the How It Works page: '.$publicHowItWorksUrl.' and then choose your next step from your dashboard.';
+                  @endphp
                   <tr>
                     <td>{{ $friendInvitation->name }}</td>
                     <td>{{ $friendInvitation->email }}</td>
@@ -95,13 +320,33 @@
                     </td>
                     <td>{{ $friendInvitation->created_at?->format('M d, Y h:i A') }}</td>
                     <td class="text-end">
-                      @if (! $friendInvitation->verified_at)
+                      @if ($friendInvitation->registered_at)
+                        <div class="d-flex justify-content-end gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-success"
+                            data-copy-text="{{ $followUpRegistrationMessage }}"
+                          >
+                            Copy follow-up
+                          </button>
+                          <span class="text-secondary small align-self-center">Registered</span>
+                        </div>
+                      @elseif ($friendInvitation->verified_at)
+                        <div class="d-flex justify-content-end gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            class="btn btn-sm btn-outline-info"
+                            data-copy-text="{{ $followUpVerificationMessage }}"
+                          >
+                            Copy follow-up
+                          </button>
+                          <span class="text-secondary small align-self-center">Verified</span>
+                        </div>
+                      @else
                         <form method="POST" action="{{ route('dashboard.friends.resend', $friendInvitation) }}" class="d-inline">
                           @csrf
                           <button type="submit" class="btn btn-sm btn-outline-secondary">Resend email</button>
                         </form>
-                      @else
-                        <span class="text-secondary small">No action</span>
                       @endif
                     </td>
                   </tr>
@@ -174,6 +419,45 @@
 @endsection
 
 @push('custom-scripts')
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('[data-copy-text]').forEach(function (button) {
+        button.addEventListener('click', async function () {
+          var text = button.getAttribute('data-copy-text') || '';
+          var originalText = button.textContent.trim();
+
+          try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              await navigator.clipboard.writeText(text);
+            } else {
+              var helper = document.createElement('textarea');
+              helper.value = text;
+              helper.setAttribute('readonly', 'readonly');
+              helper.style.position = 'absolute';
+              helper.style.left = '-9999px';
+              document.body.appendChild(helper);
+              helper.select();
+              document.execCommand('copy');
+              document.body.removeChild(helper);
+            }
+
+            button.textContent = 'Copied';
+
+            setTimeout(function () {
+              button.textContent = originalText;
+            }, 1600);
+          } catch (error) {
+            button.textContent = 'Copy failed';
+
+            setTimeout(function () {
+              button.textContent = originalText;
+            }, 1600);
+          }
+        });
+      });
+    });
+  </script>
+
   @if ($errors->any())
     <script>
       document.addEventListener('DOMContentLoaded', function () {

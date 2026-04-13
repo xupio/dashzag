@@ -158,6 +158,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(FriendInvitation::class)->latest();
     }
 
+    public function referralCoachingNote(): HasOne
+    {
+        return $this->hasOne(ReferralCoachingNote::class);
+    }
+
     public function shareholder(): HasOne
     {
         return $this->hasOne(Shareholder::class);
