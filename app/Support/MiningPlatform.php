@@ -2938,6 +2938,8 @@ class MiningPlatform
                 $remaining = 0;
             }
 
+            N8nWebhook::sendPayoutRequested($payoutRequest);
+
             return $payoutRequest;
         });
     }

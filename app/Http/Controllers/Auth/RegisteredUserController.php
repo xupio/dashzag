@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Notifications\ActivityFeedNotification;
 use App\Support\MiningPlatform;
+use App\Support\N8nWebhook;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -54,6 +55,7 @@ class RegisteredUserController extends Controller
         ]));
 
         MiningPlatform::notifyAdminsOfNewRegistration($user);
+        N8nWebhook::sendUserRegistered($user);
 
         event(new Registered($user));
 

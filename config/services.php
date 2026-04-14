@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'n8n' => [
+        'enabled' => env('N8N_WEBHOOK_ENABLED', false),
+        'webhook_url' => env('N8N_WEBHOOK_URL'),
+        'webhook_secret' => env('N8N_WEBHOOK_SECRET'),
+    ],
+
 ];

@@ -4,6 +4,7 @@ use App\Models\FriendInvitation;
 use App\Models\User;
 use App\Notifications\ActivityFeedNotification;
 use App\Notifications\InvitationAwareVerifyEmail;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 
 test('registration screen can be rendered', function () {
@@ -14,6 +15,10 @@ test('registration screen can be rendered', function () {
 
 test('new users can register', function () {
     Notification::fake();
+    Http::fake();
+    config()->set('services.n8n.enabled', true);
+    config()->set('services.n8n.webhook_url', 'https://n8n.example.test/webhook/zagchain');
+    config()->set('services.n8n.webhook_secret', 'test-secret');
 
     $admin = User::factory()->admin()->create([
         'email_verified_at' => now(),
@@ -48,6 +53,16 @@ test('new users can register', function () {
             && ($payload['action_text'] ?? null) === 'Open Admin Users'
             && str_contains((string) ($payload['action_url'] ?? ''), urlencode('test@example.com'))
             && $mailMessage->actionText === 'Open Admin Users';
+    });
+    Http::assertSent(function ($request) use ($user) {
+        $payload = $request->data();
+
+        return $request->url() === 'https://n8n.example.test/webhook/zagchain'
+            && $request->hasHeader('X-ZagChain-Event', 'user.registered')
+            && $request->hasHeader('X-ZagChain-Webhook-Secret', 'test-secret')
+            && ($payload['event'] ?? null) === 'user.registered'
+            && ($payload['data']['user']['email'] ?? null) === $user->email
+            && ($payload['data']['user']['account_type'] ?? null) === 'starter';
     });
     $response->assertRedirect(route('verification.notice', absolute: false));
 });

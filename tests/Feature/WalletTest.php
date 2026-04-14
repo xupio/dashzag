@@ -10,6 +10,7 @@ use App\Models\UserInvestment;
 use App\Notifications\PayoutStatusNotification;
 use App\Support\MiningPlatform;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 
@@ -286,6 +287,11 @@ test('wallet earnings history can be exported as csv with the active source filt
 });
 
 test('verified user can request a payout from available balance', function () {
+    Http::fake();
+    config()->set('services.n8n.enabled', true);
+    config()->set('services.n8n.webhook_url', 'https://n8n.example.test/webhook/zagchain');
+    config()->set('services.n8n.webhook_secret', 'test-secret');
+
     $user = User::factory()->create([
         'email_verified_at' => now(),
         'account_type' => 'user',
@@ -315,6 +321,16 @@ test('verified user can request a payout from available balance', function () {
     expect((float) $payoutRequest->fee_amount)->toBe(0.0);
     expect((float) $payoutRequest->net_amount)->toBe(30.0);
     expect($user->earnings->where('status', 'payout_pending')->sum('amount'))->toBe(30.0);
+    Http::assertSent(function ($request) use ($user, $payoutRequest) {
+        $payload = $request->data();
+
+        return $request->url() === 'https://n8n.example.test/webhook/zagchain'
+            && $request->hasHeader('X-ZagChain-Event', 'payout.requested')
+            && ($payload['event'] ?? null) === 'payout.requested'
+            && ($payload['data']['user']['email'] ?? null) === $user->email
+            && (float) ($payload['data']['payout']['amount'] ?? 0) === 30.0
+            && ($payload['data']['payout']['id'] ?? null) === $payoutRequest->id;
+    });
 });
 
 test('wallet page reflects admin managed payout methods', function () {

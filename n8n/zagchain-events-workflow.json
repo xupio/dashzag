@@ -1,0 +1,113 @@
+{
+  "name": "ZagChain Events Hub",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## ZagChain n8n import\n\n1. Import this workflow into n8n.\n2. Set the webhook path you want.\n3. Replace `replace-with-your-n8n-secret` inside the Code node.\n4. Use the same URL and secret in ZagChain:\n   - `N8N_WEBHOOK_ENABLED=true`\n   - `N8N_WEBHOOK_URL=https://your-n8n-domain/webhook/zagchain`\n   - `N8N_WEBHOOK_SECRET=your-secret`\n5. Add Gmail, Telegram, Slack, Google Sheets, or CRM nodes after the Code node using `route` or `event`.\n\nHandled events:\n- `user.registered`\n- `kyc.submitted`\n- `payout.requested`",
+        "width": 520,
+        "height": 320
+      },
+      "id": "b8a45d42-26db-4e9d-b456-88ad60d93210",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -520,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "zagchain",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "8ed2834f-b986-4aa5-a79b-6c159a4284a1",
+      "name": "ZagChain Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -260,
+        80
+      ],
+      "webhookId": "zagchain-events"
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $json.body && Object.keys($json.body).length ? $json.body : $json;\nconst headers = $json.headers || {};\nconst normalizedHeaders = Object.fromEntries(Object.entries(headers).map(([key, value]) => [String(key).toLowerCase(), value]));\nconst providedSecret = normalizedHeaders['x-zagchain-webhook-secret'] || '';\nconst expectedSecret = 'replace-with-your-n8n-secret';\nconst event = payload.event || 'unknown';\n\nif (providedSecret !== expectedSecret) {\n  return [{\n    ok: false,\n    error: 'Invalid webhook secret.',\n    event,\n    route: 'rejected',\n    data: payload.data || null,\n  }];\n}\n\nlet route = 'unhandled';\nlet summary = 'Unhandled ZagChain event received.';\n\nif (event === 'user.registered') {\n  route = 'user_registered';\n  summary = `New registration: ${payload?.data?.user?.name || 'Unknown user'} (${payload?.data?.user?.email || 'no email'})`;\n}\n\nif (event === 'kyc.submitted') {\n  route = 'kyc_submitted';\n  summary = `New KYC submission: ${payload?.data?.user?.name || 'Unknown user'} (${payload?.data?.user?.email || 'no email'})`;\n}\n\nif (event === 'payout.requested') {\n  route = 'payout_requested';\n  summary = `New payout request: ${payload?.data?.user?.name || 'Unknown user'} requested ${payload?.data?.payout?.amount || 0}`;\n}\n\nreturn [{\n  ok: true,\n  event,\n  route,\n  summary,\n  occurred_at: payload.occurred_at || new Date().toISOString(),\n  app: payload.app || null,\n  data: payload.data || null,\n  next_steps: [\n    'Attach an IF or Switch node after this Code node using the route field.',\n    'Send admin alerts with Gmail, SMTP, Telegram, Slack, or WhatsApp integrations.',\n    'Store the event in Google Sheets, Airtable, Notion, HubSpot, or your CRM.'\n  ]\n}];"
+      },
+      "id": "c0eaaf15-26d8-4dc3-8d5d-84adf4fdd757",
+      "name": "Verify And Route",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        20,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Next step in n8n\n\nAfter `Verify And Route`, add one of these:\n\n- `Switch` on `{{$json.route}}`\n- or separate `IF` nodes for:\n  - `user_registered`\n  - `kyc_submitted`\n  - `payout_requested`\n\nThen connect:\n- Gmail / SMTP for admin inbox\n- Telegram / Slack for team alerts\n- Google Sheets / Airtable / Notion / CRM for logging",
+        "width": 460,
+        "height": 260
+      },
+      "id": "0c08d9c8-85a7-45bf-8f03-41da142fb72c",
+      "name": "Routing Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        260,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "370a7358-b915-42f8-bfde-a51ef3db5e11",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        300,
+        80
+      ]
+    }
+  ],
+  "connections": {
+    "ZagChain Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify And Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify And Route": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "9b170a80-4574-49cf-b343-1be75ce1644a",
+  "id": "zagchain-events-hub",
+  "tags": []
+}

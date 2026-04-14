@@ -10,6 +10,8 @@ use App\Models\UserInvestment;
 use App\Models\UserLevel;
 use App\Support\MiningPlatform;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 
 beforeEach(function () {
     MiningPlatform::ensureDefaults();
@@ -551,5 +553,43 @@ test('admin users page shows kyc queue cards and can filter pending kyc users', 
     $filteredResponse->assertSee('Pending Queue User');
     $filteredResponse->assertDontSee('Rejected Queue User');
     $filteredResponse->assertDontSee('Missing Queue User');
+});
+
+test('kyc submission sends n8n webhook payload', function () {
+    Storage::fake('public');
+    Http::fake();
+
+    config()->set('services.n8n.enabled', true);
+    config()->set('services.n8n.webhook_url', 'https://n8n.example.test/webhook/zagchain');
+    config()->set('services.n8n.webhook_secret', 'test-secret');
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'kyc_status' => 'not_submitted',
+    ]);
+
+    $response = $this->actingAs($user)->post(route('dashboard.kyc.submit'), [
+        'kyc_proof' => UploadedFile::fake()->create('legal-proof.pdf', 200, 'application/pdf'),
+        'kyc_notes' => 'Responsible officer document.',
+    ]);
+
+    $response->assertRedirect();
+    $response->assertSessionHas('kyc_success');
+
+    $user->refresh();
+
+    expect($user->kyc_status)->toBe('pending');
+    expect($user->kyc_proof_original_name)->toBe('legal-proof.pdf');
+
+    Http::assertSent(function ($request) use ($user) {
+        $payload = $request->data();
+
+        return $request->url() === 'https://n8n.example.test/webhook/zagchain'
+            && $request->hasHeader('X-ZagChain-Event', 'kyc.submitted')
+            && ($payload['event'] ?? null) === 'kyc.submitted'
+            && ($payload['data']['user']['email'] ?? null) === $user->email
+            && ($payload['data']['kyc']['status'] ?? null) === 'pending'
+            && ($payload['data']['kyc']['proof_original_name'] ?? null) === 'legal-proof.pdf';
+    });
 });
 

@@ -1,0 +1,388 @@
+{
+  "name": "ZagChain User Registered",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## ZagChain user.registered workflow\n\nBefore activating:\n\n1. Replace `replace-with-your-n8n-secret` in the Code node.\n2. Set your admin email in the Email node.\n3. Set your Telegram chat ID in the Telegram node.\n4. Set your Google Sheet ID and sheet name in the Google Sheets node.\n5. Add credentials for Email, Telegram, and Google Sheets in n8n.\n\nThis workflow only handles `user.registered`.\n\nZagChain should send:\n- `N8N_WEBHOOK_ENABLED=true`\n- `N8N_WEBHOOK_URL=https://your-n8n-domain/webhook/zagchain-user-registered`\n- `N8N_WEBHOOK_SECRET=your-secret`",
+        "width": 520,
+        "height": 320
+      },
+      "id": "b775fdbf-0ad7-4e76-846b-8186cde33052",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "zagchain-user-registered",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "e9b6635d-f1a8-419e-b8d8-c90fec2112b1",
+      "name": "User Registered Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -300,
+        140
+      ],
+      "webhookId": "zagchain-user-registered"
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $json.body && Object.keys($json.body).length ? $json.body : $json;\nconst headers = $json.headers || {};\nconst normalizedHeaders = Object.fromEntries(Object.entries(headers).map(([key, value]) => [String(key).toLowerCase(), value]));\nconst providedSecret = normalizedHeaders['x-zagchain-webhook-secret'] || '';\nconst expectedSecret = 'replace-with-your-n8n-secret';\nconst event = payload.event || 'unknown';\n\nif (providedSecret !== expectedSecret) {\n  return [{ ok: false, error: 'Invalid webhook secret.', event }];\n}\n\nif (event !== 'user.registered') {\n  return [{ ok: false, error: `Unexpected event: ${event}`, event }];\n}\n\nreturn [{\n  ok: true,\n  event,\n  user_id: payload?.data?.user?.id || null,\n  name: payload?.data?.user?.name || 'Unknown user',\n  email: payload?.data?.user?.email || 'no-email@example.com',\n  account_type: payload?.data?.user?.account_type || 'unknown',\n  sponsor_user_id: payload?.data?.user?.sponsor_user_id || null,\n  email_verified: payload?.data?.user?.email_verified || false,\n  created_at: payload?.data?.user?.created_at || payload?.occurred_at || new Date().toISOString(),\n  app_url: payload?.app?.url || '',\n  source_app: payload?.app?.name || 'ZagChain'\n}];"
+      },
+      "id": "58a7162b-4fd7-4368-bc2d-eb698ece2805",
+      "name": "Validate Registration Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -20,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f3c86edc-559f-4f4a-a421-85faad4db63b",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "8c093c14-47cf-4f9f-a097-b9d1e5ce0af4",
+      "name": "Is Valid Registration",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "admin@zagchain.net",
+        "subject": "=New ZagChain registration: {{$json.name}}",
+        "emailType": "text",
+        "message": "=A new user registered on ZagChain.\\n\\nName: {{$json.name}}\\nEmail: {{$json.email}}\\nUser ID: {{$json.user_id}}\\nAccount type: {{$json.account_type}}\\nEmail verified: {{$json.email_verified}}\\nSponsor user ID: {{$json.sponsor_user_id || 'none'}}\\nCreated at: {{$json.created_at}}\\nPlatform: {{$json.app_url}}",
+        "options": {}
+      },
+      "id": "14fc3480-61f7-44ba-af5e-567fa92b6260",
+      "name": "Admin Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        520,
+        -20
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "replace-with-your-telegram-chat-id",
+        "text": "=New ZagChain registration\\n\\nName: {{$json.name}}\\nEmail: {{$json.email}}\\nType: {{$json.account_type}}\\nUser ID: {{$json.user_id}}",
+        "additionalFields": {}
+      },
+      "id": "3021278d-2de0-42d6-b92f-1907ff69782b",
+      "name": "Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        520,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Registrations"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "event": "={{ $json.event }}",
+            "user_id": "={{ $json.user_id }}",
+            "name": "={{ $json.name }}",
+            "email": "={{ $json.email }}",
+            "account_type": "={{ $json.account_type }}",
+            "email_verified": "={{ $json.email_verified }}",
+            "sponsor_user_id": "={{ $json.sponsor_user_id }}",
+            "created_at": "={{ $json.created_at }}",
+            "app_url": "={{ $json.app_url }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "event",
+              "displayName": "event",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "user_id",
+              "displayName": "user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "account_type",
+              "displayName": "account_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email_verified",
+              "displayName": "email_verified",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sponsor_user_id",
+              "displayName": "sponsor_user_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "app_url",
+              "displayName": "app_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "b808f22a-4be7-4b2a-8db3-9d4abcf8591e",
+      "name": "Google Sheets Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        520,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine"
+      },
+      "id": "5ff1d906-f5c2-4618-9f3d-c8492fd4d678",
+      "name": "Wait For Actions",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        860,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: $json.ok, event: $json.event, message: 'user.registered workflow processed' } }}",
+        "options": {}
+      },
+      "id": "17653e0a-9272-4d23-a56d-e6355f669f34",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, event: $json.event || 'unknown', error: $json.error || 'Rejected' } }}",
+        "options": {}
+      },
+      "id": "76511b76-78aa-4337-b1bb-aa9655ef54a6",
+      "name": "Rejected Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        520,
+        520
+      ]
+    }
+  ],
+  "connections": {
+    "User Registered Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Registration Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Registration Event": {
+      "main": [
+        [
+          {
+            "node": "Is Valid Registration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Valid Registration": {
+      "main": [
+        [
+          {
+            "node": "Admin Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets Log",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rejected Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Admin Email": {
+      "main": [
+        [
+          {
+            "node": "Wait For Actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Alert": {
+      "main": [
+        [
+          {
+            "node": "Wait For Actions",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Google Sheets Log": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Actions": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "5f7eb4da-cf07-4af4-9266-b85c3b0f5d27",
+  "id": "zagchain-user-registered",
+  "tags": []
+}

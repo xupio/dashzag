@@ -26,6 +26,7 @@ use App\Notifications\ActivityFeedNotification;
 use App\Notifications\DigestSummaryNotification;
 use App\Notifications\PayoutStatusNotification;
 use App\Support\MiningPlatform;
+use App\Support\N8nWebhook;
 use App\Support\UserActivity;
 use Endroid\QrCode\ErrorCorrectionLevel;
 use Endroid\QrCode\QrCode;
@@ -1601,6 +1602,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
         ])->save();
 
         MiningPlatform::notifyAdminsOfKycSubmission($user);
+        N8nWebhook::sendKycSubmitted($user->fresh());
 
         return back()->with('kyc_success', 'Your legal verification proof was uploaded and is now waiting for admin review.');
     })->middleware('throttle:6,1')->name('dashboard.kyc.submit');
