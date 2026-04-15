@@ -41,4 +41,9 @@ return [
         'webhook_secret' => env('N8N_WEBHOOK_SECRET'),
     ],
 
+    'zagn8n' => [
+        'enabled' => env('ZAGN8N_ENABLED', false),
+        'token' => env('ZAGN8N_TOKEN'),
+    ],
+
 ];

@@ -1,0 +1,243 @@
+{
+  "name": "zagn8n Marketing Content Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## zagn8n marketing content generator\n\nBefore activating:\n\n1. Replace `https://www.zagchain.net/zagn8n/marketing-feed` with your real feed URL if needed.\n2. Replace `replace-with-your-zagn8n-token` in the HTTP header.\n3. Optional: change the schedule.\n4. Optional: connect the final content pack to OpenAI, Telegram, Gmail, Google Sheets, or Canva.\n\nThis workflow does:\n- poll ZagChain safe marketing metrics\n- prepare an AI-ready prompt\n- produce a structured content pack shell for Instagram and TikTok\n\nUse this after enabling on the server:\n- `ZAGN8N_ENABLED=true`\n- `ZAGN8N_TOKEN=your-secret`",
+        "width": 560,
+        "height": 340
+      },
+      "id": "41842765-0059-4d91-b875-6294d3d7d6fd",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -700,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "807ba4b8-8178-4554-a5ec-4b26af4b4e93",
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -560,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.zagchain.net/zagn8n/marketing-feed",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-ZagChain-Automation-Token",
+              "value": "replace-with-your-zagn8n-token"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3ac51a80-df4c-42d4-8d9b-61205a6cc4ef",
+      "name": "Fetch zagn8n Feed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -300,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const feed = $json;\nconst appUrl = feed?.app?.url || 'https://www.zagchain.net';\nconst topPackage = Array.isArray(feed?.top_packages) && feed.top_packages.length ? feed.top_packages[0] : null;\nconst totals = feed?.totals || {};\nconst day = feed?.last_24_hours || {};\nconst week = feed?.last_7_days || {};\n\nconst prompt = `You are creating short-form marketing content for ZagChain.\n\nUse only the facts in the input JSON.\nDo not promise guaranteed returns.\nDo not use misleading urgency.\nKeep the tone premium, simple, confident, and persuasive.\nMake the output suitable for Instagram Reels, Instagram captions, TikTok voiceover, story text, and image creative.\nFocus on clarity, trust, dashboard visibility, user experience, and real momentum.\n\nReturn exactly these sections:\n1. Instagram caption\n2. TikTok hook\n3. 15-second video script\n4. 30-second video script\n5. Story text\n6. Image headline\n7. Image subheadline\n8. CTA\n9. 5 hashtags\n10. Canva image brief\n11. Canva short video brief\n\nInput data:\n${JSON.stringify(feed, null, 2)}`;\n\nconst contentPack = {\n  brand: 'ZagChain',\n  generated_at: feed?.generated_at || new Date().toISOString(),\n  app_url: appUrl,\n  top_angle: topPackage\n    ? `Highlight ${topPackage.name} as the leading package by active capital and explain the platform journey clearly.`\n    : 'Explain the ZagChain journey clearly and build trust through visibility and user experience.',\n  quick_facts: {\n    active_investor_count: totals.active_investor_count || 0,\n    active_capital_usd: totals.active_capital_usd || 0,\n    verified_user_count: totals.verified_user_count || 0,\n    approved_kyc_count: totals.approved_kyc_count || 0,\n    paid_payout_count: totals.paid_payout_count || 0,\n    paid_payout_total_usd: totals.paid_payout_total_usd || 0,\n    registrations_last_24_hours: day.new_registrations || 0,\n    active_investments_last_24_hours: day.new_active_investments || 0,\n    registrations_last_7_days: week.new_registrations || 0,\n    active_investments_last_7_days: week.new_active_investments || 0\n  },\n  top_package: topPackage,\n  suggested_output_structure: {\n    instagram_caption: '',\n    tiktok_hook: '',\n    video_script_15s: '',\n    video_script_30s: '',\n    story_text: '',\n    image_headline: '',\n    image_subheadline: '',\n    cta: '',\n    hashtags: [],\n    canva_image_brief: '',\n    canva_video_brief: ''\n  },\n  safe_marketing_rules: feed?.content_rules || {},\n  suggested_cta_angles: [\n    'Start simple. Track clearly. Grow with ZagChain.',\n    'See how a clearer investment journey can feel stronger than letting money sleep.',\n    'Follow your package, earnings, and wallet progress in one dashboard.'\n  ]\n};\n\nreturn [{\n  ...feed,\n  zagn8n_name: 'zagn8n',\n  ai_prompt: prompt,\n  content_pack: contentPack\n}];"
+      },
+      "id": "e95b30f4-626e-4c90-9a69-c6c5383525db",
+      "name": "Build Content Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -20,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Optional next node\n\nConnect one of these after `Build Content Prompt`:\n\n- OpenAI Chat / HTTP AI call\n- Telegram message to yourself\n- Gmail draft / email\n- Google Sheets row\n- Canva workflow input\n\nRecommended AI input field:\n- `{{$json.ai_prompt}}`\n\nRecommended structured field for downstream tools:\n- `{{$json.content_pack}}`",
+        "width": 460,
+        "height": 260
+      },
+      "id": "63c46d37-7df5-4d4b-9939-a3d12c5b4ef7",
+      "name": "Next Step Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        240,
+        -180
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "668ad0b4-77ce-4f79-b591-58b84327b616",
+              "name": "summary_message",
+              "value": "=zagn8n marketing pack ready\\n\\nTop angle: {{$json.content_pack.top_angle}}\\nActive investors: {{$json.content_pack.quick_facts.active_investor_count}}\\nActive capital: ${{$json.content_pack.quick_facts.active_capital_usd}}\\nPaid payouts: {{$json.content_pack.quick_facts.paid_payout_count}}\\n\\nTop package: {{$json.top_package[0].name || $json.content_pack.top_package.name || 'N/A'}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ec318bf1-b37e-4876-b9e5-7dba8506e7d7",
+      "name": "Create Summary",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "replace-with-your-telegram-chat-id",
+        "text": "={{ $json.summary_message }}",
+        "additionalFields": {}
+      },
+      "id": "d5f88b7a-0cbe-4347-8bda-93789dcf38bf",
+      "name": "Telegram Preview",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        520,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_content"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "generated_at": "={{ $json.generated_at }}",
+            "feed": "={{ $json.feed }}",
+            "top_angle": "={{ $json.content_pack.top_angle }}",
+            "active_investor_count": "={{ $json.content_pack.quick_facts.active_investor_count }}",
+            "active_capital_usd": "={{ $json.content_pack.quick_facts.active_capital_usd }}",
+            "top_package_name": "={{ $json.content_pack.top_package ? $json.content_pack.top_package.name : '' }}",
+            "ai_prompt": "={{ $json.ai_prompt }}",
+            "summary_message": "={{ $json.summary_message }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "generated_at", "displayName": "generated_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "feed", "displayName": "feed", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "top_angle", "displayName": "top_angle", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "active_investor_count", "displayName": "active_investor_count", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "active_capital_usd", "displayName": "active_capital_usd", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "top_package_name", "displayName": "top_package_name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "ai_prompt", "displayName": "ai_prompt", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "summary_message", "displayName": "summary_message", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "4166b63a-6f0d-46a5-a56d-6854f7f6d4a6",
+      "name": "Google Sheets Prompt Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        520,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch zagn8n Feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch zagn8n Feed": {
+      "main": [
+        [
+          {
+            "node": "Build Content Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Content Prompt": {
+      "main": [
+        [
+          {
+            "node": "Create Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Summary": {
+      "main": [
+        [
+          {
+            "node": "Telegram Preview",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets Prompt Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "af3af6ca-6170-4c8e-9476-21c97f4b5891",
+  "id": "zagn8n-marketing-content-generator",
+  "tags": []
+}

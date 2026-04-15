@@ -4,6 +4,13 @@ Import this file into n8n:
 
 - `n8n/zagchain-events-workflow.json`
 - `n8n/zagchain-user-registered-workflow.json`
+- `n8n/zagn8n-marketing-content-workflow.json`
+- `n8n/zagn8n-marketing-ai-workflow.json`
+- `n8n/zagn8n-bank-vs-zagchain-ai-workflow.json`
+- `n8n/zagn8n-package-spotlight-ai-workflow.json`
+- `n8n/zagn8n-referral-campaign-ai-workflow.json`
+- `n8n/zagn8n-approval-review-workflow.json`
+- `n8n/zagn8n-approved-content-publisher-workflow.json`
 
 What it does:
 
@@ -26,6 +33,118 @@ It includes prepared nodes for:
 - Google Sheets logging
 
 You only need to replace the placeholder secret, admin email, Telegram chat ID, and Google Sheet ID.
+
+The `zagn8n` marketing file is for content generation:
+
+- `n8n/zagn8n-marketing-content-workflow.json`
+
+It:
+
+- polls `/zagn8n/marketing-feed`
+- sends the private token
+- builds an AI-ready marketing prompt
+- prepares a content-pack shell
+- sends a Telegram preview
+- logs the prompt to Google Sheets
+
+The next `zagn8n` file adds real AI generation:
+
+- `n8n/zagn8n-marketing-ai-workflow.json`
+
+It:
+
+- polls the secure `zagn8n` feed
+- builds the AI prompt
+- calls the OpenAI Responses API
+- asks for JSON output
+- parses ready Instagram / TikTok content
+- sends a Telegram preview
+- logs the content to Google Sheets
+- can forward generated content into the approval-review webhook
+
+To enable the approval handoff:
+
+1. Import `zagn8n-approval-review-workflow.json`
+2. Copy its webhook URL
+3. Open `zagn8n-marketing-ai-workflow.json`
+4. Replace:
+   - `https://your-n8n-domain/webhook/zagn8n-approval-review`
+5. Then new generated content will be sent into the approval queue automatically
+
+The same approval handoff pattern is now prepared in:
+
+- `zagn8n-bank-vs-zagchain-ai-workflow.json`
+- `zagn8n-package-spotlight-ai-workflow.json`
+- `zagn8n-referral-campaign-ai-workflow.json`
+
+The next focused theme file is:
+
+- `n8n/zagn8n-bank-vs-zagchain-ai-workflow.json`
+
+It is optimized for one high-conversion angle:
+
+- bank savings vs ZagChain growth visibility
+
+It calculates a simple example comparison and then asks AI to create:
+
+- Instagram caption
+- TikTok hook
+- short scripts
+- story text
+- image copy
+- CTA
+- Canva briefs
+
+Another focused theme file is:
+
+- `n8n/zagn8n-package-spotlight-ai-workflow.json`
+
+It is optimized for:
+
+- promoting the strongest package from the live feed
+
+It turns the current top package into:
+
+- Instagram caption
+- TikTok hook
+- short scripts
+- story text
+- image copy
+- CTA
+- Canva briefs
+
+Another focused theme file is:
+
+- `n8n/zagn8n-referral-campaign-ai-workflow.json`
+
+It is optimized for:
+
+- referral growth
+- warm-contact invitations
+- trust-based sharing
+- onboarding momentum
+
+Approval flow file:
+
+- `n8n/zagn8n-approval-review-workflow.json`
+
+It is used to:
+
+- receive generated content for review
+- send Telegram review alerts
+- store content in a Google Sheets approval queue
+- track `pending_review`, `approved`, `needs_edit`, or `rejected`
+
+Approved publishing queue file:
+
+- `n8n/zagn8n-approved-content-publisher-workflow.json`
+
+It is used to:
+
+- read only approved content from the approval queue
+- create publish-ready queue rows
+- send Telegram queue alerts
+- prepare the handoff into Canva or a social scheduler
 
 After import:
 

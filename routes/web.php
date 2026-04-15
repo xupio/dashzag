@@ -28,6 +28,7 @@ use App\Notifications\PayoutStatusNotification;
 use App\Support\MiningPlatform;
 use App\Support\N8nWebhook;
 use App\Support\UserActivity;
+use App\Support\Zagn8nMarketingFeed;
 use Endroid\QrCode\ErrorCorrectionLevel;
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\SvgWriter;
@@ -122,6 +123,10 @@ Route::redirect('/about', '/how-it-works');
 Route::get('/how-it-works', function () use ($marketingPageData) {
     return view('marketing.how-it-works', $marketingPageData());
 })->name('marketing.how-it-works');
+
+Route::get('/zagn8n/marketing-feed', function () {
+    return response()->json(Zagn8nMarketingFeed::payload());
+})->middleware('zagn8n.token')->name('zagn8n.marketing-feed');
 
 Route::redirect('/packages', '/');
 Route::redirect('/media', '/');

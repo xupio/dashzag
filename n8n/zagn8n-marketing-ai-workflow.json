@@ -1,0 +1,308 @@
+{
+  "name": "zagn8n AI Marketing Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## zagn8n AI marketing generator\n\nBefore activating:\n\n1. Replace the ZagChain feed URL if needed.\n2. Replace `replace-with-your-zagn8n-token`.\n3. Replace `replace-with-your-openai-api-key`.\n4. Replace your Telegram chat ID and Google Sheet ID.\n5. Review the prompt rules before publishing content.\n\nThis workflow:\n- polls the secure `zagn8n` feed\n- builds the marketing prompt\n- calls the OpenAI Responses API\n- asks for JSON output\n- parses the generated content into ready sections\n- sends a Telegram preview\n- logs the result to Google Sheets",
+        "width": 620,
+        "height": 360
+      },
+      "id": "1c376f4e-0148-4f17-8ef4-2ed3657fb320",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -900,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "18ac3796-a352-4792-b58f-26d7c4631a7c",
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -700,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.zagchain.net/zagn8n/marketing-feed",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-ZagChain-Automation-Token",
+              "value": "replace-with-your-zagn8n-token"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7306470c-338e-4d94-b768-ec5c603307e6",
+      "name": "Fetch zagn8n Feed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -440,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const feed = $json;\nconst prompt = `You are creating short-form marketing content for ZagChain.\n\nUse only the facts in the input JSON.\nDo not promise guaranteed returns.\nDo not use misleading urgency.\nKeep the tone premium, simple, confident, and persuasive.\nOutput must be valid JSON.\n\nReturn a JSON object with exactly these keys:\ninstagram_caption, tiktok_hook, video_script_15s, video_script_30s, story_text, image_headline, image_subheadline, cta, hashtags, canva_image_brief, canva_video_brief\n\nRules:\n- hashtags must be an array of 5 short hashtags\n- keep captions and scripts concise and natural\n- mention ZagChain only where it feels natural\n- do not invent metrics\n- rely only on the input JSON\n\nInput JSON:\n${JSON.stringify(feed, null, 2)}`;\n\nreturn [{\n  feed,\n  ai_prompt: prompt,\n  generated_at: feed.generated_at || new Date().toISOString(),\n  top_package_name: Array.isArray(feed.top_packages) && feed.top_packages.length ? feed.top_packages[0].name : 'ZagChain package',\n  active_investor_count: feed?.totals?.active_investor_count || 0,\n  active_capital_usd: feed?.totals?.active_capital_usd || 0\n}];"
+      },
+      "id": "65f0af11-1d6f-4061-b7aa-9e3877aef9a1",
+      "name": "Build AI Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.openai.com/v1/responses",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer replace-with-your-openai-api-key"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"model\": \"gpt-5.2\",\n  \"instructions\": \"You create compliant ZagChain marketing copy. Always output valid JSON.\",\n  \"input\": $json.ai_prompt,\n  \"text\": {\n    \"format\": {\n      \"type\": \"json_object\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "eed88a4e-3d0e-47c6-a682-0b008cb46ab1",
+      "name": "OpenAI Generate Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        120,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.output_text || '';\nlet content = {};\n\ntry {\n  content = raw ? JSON.parse(raw) : {};\n} catch (error) {\n  content = {\n    instagram_caption: raw,\n    tiktok_hook: '',\n    video_script_15s: '',\n    video_script_30s: '',\n    story_text: '',\n    image_headline: '',\n    image_subheadline: '',\n    cta: '',\n    hashtags: [],\n    canva_image_brief: '',\n    canva_video_brief: '',\n    parse_error: 'OpenAI response was not valid JSON. Review output_text manually.'\n  };\n}\n\nconst hashtags = Array.isArray(content.hashtags) ? content.hashtags.join(' ') : String(content.hashtags || '');\nconst preview = `zagn8n content ready\\n\\nIG: ${content.instagram_caption || ''}\\n\\nTikTok hook: ${content.tiktok_hook || ''}\\n\\nCTA: ${content.cta || ''}\\n\\nHashtags: ${hashtags}`;\n\nreturn [{\n  ...content,\n  preview_message: preview,\n  raw_output_text: raw,\n  hashtags_text: hashtags,\n  generated_at: new Date().toISOString()\n}];"
+      },
+      "id": "947f4935-8561-4bf7-b7ba-875f2cc10b36",
+      "name": "Parse AI Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "replace-with-your-telegram-chat-id",
+        "text": "={{ $json.preview_message }}",
+        "additionalFields": {}
+      },
+      "id": "7caac07f-5570-4bc9-9925-31a8d5faee61",
+      "name": "Telegram Preview",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        680,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://your-n8n-domain/webhook/zagn8n-approval-review",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"theme\": \"general_marketing\",\n  \"generated_at\": $json.generated_at,\n  \"instagram_caption\": $json.instagram_caption,\n  \"tiktok_hook\": $json.tiktok_hook,\n  \"video_script_15s\": $json.video_script_15s,\n  \"video_script_30s\": $json.video_script_30s,\n  \"story_text\": $json.story_text,\n  \"image_headline\": $json.image_headline,\n  \"image_subheadline\": $json.image_subheadline,\n  \"cta\": $json.cta,\n  \"hashtags\": $json.hashtags_text,\n  \"canva_image_brief\": $json.canva_image_brief,\n  \"canva_video_brief\": $json.canva_video_brief,\n  \"approval_status\": \"pending_review\",\n  \"reviewer_notes\": \"Generated by zagn8n marketing AI workflow.\"\n}",
+        "options": {}
+      },
+      "id": "6b938749-9c0d-4e3a-a41f-0a6eb1642029",
+      "name": "Send To Approval Queue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_ai_content"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "generated_at": "={{ $json.generated_at }}",
+            "instagram_caption": "={{ $json.instagram_caption }}",
+            "tiktok_hook": "={{ $json.tiktok_hook }}",
+            "video_script_15s": "={{ $json.video_script_15s }}",
+            "video_script_30s": "={{ $json.video_script_30s }}",
+            "story_text": "={{ $json.story_text }}",
+            "image_headline": "={{ $json.image_headline }}",
+            "image_subheadline": "={{ $json.image_subheadline }}",
+            "cta": "={{ $json.cta }}",
+            "hashtags": "={{ $json.hashtags_text }}",
+            "canva_image_brief": "={{ $json.canva_image_brief }}",
+            "canva_video_brief": "={{ $json.canva_video_brief }}",
+            "raw_output_text": "={{ $json.raw_output_text }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "generated_at", "displayName": "generated_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "instagram_caption", "displayName": "instagram_caption", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "tiktok_hook", "displayName": "tiktok_hook", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "video_script_15s", "displayName": "video_script_15s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "video_script_30s", "displayName": "video_script_30s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "story_text", "displayName": "story_text", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_headline", "displayName": "image_headline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_subheadline", "displayName": "image_subheadline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "cta", "displayName": "cta", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "hashtags", "displayName": "hashtags", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_image_brief", "displayName": "canva_image_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_video_brief", "displayName": "canva_video_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "raw_output_text", "displayName": "raw_output_text", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "3215204d-10d1-4d68-80ec-e8f3c4d225c6",
+      "name": "Google Sheets Content Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        680,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## OpenAI API note\n\nThis workflow calls the OpenAI Responses API at `POST /v1/responses` and asks for JSON output.\n\nOfficial docs:\n- https://platform.openai.com/docs/api-reference/responses\n- https://platform.openai.com/docs/guides/text\n- https://platform.openai.com/docs/guides/json-mode\n\nIf you prefer, you can replace the HTTP Request node with an official n8n OpenAI node later.",
+        "width": 460,
+        "height": 260
+      },
+      "id": "9dfa14e8-5227-4c00-8102-2b522e83484e",
+      "name": "OpenAI Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        80,
+        -220
+      ]
+    }
+  ],
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch zagn8n Feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch zagn8n Feed": {
+      "main": [
+        [
+          {
+            "node": "Build AI Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build AI Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Generate Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Generate Content": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Output": {
+      "main": [
+        [
+          {
+            "node": "Telegram Preview",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send To Approval Queue",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets Content Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "c0d31f2d-cf3e-4f30-a83e-ea526c875a4e",
+  "id": "zagn8n-marketing-ai-generator",
+  "tags": []
+}

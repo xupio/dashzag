@@ -1,0 +1,293 @@
+{
+  "name": "zagn8n Referral Campaign AI Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## zagn8n referral campaign generator\n\nThis workflow focuses on one theme:\n- referral growth and word-of-mouth momentum\n\nBefore activating:\n\n1. Replace the secure feed URL if needed.\n2. Replace `replace-with-your-zagn8n-token`.\n3. Replace `replace-with-your-openai-api-key`.\n4. Replace Telegram chat ID and Google Sheet ID.\n\nThis workflow is built to produce cleaner referral-focused marketing instead of mixing package and comparison angles together.",
+        "width": 620,
+        "height": 320
+      },
+      "id": "26f77c13-58c8-4e6f-8eca-99df7592c44e",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -920,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "26732fdc-af75-449c-9f5e-2b1abd80e68c",
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -700,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.zagchain.net/zagn8n/marketing-feed",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-ZagChain-Automation-Token",
+              "value": "replace-with-your-zagn8n-token"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "d3143ff1-9f1b-41d9-abf5-945d0d44f714",
+      "name": "Fetch zagn8n Feed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -440,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const feed = $json;\nconst totals = feed?.totals || {};\nconst last24 = feed?.last_24_hours || {};\nconst last7 = feed?.last_7_days || {};\n\nconst prompt = `You are creating premium short-form referral campaign content for ZagChain.\n\nTheme: word-of-mouth growth, referrals, and trust-based sharing.\nUse only the facts in the input JSON.\nDo not promise guaranteed returns.\nDo not use misleading urgency.\nDo not make fake income claims about referrals.\nOutput must be valid JSON.\n\nReferral-growth relevant facts:\n- Active investors: ${totals.active_investor_count || 0}\n- Verified users: ${totals.verified_user_count || 0}\n- Approved KYC users: ${totals.approved_kyc_count || 0}\n- New registrations last 24 hours: ${last24.new_registrations || 0}\n- New active investments last 24 hours: ${last24.new_active_investments || 0}\n- New registrations last 7 days: ${last7.new_registrations || 0}\n- New active investments last 7 days: ${last7.new_active_investments || 0}\n\nReturn a JSON object with exactly these keys:\ninstagram_caption, tiktok_hook, video_script_15s, video_script_30s, story_text, image_headline, image_subheadline, cta, hashtags, canva_image_brief, canva_video_brief\n\nRules:\n- hashtags must be an array of 5 hashtags\n- keep the tone premium, simple, and social\n- focus on inviting warm contacts, trust, and helping people understand first\n- mention clarity, dashboard visibility, and guided onboarding where useful\n- avoid hype-heavy MLM wording\n- avoid overclaiming referral rewards\n\nInput JSON:\n${JSON.stringify(feed, null, 2)}`;\n\nreturn [{\n  feed,\n  ai_prompt: prompt\n}];"
+      },
+      "id": "c8f5593d-a19b-44fd-a6c2-e63e3302f38b",
+      "name": "Build Referral Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.openai.com/v1/responses",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer replace-with-your-openai-api-key"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"model\": \"gpt-5.2\",\n  \"instructions\": \"You create compliant ZagChain referral campaign marketing copy. Always output valid JSON.\",\n  \"input\": $json.ai_prompt,\n  \"text\": {\n    \"format\": {\n      \"type\": \"json_object\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "279a39f3-7190-4f9c-bf7a-198378d7baf8",
+      "name": "OpenAI Generate Referral Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        120,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.output_text || '';\nlet content = {};\n\ntry {\n  content = raw ? JSON.parse(raw) : {};\n} catch (error) {\n  content = {\n    instagram_caption: raw,\n    tiktok_hook: '',\n    video_script_15s: '',\n    video_script_30s: '',\n    story_text: '',\n    image_headline: '',\n    image_subheadline: '',\n    cta: '',\n    hashtags: [],\n    canva_image_brief: '',\n    canva_video_brief: '',\n    parse_error: 'OpenAI response was not valid JSON. Review raw output manually.'\n  };\n}\n\nconst hashtags = Array.isArray(content.hashtags) ? content.hashtags.join(' ') : String(content.hashtags || '');\nconst preview = `zagn8n referral campaign ready\\n\\nHook: ${content.tiktok_hook || ''}\\n\\nHeadline: ${content.image_headline || ''}\\n\\nCTA: ${content.cta || ''}\\n\\nHashtags: ${hashtags}`;\n\nreturn [{\n  ...content,\n  preview_message: preview,\n  raw_output_text: raw,\n  hashtags_text: hashtags,\n  generated_at: new Date().toISOString()\n}];"
+      },
+      "id": "0cab9bab-0fd7-43ba-bd47-54d1a2075f01",
+      "name": "Parse Referral Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "replace-with-your-telegram-chat-id",
+        "text": "={{ $json.preview_message }}",
+        "additionalFields": {}
+      },
+      "id": "6991a508-d2d1-4d6f-a654-9fbb8c2332af",
+      "name": "Telegram Preview",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        680,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://your-n8n-domain/webhook/zagn8n-approval-review",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"theme\": \"referral_campaign\",\n  \"generated_at\": $json.generated_at,\n  \"instagram_caption\": $json.instagram_caption,\n  \"tiktok_hook\": $json.tiktok_hook,\n  \"video_script_15s\": $json.video_script_15s,\n  \"video_script_30s\": $json.video_script_30s,\n  \"story_text\": $json.story_text,\n  \"image_headline\": $json.image_headline,\n  \"image_subheadline\": $json.image_subheadline,\n  \"cta\": $json.cta,\n  \"hashtags\": $json.hashtags_text,\n  \"canva_image_brief\": $json.canva_image_brief,\n  \"canva_video_brief\": $json.canva_video_brief,\n  \"approval_status\": \"pending_review\",\n  \"reviewer_notes\": \"Generated by zagn8n referral campaign AI workflow.\"\n}",
+        "options": {}
+      },
+      "id": "0c994609-0d73-4363-a6f2-629e8e37b7dd",
+      "name": "Send To Approval Queue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_referral_campaign"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "generated_at": "={{ $json.generated_at }}",
+            "instagram_caption": "={{ $json.instagram_caption }}",
+            "tiktok_hook": "={{ $json.tiktok_hook }}",
+            "video_script_15s": "={{ $json.video_script_15s }}",
+            "video_script_30s": "={{ $json.video_script_30s }}",
+            "story_text": "={{ $json.story_text }}",
+            "image_headline": "={{ $json.image_headline }}",
+            "image_subheadline": "={{ $json.image_subheadline }}",
+            "cta": "={{ $json.cta }}",
+            "hashtags": "={{ $json.hashtags_text }}",
+            "canva_image_brief": "={{ $json.canva_image_brief }}",
+            "canva_video_brief": "={{ $json.canva_video_brief }}",
+            "raw_output_text": "={{ $json.raw_output_text }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "generated_at", "displayName": "generated_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "instagram_caption", "displayName": "instagram_caption", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "tiktok_hook", "displayName": "tiktok_hook", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "video_script_15s", "displayName": "video_script_15s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "video_script_30s", "displayName": "video_script_30s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "story_text", "displayName": "story_text", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_headline", "displayName": "image_headline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_subheadline", "displayName": "image_subheadline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "cta", "displayName": "cta", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "hashtags", "displayName": "hashtags", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_image_brief", "displayName": "canva_image_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_video_brief", "displayName": "canva_video_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "raw_output_text", "displayName": "raw_output_text", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "4cb7f273-e47c-4541-8e48-c976731fbd73",
+      "name": "Google Sheets Referral Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        680,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch zagn8n Feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch zagn8n Feed": {
+      "main": [
+        [
+          {
+            "node": "Build Referral Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Referral Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Generate Referral Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Generate Referral Content": {
+      "main": [
+        [
+          {
+            "node": "Parse Referral Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Referral Output": {
+      "main": [
+        [
+          {
+            "node": "Telegram Preview",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send To Approval Queue",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets Referral Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "93fed3b0-d91b-49d0-afd1-5cc5304b0eb1",
+  "id": "zagn8n-referral-campaign-ai-generator",
+  "tags": []
+}

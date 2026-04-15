@@ -1,0 +1,187 @@
+{
+  "name": "zagn8n Approval Review Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## zagn8n approval review flow\n\nPurpose:\n- receive generated content for review\n- send it to Telegram or email for manual approval\n- log it into Google Sheets with an approval status\n\nRecommended sheet columns:\n- generated_at\n- theme\n- instagram_caption\n- tiktok_hook\n- image_headline\n- cta\n- approval_status\n- reviewer_notes\n\nRecommended manual process:\n1. AI workflow writes generated content here\n2. You review in Telegram / Google Sheets\n3. Mark `approved`, `needs_edit`, or `rejected` in the sheet\n4. Only approved rows move to Canva or publishing workflows",
+        "width": 620,
+        "height": 340
+      },
+      "id": "bd042ed9-dbfe-4c0c-a21b-82cbf5c5a87e",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -860,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "zagn8n-approval-review",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ec309b56-4fb3-4dc2-a2db-157b7bb15280",
+      "name": "Approval Review Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -620,
+        140
+      ],
+      "webhookId": "zagn8n-approval-review"
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $json.body && Object.keys($json.body).length ? $json.body : $json;\nconst generatedAt = payload.generated_at || new Date().toISOString();\nconst theme = payload.theme || 'general';\nconst approvalStatus = payload.approval_status || 'pending_review';\n\nreturn [{\n  generated_at: generatedAt,\n  theme,\n  instagram_caption: payload.instagram_caption || '',\n  tiktok_hook: payload.tiktok_hook || '',\n  video_script_15s: payload.video_script_15s || '',\n  video_script_30s: payload.video_script_30s || '',\n  story_text: payload.story_text || '',\n  image_headline: payload.image_headline || '',\n  image_subheadline: payload.image_subheadline || '',\n  cta: payload.cta || '',\n  hashtags: Array.isArray(payload.hashtags) ? payload.hashtags.join(' ') : String(payload.hashtags || ''),\n  canva_image_brief: payload.canva_image_brief || '',\n  canva_video_brief: payload.canva_video_brief || '',\n  approval_status: approvalStatus,\n  reviewer_notes: payload.reviewer_notes || '',\n  preview_message: `zagn8n approval review\\n\\nTheme: ${theme}\\nHeadline: ${payload.image_headline || ''}\\nHook: ${payload.tiktok_hook || ''}\\nCTA: ${payload.cta || ''}\\nStatus: ${approvalStatus}`\n}];"
+      },
+      "id": "2d91ec58-dc18-4d1c-96dc-6676f3f53b6e",
+      "name": "Prepare Review Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -340,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "replace-with-your-telegram-chat-id",
+        "text": "={{ $json.preview_message }}",
+        "additionalFields": {}
+      },
+      "id": "54c58c86-a0b3-42f7-a5ff-62a283e68249",
+      "name": "Telegram Review Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -60,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_approval_queue"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "generated_at": "={{ $json.generated_at }}",
+            "theme": "={{ $json.theme }}",
+            "instagram_caption": "={{ $json.instagram_caption }}",
+            "tiktok_hook": "={{ $json.tiktok_hook }}",
+            "video_script_15s": "={{ $json.video_script_15s }}",
+            "video_script_30s": "={{ $json.video_script_30s }}",
+            "story_text": "={{ $json.story_text }}",
+            "image_headline": "={{ $json.image_headline }}",
+            "image_subheadline": "={{ $json.image_subheadline }}",
+            "cta": "={{ $json.cta }}",
+            "hashtags": "={{ $json.hashtags }}",
+            "canva_image_brief": "={{ $json.canva_image_brief }}",
+            "canva_video_brief": "={{ $json.canva_video_brief }}",
+            "approval_status": "={{ $json.approval_status }}",
+            "reviewer_notes": "={{ $json.reviewer_notes }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "generated_at", "displayName": "generated_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "theme", "displayName": "theme", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "instagram_caption", "displayName": "instagram_caption", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "tiktok_hook", "displayName": "tiktok_hook", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "video_script_15s", "displayName": "video_script_15s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "video_script_30s", "displayName": "video_script_30s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "story_text", "displayName": "story_text", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_headline", "displayName": "image_headline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_subheadline", "displayName": "image_subheadline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "cta", "displayName": "cta", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "hashtags", "displayName": "hashtags", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_image_brief", "displayName": "canva_image_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_video_brief", "displayName": "canva_video_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "approval_status", "displayName": "approval_status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "reviewer_notes", "displayName": "reviewer_notes", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "23d28096-e1f0-44c8-9164-b67c4634fdad",
+      "name": "Google Sheets Approval Queue",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -60,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, status: $json.approval_status, theme: $json.theme } }}",
+        "options": {}
+      },
+      "id": "de7d3fd2-d739-4bd8-8878-f35d5a110d35",
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        140
+      ]
+    }
+  ],
+  "connections": {
+    "Approval Review Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Review Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Review Record": {
+      "main": [
+        [
+          {
+            "node": "Telegram Review Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets Approval Queue",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "9ca82666-210d-413c-acd5-d610f1b998fb",
+  "id": "zagn8n-approval-review-flow",
+  "tags": []
+}

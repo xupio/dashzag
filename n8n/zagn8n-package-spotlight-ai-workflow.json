@@ -1,0 +1,293 @@
+{
+  "name": "zagn8n Package Spotlight AI Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## zagn8n package spotlight generator\n\nThis workflow focuses on one marketing theme:\n- spotlighting the strongest active package in ZagChain\n\nBefore activating:\n\n1. Replace the secure feed URL if needed.\n2. Replace `replace-with-your-zagn8n-token`.\n3. Replace `replace-with-your-openai-api-key`.\n4. Replace Telegram chat ID and Google Sheet ID.\n\nThis workflow is designed to create cleaner package-specific marketing than a generic content generator.",
+        "width": 620,
+        "height": 320
+      },
+      "id": "4f46fc19-c3b0-49cc-a5b4-f9f0b4ca6b08",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -920,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "bc23843c-24dc-4948-ba73-7d76cb13cab5",
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -700,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.zagchain.net/zagn8n/marketing-feed",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-ZagChain-Automation-Token",
+              "value": "replace-with-your-zagn8n-token"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b7bb45d8-90ce-48ab-bbab-672e7634f3f2",
+      "name": "Fetch zagn8n Feed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -440,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const feed = $json;\nconst packageSpotlight = Array.isArray(feed?.top_packages) && feed.top_packages.length ? feed.top_packages[0] : null;\nconst fallbackPackage = {\n  name: 'ZagChain package',\n  price: 1000,\n  shares_count: 10,\n  monthly_return_rate_percent: 0,\n  active_investor_count: 0,\n  active_capital_usd: 0,\n  miner: 'Alpha One'\n};\nconst pkg = packageSpotlight || fallbackPackage;\n\nconst prompt = `You are creating premium short-form marketing content for ZagChain.\n\nTheme: package spotlight.\nUse only the facts in the input JSON.\nDo not promise guaranteed returns.\nDo not use misleading urgency.\nOutput must be valid JSON.\n\nSpotlight package facts:\n- Package name: ${pkg.name}\n- Price: $${pkg.price}\n- Shares count: ${pkg.shares_count}\n- Displayed monthly rate example: ${pkg.monthly_return_rate_percent}%\n- Active investor count: ${pkg.active_investor_count}\n- Active capital in this package: $${pkg.active_capital_usd}\n- Miner: ${pkg.miner}\n\nReturn a JSON object with exactly these keys:\ninstagram_caption, tiktok_hook, video_script_15s, video_script_30s, story_text, image_headline, image_subheadline, cta, hashtags, canva_image_brief, canva_video_brief\n\nRules:\n- hashtags must be an array of 5 hashtags\n- keep the tone premium, clear, and confidence-building\n- explain why the package is attractive in simple language\n- mention dashboard visibility, package structure, and clarity where useful\n- do not invent missing metrics\n\nInput JSON:\n${JSON.stringify(feed, null, 2)}`;\n\nreturn [{\n  feed,\n  package_spotlight: pkg,\n  ai_prompt: prompt\n}];"
+      },
+      "id": "c41adb8e-4fd9-40d7-a217-f171dce7b7e2",
+      "name": "Build Package Spotlight Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.openai.com/v1/responses",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer replace-with-your-openai-api-key"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"model\": \"gpt-5.2\",\n  \"instructions\": \"You create compliant ZagChain package spotlight marketing copy. Always output valid JSON.\",\n  \"input\": $json.ai_prompt,\n  \"text\": {\n    \"format\": {\n      \"type\": \"json_object\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "07dad3e3-aee7-4579-b2e1-13db2bce7263",
+      "name": "OpenAI Generate Spotlight Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        120,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.output_text || '';\nlet content = {};\n\ntry {\n  content = raw ? JSON.parse(raw) : {};\n} catch (error) {\n  content = {\n    instagram_caption: raw,\n    tiktok_hook: '',\n    video_script_15s: '',\n    video_script_30s: '',\n    story_text: '',\n    image_headline: '',\n    image_subheadline: '',\n    cta: '',\n    hashtags: [],\n    canva_image_brief: '',\n    canva_video_brief: '',\n    parse_error: 'OpenAI response was not valid JSON. Review raw output manually.'\n  };\n}\n\nconst hashtags = Array.isArray(content.hashtags) ? content.hashtags.join(' ') : String(content.hashtags || '');\nconst preview = `zagn8n package spotlight ready\\n\\nHook: ${content.tiktok_hook || ''}\\n\\nHeadline: ${content.image_headline || ''}\\n\\nCTA: ${content.cta || ''}\\n\\nHashtags: ${hashtags}`;\n\nreturn [{\n  ...content,\n  preview_message: preview,\n  raw_output_text: raw,\n  hashtags_text: hashtags,\n  generated_at: new Date().toISOString()\n}];"
+      },
+      "id": "fe84c330-570a-4144-af44-190aa31fa162",
+      "name": "Parse Spotlight Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "replace-with-your-telegram-chat-id",
+        "text": "={{ $json.preview_message }}",
+        "additionalFields": {}
+      },
+      "id": "d5bad13a-4713-4c88-91a5-8160f9747996",
+      "name": "Telegram Preview",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        680,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://your-n8n-domain/webhook/zagn8n-approval-review",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"theme\": \"package_spotlight\",\n  \"generated_at\": $json.generated_at,\n  \"instagram_caption\": $json.instagram_caption,\n  \"tiktok_hook\": $json.tiktok_hook,\n  \"video_script_15s\": $json.video_script_15s,\n  \"video_script_30s\": $json.video_script_30s,\n  \"story_text\": $json.story_text,\n  \"image_headline\": $json.image_headline,\n  \"image_subheadline\": $json.image_subheadline,\n  \"cta\": $json.cta,\n  \"hashtags\": $json.hashtags_text,\n  \"canva_image_brief\": $json.canva_image_brief,\n  \"canva_video_brief\": $json.canva_video_brief,\n  \"approval_status\": \"pending_review\",\n  \"reviewer_notes\": \"Generated by zagn8n package spotlight AI workflow.\"\n}",
+        "options": {}
+      },
+      "id": "ea9882a6-25e7-4d55-81e1-b0de7415655c",
+      "name": "Send To Approval Queue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_package_spotlight"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "generated_at": "={{ $json.generated_at }}",
+            "instagram_caption": "={{ $json.instagram_caption }}",
+            "tiktok_hook": "={{ $json.tiktok_hook }}",
+            "video_script_15s": "={{ $json.video_script_15s }}",
+            "video_script_30s": "={{ $json.video_script_30s }}",
+            "story_text": "={{ $json.story_text }}",
+            "image_headline": "={{ $json.image_headline }}",
+            "image_subheadline": "={{ $json.image_subheadline }}",
+            "cta": "={{ $json.cta }}",
+            "hashtags": "={{ $json.hashtags_text }}",
+            "canva_image_brief": "={{ $json.canva_image_brief }}",
+            "canva_video_brief": "={{ $json.canva_video_brief }}",
+            "raw_output_text": "={{ $json.raw_output_text }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "generated_at", "displayName": "generated_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "instagram_caption", "displayName": "instagram_caption", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "tiktok_hook", "displayName": "tiktok_hook", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "video_script_15s", "displayName": "video_script_15s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "video_script_30s", "displayName": "video_script_30s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "story_text", "displayName": "story_text", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_headline", "displayName": "image_headline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_subheadline", "displayName": "image_subheadline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "cta", "displayName": "cta", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "hashtags", "displayName": "hashtags", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_image_brief", "displayName": "canva_image_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_video_brief", "displayName": "canva_video_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "raw_output_text", "displayName": "raw_output_text", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "64009bf0-2632-4bb6-b41d-1485b3725082",
+      "name": "Google Sheets Spotlight Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        680,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch zagn8n Feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch zagn8n Feed": {
+      "main": [
+        [
+          {
+            "node": "Build Package Spotlight Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Package Spotlight Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Generate Spotlight Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Generate Spotlight Content": {
+      "main": [
+        [
+          {
+            "node": "Parse Spotlight Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Spotlight Output": {
+      "main": [
+        [
+          {
+            "node": "Telegram Preview",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send To Approval Queue",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets Spotlight Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "7735115d-01ec-45ef-b58d-b0d91d6d5d10",
+  "id": "zagn8n-package-spotlight-ai-generator",
+  "tags": []
+}

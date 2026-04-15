@@ -1,0 +1,293 @@
+{
+  "name": "zagn8n Bank vs ZagChain AI Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## zagn8n bank vs ZagChain generator\n\nThis workflow is focused on one theme only:\n- comparing slow bank-style growth with the clearer ZagChain investment journey\n\nBefore activating:\n\n1. Replace the secure feed URL if needed.\n2. Replace `replace-with-your-zagn8n-token`.\n3. Replace `replace-with-your-openai-api-key`.\n4. Replace Telegram chat ID and Google Sheet ID.\n\nThis workflow is stronger for ads and short-form content because it stays on one angle instead of mixing many ideas.",
+        "width": 620,
+        "height": 320
+      },
+      "id": "9ca16b9f-bda8-487d-b0d1-7d747d99d486",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -920,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "2c9a3865-f758-4832-9d7e-fd87f5a0baf0",
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -700,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.zagchain.net/zagn8n/marketing-feed",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-ZagChain-Automation-Token",
+              "value": "replace-with-your-zagn8n-token"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "5be4d0d5-a1d4-4514-b4c1-33b0c397db10",
+      "name": "Fetch zagn8n Feed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -440,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const feed = $json;\nconst topPackage = Array.isArray(feed?.top_packages) && feed.top_packages.length ? feed.top_packages[0] : null;\nconst packagePrice = Number(topPackage?.price || 1000);\nconst bankRate = 4;\nconst zagRate = Number(topPackage?.monthly_return_rate_percent || 0);\nconst bankYearValue = Number((packagePrice * (1 + (bankRate / 100))).toFixed(2));\nconst bankYearGain = Number((bankYearValue - packagePrice).toFixed(2));\nconst zagMonthEstimate = Number((packagePrice * (zagRate / 100)).toFixed(2));\n\nconst prompt = `You are creating premium short-form marketing content for ZagChain.\n\nTheme: bank vs ZagChain.\nUse only the facts in the input JSON and the comparison figures provided below.\nDo not promise guaranteed returns.\nDo not say risk-free.\nDo not use fake urgency.\nOutput must be valid JSON.\n\nComparison frame:\n- Example amount: $${packagePrice}\n- Example bank annual rate: ${bankRate}%\n- Example bank yearly value: $${bankYearValue}\n- Example bank yearly gain: $${bankYearGain}\n- ZagChain example package: ${topPackage?.name || 'ZagChain package'}\n- ZagChain displayed monthly rate example: ${zagRate}%\n- ZagChain monthly estimate example: $${zagMonthEstimate}\n\nReturn a JSON object with exactly these keys:\ninstagram_caption, tiktok_hook, video_script_15s, video_script_30s, story_text, image_headline, image_subheadline, cta, hashtags, canva_image_brief, canva_video_brief\n\nRules:\n- hashtags must be an array of 5 hashtags\n- keep it persuasive, clear, premium, and simple\n- focus on the difference between sleeping savings and smarter earnings visibility\n- make the comparison understandable for normal users\n- avoid legal or financial overclaiming\n\nInput JSON:\n${JSON.stringify(feed, null, 2)}`;\n\nreturn [{\n  feed,\n  ai_prompt: prompt,\n  comparison: {\n    example_amount_usd: packagePrice,\n    bank_annual_rate_percent: bankRate,\n    bank_yearly_value_usd: bankYearValue,\n    bank_yearly_gain_usd: bankYearGain,\n    zag_package_name: topPackage?.name || 'ZagChain package',\n    zag_monthly_rate_percent: zagRate,\n    zag_monthly_estimate_usd: zagMonthEstimate\n  }\n}];"
+      },
+      "id": "dffce4ff-5ba9-48a3-b8f6-d0ecedb0f737",
+      "name": "Build Bank Comparison Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.openai.com/v1/responses",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer replace-with-your-openai-api-key"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"model\": \"gpt-5.2\",\n  \"instructions\": \"You create compliant ZagChain comparison marketing copy. Always output valid JSON.\",\n  \"input\": $json.ai_prompt,\n  \"text\": {\n    \"format\": {\n      \"type\": \"json_object\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "db61daa0-5d5b-4fd0-9920-a82fbd834397",
+      "name": "OpenAI Generate Comparison Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        120,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.output_text || '';\nlet content = {};\n\ntry {\n  content = raw ? JSON.parse(raw) : {};\n} catch (error) {\n  content = {\n    instagram_caption: raw,\n    tiktok_hook: '',\n    video_script_15s: '',\n    video_script_30s: '',\n    story_text: '',\n    image_headline: '',\n    image_subheadline: '',\n    cta: '',\n    hashtags: [],\n    canva_image_brief: '',\n    canva_video_brief: '',\n    parse_error: 'OpenAI response was not valid JSON. Review raw output manually.'\n  };\n}\n\nconst hashtags = Array.isArray(content.hashtags) ? content.hashtags.join(' ') : String(content.hashtags || '');\nconst preview = `zagn8n bank vs ZagChain ready\\n\\nHook: ${content.tiktok_hook || ''}\\n\\nHeadline: ${content.image_headline || ''}\\n\\nCTA: ${content.cta || ''}\\n\\nHashtags: ${hashtags}`;\n\nreturn [{\n  ...content,\n  preview_message: preview,\n  raw_output_text: raw,\n  hashtags_text: hashtags,\n  generated_at: new Date().toISOString()\n}];"
+      },
+      "id": "0baa254a-4de1-4d1a-9622-ae7a93a2d6a4",
+      "name": "Parse Comparison Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "replace-with-your-telegram-chat-id",
+        "text": "={{ $json.preview_message }}",
+        "additionalFields": {}
+      },
+      "id": "ee5bfeb3-25ba-4711-9d03-bfe9dfc37628",
+      "name": "Telegram Preview",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        680,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://your-n8n-domain/webhook/zagn8n-approval-review",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={\n  \"theme\": \"bank_vs_zagchain\",\n  \"generated_at\": $json.generated_at,\n  \"instagram_caption\": $json.instagram_caption,\n  \"tiktok_hook\": $json.tiktok_hook,\n  \"video_script_15s\": $json.video_script_15s,\n  \"video_script_30s\": $json.video_script_30s,\n  \"story_text\": $json.story_text,\n  \"image_headline\": $json.image_headline,\n  \"image_subheadline\": $json.image_subheadline,\n  \"cta\": $json.cta,\n  \"hashtags\": $json.hashtags_text,\n  \"canva_image_brief\": $json.canva_image_brief,\n  \"canva_video_brief\": $json.canva_video_brief,\n  \"approval_status\": \"pending_review\",\n  \"reviewer_notes\": \"Generated by zagn8n bank vs ZagChain AI workflow.\"\n}",
+        "options": {}
+      },
+      "id": "af52f19d-e85c-4df7-8ca8-526634bf2d90",
+      "name": "Send To Approval Queue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_bank_vs_zagchain"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "generated_at": "={{ $json.generated_at }}",
+            "instagram_caption": "={{ $json.instagram_caption }}",
+            "tiktok_hook": "={{ $json.tiktok_hook }}",
+            "video_script_15s": "={{ $json.video_script_15s }}",
+            "video_script_30s": "={{ $json.video_script_30s }}",
+            "story_text": "={{ $json.story_text }}",
+            "image_headline": "={{ $json.image_headline }}",
+            "image_subheadline": "={{ $json.image_subheadline }}",
+            "cta": "={{ $json.cta }}",
+            "hashtags": "={{ $json.hashtags_text }}",
+            "canva_image_brief": "={{ $json.canva_image_brief }}",
+            "canva_video_brief": "={{ $json.canva_video_brief }}",
+            "raw_output_text": "={{ $json.raw_output_text }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "generated_at", "displayName": "generated_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "instagram_caption", "displayName": "instagram_caption", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "tiktok_hook", "displayName": "tiktok_hook", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "video_script_15s", "displayName": "video_script_15s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "video_script_30s", "displayName": "video_script_30s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "story_text", "displayName": "story_text", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_headline", "displayName": "image_headline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_subheadline", "displayName": "image_subheadline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "cta", "displayName": "cta", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "hashtags", "displayName": "hashtags", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_image_brief", "displayName": "canva_image_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_video_brief", "displayName": "canva_video_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "raw_output_text", "displayName": "raw_output_text", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "88ffd4db-c495-46af-a5a3-9aad07ca4fe2",
+      "name": "Google Sheets Comparison Log",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        680,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch zagn8n Feed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch zagn8n Feed": {
+      "main": [
+        [
+          {
+            "node": "Build Bank Comparison Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Bank Comparison Prompt": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Generate Comparison Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Generate Comparison Content": {
+      "main": [
+        [
+          {
+            "node": "Parse Comparison Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Comparison Output": {
+      "main": [
+        [
+          {
+            "node": "Telegram Preview",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send To Approval Queue",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Google Sheets Comparison Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "1cb2fcf2-f95d-4e1f-8fb7-b29152ffd659",
+  "id": "zagn8n-bank-vs-zagchain-ai-generator",
+  "tags": []
+}

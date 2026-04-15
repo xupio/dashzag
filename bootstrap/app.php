@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureAdminTwoFactorVerified;
 use App\Http\Middleware\EnsureSingleDeviceSession;
 use App\Http\Middleware\SecureHeaders;
+use App\Http\Middleware\EnsureZagn8nTokenIsValid;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'admin' => EnsureUserIsAdmin::class,
             'admin.two_factor' => EnsureAdminTwoFactorVerified::class,
             'single_session' => EnsureSingleDeviceSession::class,
+            'zagn8n.token' => EnsureZagn8nTokenIsValid::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
