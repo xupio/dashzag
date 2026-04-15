@@ -1,6 +1,33 @@
 ﻿@extends('layout.master')
 
 @section('content')
+@php
+  $friendReferralMetrics = $friendReferralMetrics ?? [
+    'total' => 0,
+    'pending' => 0,
+    'verified' => 0,
+    'registered' => 0,
+    'active_investors' => 0,
+    'verification_rate' => 0,
+    'registration_rate' => 0,
+    'investor_rate' => 0,
+  ];
+
+  $friendReferralMilestone = $friendReferralMilestone ?? [
+    'current' => 0,
+    'next_target' => 1,
+    'remaining' => 1,
+    'progress' => 0,
+  ];
+
+  $publicHowItWorksUrl = $publicHowItWorksUrl ?? route('marketing.how-it-works');
+  $publicRegisterUrl = $publicRegisterUrl ?? route('register');
+  $displayHowItWorksUrl = $displayHowItWorksUrl ?? preg_replace('#^https?://#', '', $publicHowItWorksUrl);
+  $displayRegisterUrl = $displayRegisterUrl ?? preg_replace('#^https?://#', '', $publicRegisterUrl);
+  $shareShortMessage = $shareShortMessage ?? ('Take a look at ZagChain: '.$publicHowItWorksUrl.' If it fits your goals, you can register here: '.$publicRegisterUrl);
+  $shareWhatsappText = $shareWhatsappText ?? ("Start simple. Track clearly. Grow with ZagChain.\n\nCreate your account, choose a package, follow your earnings in the dashboard, and complete KYC before your first withdrawal.\n\nHow it works: ".$publicHowItWorksUrl."\nRegister: ".$publicRegisterUrl);
+  $shareTelegramText = $shareTelegramText ?? ("I wanted to share ZagChain with you.\n\nCreate your account, choose a package, follow your earnings in the dashboard, and complete KYC before your first withdrawal.\n\nHow it works: ".$publicHowItWorksUrl."\nRegister: ".$publicRegisterUrl);
+@endphp
 <div class="row">
   <div class="col-12 grid-margin">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
