@@ -1,0 +1,379 @@
+{
+  "name": "zagn8n Approved Content Publisher With Status Update",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## zagn8n approved content publisher with status update\n\nPurpose:\n- read approved content only\n- turn approved rows into a publishing queue\n- update the original approval row to `queued_for_publish`\n- prevent duplicate queueing on the next schedule run\n\nRecommended process:\n1. AI workflow generates content\n2. approval-review workflow stores it in the approval queue\n3. you mark rows as `approved`\n4. this workflow reads only approved rows\n5. it forwards them to your publishing queue\n6. it updates the original approval row to `queued_for_publish`\n\nImportant:\n- `generated_at` is used as the row match key for the update step\n- keep `generated_at` unique per approval record",
+        "width": 700,
+        "height": 360
+      },
+      "id": "e0c2f775-5147-4670-90ea-5896ac88522d",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -960,
+        -260
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "1d0ff0db-d536-4d2d-98d4-fa663f9a4981",
+      "name": "Queue Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -700,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_approval_queue"
+        },
+        "options": {}
+      },
+      "id": "6567d7b8-4fcb-48ee-bb31-33a6d95bf8e7",
+      "name": "Read Approval Queue",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -440,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "83c2bca9-8109-4aa7-9a89-b805b44d7ac1",
+              "leftValue": "={{ $json.approval_status }}",
+              "rightValue": "approved",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "0b427a1c-caa5-4cb0-a8f8-ddcbe655a6ab",
+      "name": "Approved Only",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -180,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bbf62e9c-6d73-4e3a-af4a-a61b99666494",
+              "name": "queued_at",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "575e54a0-80a8-4ad4-af61-86946ec3307c",
+              "name": "theme",
+              "value": "={{ $json.theme }}",
+              "type": "string"
+            },
+            {
+              "id": "ed7fc9ae-d585-406f-bdd7-a544b53fe04b",
+              "name": "channel",
+              "value": "instagram_tiktok",
+              "type": "string"
+            },
+            {
+              "id": "9961ffb8-9f6c-42ec-ac97-a99a243f4369",
+              "name": "caption",
+              "value": "={{ $json.instagram_caption }}",
+              "type": "string"
+            },
+            {
+              "id": "51f5e713-dab2-448d-bf1a-313eab85c883",
+              "name": "hook",
+              "value": "={{ $json.tiktok_hook }}",
+              "type": "string"
+            },
+            {
+              "id": "a03f1a34-b4f8-4de0-ab29-c52ed889e5d1",
+              "name": "headline",
+              "value": "={{ $json.image_headline }}",
+              "type": "string"
+            },
+            {
+              "id": "cbabfca0-7d82-470d-8084-4a43059c9074",
+              "name": "cta",
+              "value": "={{ $json.cta }}",
+              "type": "string"
+            },
+            {
+              "id": "ea8fe6c3-39bc-4897-9fe6-710d1c831073",
+              "name": "publish_status",
+              "value": "queued",
+              "type": "string"
+            },
+            {
+              "id": "d5975baa-2824-445d-9a34-1441e4676924",
+              "name": "generated_at",
+              "value": "={{ $json.generated_at }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0bfd3f9c-fb94-4917-a703-cb2c3e5e17f5",
+      "name": "Prepare Publish Queue Record",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        80,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_publish_queue"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "queued_at": "={{ $json.queued_at }}",
+            "theme": "={{ $json.theme }}",
+            "channel": "={{ $json.channel }}",
+            "caption": "={{ $json.caption }}",
+            "hook": "={{ $json.hook }}",
+            "headline": "={{ $json.headline }}",
+            "cta": "={{ $json.cta }}",
+            "publish_status": "={{ $json.publish_status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "queued_at", "displayName": "queued_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "theme", "displayName": "theme", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "channel", "displayName": "channel", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "caption", "displayName": "caption", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "hook", "displayName": "hook", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "headline", "displayName": "headline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "cta", "displayName": "cta", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "publish_status", "displayName": "publish_status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "b94e7bd9-1903-43cf-8417-e447050d2614",
+      "name": "Append Publish Queue",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        340,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_approval_queue"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "generated_at": "={{ $json.generated_at }}",
+            "approval_status": "queued_for_publish"
+          },
+          "matchingColumns": [
+            "generated_at"
+          ],
+          "schema": [
+            { "id": "generated_at", "displayName": "generated_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "theme", "displayName": "theme", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "instagram_caption", "displayName": "instagram_caption", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "tiktok_hook", "displayName": "tiktok_hook", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "video_script_15s", "displayName": "video_script_15s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "video_script_30s", "displayName": "video_script_30s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "story_text", "displayName": "story_text", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_headline", "displayName": "image_headline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_subheadline", "displayName": "image_subheadline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "cta", "displayName": "cta", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "hashtags", "displayName": "hashtags", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_image_brief", "displayName": "canva_image_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_video_brief", "displayName": "canva_video_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "approval_status", "displayName": "approval_status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "reviewer_notes", "displayName": "reviewer_notes", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "8c625147-dc1d-4455-ba71-b25ef3f216ab",
+      "name": "Mark Approval Row Queued",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        620,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "replace-with-your-telegram-chat-id",
+        "text": "=zagn8n approved content queued\n\nTheme: {{$json.theme}}\nHeadline: {{$json.headline}}\nStatus: {{$json.publish_status}}\nApproval row: queued_for_publish",
+        "additionalFields": {}
+      },
+      "id": "c3e2913d-6e7c-46c8-8c91-ce57ed68dc56",
+      "name": "Telegram Queue Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Why this version matters\n\nThis workflow adds one missing safety step:\n- after queueing approved content, it updates the original approval row to `queued_for_publish`\n\nThat prevents the same approved record from being re-added on every schedule run.",
+        "width": 440,
+        "height": 220
+      },
+      "id": "4f6e79f0-5999-4773-92c4-dcb33563f33f",
+      "name": "Status Update Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        820,
+        -180
+      ]
+    }
+  ],
+  "connections": {
+    "Queue Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Approval Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Approval Queue": {
+      "main": [
+        [
+          {
+            "node": "Approved Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved Only": {
+      "main": [
+        [
+          {
+            "node": "Prepare Publish Queue Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Prepare Publish Queue Record": {
+      "main": [
+        [
+          {
+            "node": "Append Publish Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Publish Queue": {
+      "main": [
+        [
+          {
+            "node": "Mark Approval Row Queued",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Approval Row Queued": {
+      "main": [
+        [
+          {
+            "node": "Telegram Queue Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "7f3e2949-a9e8-43ef-bc67-43691d2892bf",
+  "id": "zagn8n-approved-content-publisher-with-status-update",
+  "tags": []
+}

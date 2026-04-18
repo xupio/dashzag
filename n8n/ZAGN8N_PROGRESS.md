@@ -152,3 +152,14 @@ n8n can poll this endpoint and generate:
   - builds a publish queue record
   - stores publish-ready rows in a separate queue
   - sends Telegram queue alerts
+
+## Stage 11 completed
+
+- added enhanced approved content publisher workflow:
+  - `zagn8n-approved-content-publisher-with-status-update-workflow.json`
+- workflow now:
+  - reads approved content only
+  - builds a publish queue record
+  - stores publish-ready rows in a separate queue
+  - updates the original approval row to `queued_for_publish`
+  - avoids duplicate queueing on later schedule runs

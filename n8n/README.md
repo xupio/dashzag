@@ -11,6 +11,7 @@ Import this file into n8n:
 - `n8n/zagn8n-referral-campaign-ai-workflow.json`
 - `n8n/zagn8n-approval-review-workflow.json`
 - `n8n/zagn8n-approved-content-publisher-workflow.json`
+- `n8n/zagn8n-approved-content-publisher-with-status-update-workflow.json`
 
 What it does:
 
@@ -145,6 +146,17 @@ It is used to:
 - create publish-ready queue rows
 - send Telegram queue alerts
 - prepare the handoff into Canva or a social scheduler
+
+Enhanced approved publishing queue file:
+
+- `n8n/zagn8n-approved-content-publisher-with-status-update-workflow.json`
+
+It is used to:
+
+- read only approved content from the approval queue
+- create publish-ready queue rows
+- update the original approval row to `queued_for_publish`
+- prevent duplicate queueing on the next schedule run
 
 After import:
 
