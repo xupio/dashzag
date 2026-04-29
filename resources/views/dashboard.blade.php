@@ -163,6 +163,68 @@
   </div>
 @endif
 
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card border-info">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div>
+            <h5 class="mb-1">Miner market board</h5>
+            <p class="text-secondary mb-0">See which miners are still selling, approaching capacity, maturing after sell out, or already open for resale.</p>
+          </div>
+          <a href="{{ route('share-market.index') }}" class="btn btn-outline-primary btn-sm">Open Share Market</a>
+        </div>
+        <div class="row g-3">
+          @foreach (($marketLifecycleMiners ?? collect()) as $marketMiner)
+            @php
+              $statusClass = match ($marketMiner['status']) {
+                'secondary_market_open' => 'bg-success-subtle text-success',
+                'sold_out', 'mature' => 'bg-info-subtle text-info',
+                'nearly_full' => 'bg-warning-subtle text-warning',
+                default => 'bg-light text-dark',
+              };
+              $progressClass = $marketMiner['sold_percent'] >= 100
+                ? 'bg-success'
+                : ($marketMiner['sold_percent'] >= $marketMiner['near_capacity_threshold_percent'] ? 'bg-warning' : 'bg-primary');
+            @endphp
+            <div class="col-xl-3 col-md-6">
+              <div class="border rounded p-3 h-100 bg-light">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <div>
+                    <div class="fw-semibold">{{ $marketMiner['name'] }}</div>
+                    <div class="text-secondary small">{{ number_format($marketMiner['shares_sold']) }} / {{ number_format($marketMiner['total_shares']) }} shares sold</div>
+                  </div>
+                  <span class="badge {{ $statusClass }}">{{ ucfirst($marketMiner['status_label']) }}</span>
+                </div>
+                <div class="progress mb-2" style="height: 8px;">
+                  <div class="progress-bar {{ $progressClass }}" role="progressbar" style="width: {{ min(100, $marketMiner['sold_percent']) }}%"></div>
+                </div>
+                <div class="text-secondary small mb-3">{{ number_format($marketMiner['sold_percent'], 1) }}% sell-through</div>
+                @if ($marketMiner['is_tradable'])
+                  <div class="small fw-semibold text-success">Secondary market open</div>
+                  <div class="text-secondary small">Fee: {{ number_format($marketMiner['secondary_market_fee_percent'], 2) }}%</div>
+                @elseif ($marketMiner['status'] === 'sold_out' && $marketMiner['maturity_due_at'])
+                  <div class="small fw-semibold text-info">Maturing</div>
+                  <div class="text-secondary small">{{ $marketMiner['days_until_maturity'] }} day{{ $marketMiner['days_until_maturity'] === 1 ? '' : 's' }} until {{ $marketMiner['maturity_due_at']->format('M d') }}</div>
+                @elseif ($marketMiner['status'] === 'mature')
+                  <div class="small fw-semibold text-info">Ready for resale opening</div>
+                  <div class="text-secondary small">Will open on the next lifecycle sync.</div>
+                @elseif ($marketMiner['status'] === 'nearly_full')
+                  <div class="small fw-semibold text-warning">Near capacity</div>
+                  <div class="text-secondary small">Primary sales are almost complete.</div>
+                @else
+                  <div class="small fw-semibold text-secondary">Primary market active</div>
+                  <div class="text-secondary small">New shares are still being sold directly.</div>
+                @endif
+              </div>
+            </div>
+          @endforeach
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="row">
   <div class="col-md-3 grid-margin stretch-card">
     <div class="card">

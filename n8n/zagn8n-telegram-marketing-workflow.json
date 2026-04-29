@@ -1,0 +1,808 @@
+{
+  "name": "zagn8n Telegram Marketing Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## zagn8n Telegram-first workflow\n\nThis is the simplified version.\n\nFlow:\n1. You send a Telegram message like `daily`, `approve`, or `edit: ...`\n2. The workflow uses one control sheet only\n3. `daily` creates one draft from ZagChain performance data\n4. `approve` marks the latest draft approved and creates a Canva social-post design automatically\n5. `edit: ...` rewrites the latest draft and sends it back to Telegram\n\nRequired sheet name:\n- `zagn8n_marketing_control`\n\nRequired columns:\n- created_at\n- chat_id\n- trigger_word\n- performance_date\n- performance_summary\n- draft_text\n- approval_status\n- edit_request\n- version\n- canva_status\n- canva_design_id\n- canva_design_link\n- last_action\n\nCanva note:\n- this workflow creates a simple 1080x1080 Canva design automatically after approval\n- if you later want the draft text placed into a branded template automatically, switch the Canva step to Autofill with a Canva brand template",
+        "width": 720,
+        "height": 360
+      },
+      "id": "c8d83f50-b0d3-40e7-99e6-6e61224c98b8",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1240,
+        -320
+      ]
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "9c98720c-7208-40c7-ab5d-6656f9336158",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1140,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const message = $json.message || {};\nconst chatId = String(message.chat?.id || '');\nconst text = String(message.text || '').trim();\nconst lower = text.toLowerCase();\n\nlet command = 'unknown';\nlet editRequest = '';\n\nif (lower === 'daily') {\n  command = 'daily';\n} else if (lower === 'approve') {\n  command = 'approve';\n} else if (lower.startsWith('edit:')) {\n  command = 'edit';\n  editRequest = text.slice(5).trim();\n}\n\nreturn [{\n  json: {\n    chat_id: chatId,\n    telegram_text: text,\n    command,\n    edit_request: editRequest,\n    received_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "3c94770e-b233-4b7b-9f86-21b325b2bd4a",
+      "name": "Parse Telegram Command",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -860,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2f0ff827-f985-4c7f-babf-19cf942ad773",
+              "leftValue": "={{ $json.command }}",
+              "rightValue": "daily",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "72d2a359-ddff-4f71-939e-6ba10aeea900",
+      "name": "Is Daily?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -580,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "da98a32d-5915-4d62-9987-e75f43b73673",
+              "leftValue": "={{ $json.command }}",
+              "rightValue": "approve",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4fbfe4c7-54e6-40d1-af90-689f6924ff70",
+      "name": "Is Approve?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -300,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9bd71d2b-24e8-48fb-a742-7dd0cb4e1910",
+              "leftValue": "={{ $json.command }}",
+              "rightValue": "edit",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2960d808-c3d0-4bc4-8498-31ee722df3fe",
+      "name": "Is Edit?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -20,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://www.zagchain.net/zagn8n/marketing-feed",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-ZagChain-Automation-Token",
+              "value": "replace-with-your-zagn8n-token"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "497d37b0-2d7f-4d91-8dc0-f6088aab5eec",
+      "name": "Fetch Daily Performance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -300,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const trigger = $('Parse Telegram Command').first().json;\nconst feed = $json;\nconst totals = feed.totals || {};\nconst topPackages = Array.isArray(feed.top_packages) ? feed.top_packages : [];\nconst packageLine = topPackages.slice(0, 3).map((pkg) => `${pkg.name} (${pkg.monthly_return_rate || pkg.return_rate || 'rate listed'})`).join(', ');\nconst performanceSummary = `Verified users: ${totals.verified_user_count || 0}; active investors: ${totals.active_investor_count || 0}; active capital: $${totals.active_capital_usd || 0}; paid payouts: ${totals.paid_payout_count || 0}.`;\nconst prompt = `Create one premium but clear Telegram-ready marketing draft for ZagChain using only these facts. Avoid guarantees. Keep it concise and persuasive. Mention package examples naturally. Return plain text only.\\n\\nPerformance summary: ${performanceSummary}\\nPackage examples: ${packageLine || 'Use current dashboard package listings only.'}`;\n\nreturn [{\n  json: {\n    created_at: new Date().toISOString(),\n    chat_id: trigger.chat_id,\n    trigger_word: 'daily',\n    performance_date: String(feed.generated_at || new Date().toISOString()).slice(0, 10),\n    performance_summary: performanceSummary,\n    ai_prompt: prompt,\n    version: 1,\n    package_line: packageLine\n  }\n}];"
+      },
+      "id": "2b9e9bb2-7cbf-4633-8e06-34afd1664355",
+      "name": "Build Daily Draft Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -20,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.openai.com/v1/responses",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer replace-with-your-openai-api-key"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: 'gpt-5.2', instructions: 'You write compliant marketing copy for ZagChain. No guarantees. Plain text only.', input: $json.ai_prompt } }}",
+        "options": {}
+      },
+      "id": "81877fc3-12ea-4f26-839d-0f688915d884",
+      "name": "Generate Daily Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ctx = $('Build Daily Draft Prompt').first().json;\nconst raw = $json.output?.[0]?.content?.[0]?.text || $json.output_text || '';\nconst draft = String(raw || '').trim();\nconst draftMessage = `zagn8n draft ready\\n\\nPerformance summary:\\n${ctx.performance_summary}\\n\\nDraft:\\n${draft}\\n\\nReply with:\\napprove\\nor\\nedit: your change request`;\n\nreturn [{\n  json: {\n    created_at: ctx.created_at,\n    chat_id: ctx.chat_id,\n    trigger_word: ctx.trigger_word,\n    performance_date: ctx.performance_date,\n    performance_summary: ctx.performance_summary,\n    draft_text: draft,\n    approval_status: 'draft',\n    edit_request: '',\n    version: ctx.version,\n    canva_status: 'not_started',\n    canva_design_id: '',\n    canva_design_link: '',\n    last_action: 'draft_sent',\n    telegram_message: draftMessage\n  }\n}];"
+      },
+      "id": "be33d7ff-3c7b-48df-9a75-fce60c43d02d",
+      "name": "Prepare Daily Draft Record",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_marketing_control"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "created_at": "={{ $json.created_at }}",
+            "chat_id": "={{ $json.chat_id }}",
+            "trigger_word": "={{ $json.trigger_word }}",
+            "performance_date": "={{ $json.performance_date }}",
+            "performance_summary": "={{ $json.performance_summary }}",
+            "draft_text": "={{ $json.draft_text }}",
+            "approval_status": "={{ $json.approval_status }}",
+            "edit_request": "={{ $json.edit_request }}",
+            "version": "={{ $json.version }}",
+            "canva_status": "={{ $json.canva_status }}",
+            "canva_design_id": "={{ $json.canva_design_id }}",
+            "canva_design_link": "={{ $json.canva_design_link }}",
+            "last_action": "={{ $json.last_action }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "created_at", "displayName": "created_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "chat_id", "displayName": "chat_id", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "trigger_word", "displayName": "trigger_word", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "performance_date", "displayName": "performance_date", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "performance_summary", "displayName": "performance_summary", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "draft_text", "displayName": "draft_text", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "approval_status", "displayName": "approval_status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "edit_request", "displayName": "edit_request", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "version", "displayName": "version", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_status", "displayName": "canva_status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_design_id", "displayName": "canva_design_id", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_design_link", "displayName": "canva_design_link", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "last_action", "displayName": "last_action", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "57bd807c-286d-4501-9326-d8597b6ec37e",
+      "name": "Append New Draft Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        840,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.telegram_message }}",
+        "additionalFields": {}
+      },
+      "id": "0df8451e-7cd3-4dc9-b7f1-6bce78c35b27",
+      "name": "Send Draft To Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1140,
+        -60
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_marketing_control"
+        },
+        "options": {}
+      },
+      "id": "4eeb0f7e-f76f-4330-b678-06fce8ab8ceb",
+      "name": "Read Control Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        260,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const commandCtx = $('Parse Telegram Command').first().json;\nconst rows = items.map((item) => item.json).filter((row) => String(row.chat_id || '') === String(commandCtx.chat_id || ''));\nrows.sort((a, b) => String(b.created_at || '').localeCompare(String(a.created_at || '')));\nconst latest = rows[0];\n\nif (!latest) {\n  return [{ json: { chat_id: commandCtx.chat_id, error_message: 'No active draft found for this chat. Send `daily` first.' } }];\n}\n\nreturn [{\n  json: {\n    ...latest,\n    chat_id: commandCtx.chat_id,\n    command: commandCtx.command,\n    edit_request_incoming: commandCtx.edit_request,\n    telegram_text: commandCtx.telegram_text\n  }\n}];"
+      },
+      "id": "9e1cff54-8fcd-4855-afd8-a82ae2f0960e",
+      "name": "Find Latest Chat Draft",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        540,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0f03ced5-90b0-4e89-8d98-170c8f74b5f1",
+              "leftValue": "={{ $json.command }}",
+              "rightValue": "approve",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "34557cbf-95a0-47ec-8f3f-944ea2c17cb8",
+      "name": "Latest Is Approve?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        840,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const draft = String($json.draft_text || '').trim();\nconst performanceSummary = String($json.performance_summary || '').trim();\nconst titleDate = String($json.performance_date || '').trim() || new Date().toISOString().slice(0, 10);\n\nreturn [{\n  json: {\n    ...$json,\n    approval_status: 'approved',\n    canva_status: 'creating',\n    canva_design_id: '',\n    canva_design_link: '',\n    canva_title: `ZagChain Social Post ${titleDate}`,\n    canva_brief: `Create a premium ZagChain social post using this approved draft.\\n\\nPerformance summary:\\n${performanceSummary}\\n\\nApproved draft:\\n${draft}`,\n    last_action: 'approved_sending_to_canva'\n  }\n}];"
+      },
+      "id": "6da8f702-a1b6-4a5f-b502-0489b8052f8f",
+      "name": "Prepare Approve Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.openai.com/v1/responses",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer replace-with-your-openai-api-key"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: 'gpt-5.2', instructions: 'Rewrite the ZagChain draft using the edit request. Keep it concise, compliant, and plain text only.', input: `Original draft:\\n${$json.draft_text}\\n\\nPerformance summary:\\n${$json.performance_summary}\\n\\nEdit request:\\n${$json.edit_request_incoming}` } }}",
+        "options": {}
+      },
+      "id": "09628bfb-c4d4-4d84-bcf5-726f1223454f",
+      "name": "Regenerate Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const latest = $('Find Latest Chat Draft').first().json;\nconst raw = $json.output?.[0]?.content?.[0]?.text || $json.output_text || '';\nconst revised = String(raw || '').trim();\nconst nextVersion = Number(latest.version || 1) + 1;\n\nreturn [{\n  json: {\n    ...latest,\n    draft_text: revised,\n    approval_status: 'needs_edit',\n    edit_request: latest.edit_request_incoming || '',\n    version: nextVersion,\n    last_action: 'revised_draft_sent',\n    revised_message: `zagn8n revised draft\\n\\nDraft:\\n${revised}\\n\\nReply with:\\napprove\\nor\\nedit: your change request`\n  }\n}];"
+      },
+      "id": "425b2fbb-f34b-4642-8c9e-97ae0f4d448c",
+      "name": "Prepare Edited Draft Update",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.canva.com/rest/v1/designs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer replace-with-your-canva-access-token"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { design_type: { type: 'custom', width: 1080, height: 1080 }, title: $json.canva_title } }}",
+        "options": {}
+      },
+      "id": "1e61f991-815c-448e-a3a6-0862e952d291",
+      "name": "Create Canva Social Design",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const approved = $('Prepare Approve Update').first().json;\nconst design = $json.design || {};\nconst designId = design.id || '';\nconst editUrl = designId ? `https://www.canva.com/design/${designId}/edit` : '';\n\nreturn [{\n  json: {\n    ...approved,\n    canva_status: editUrl ? 'created' : 'create_failed',\n    canva_design_id: designId,\n    canva_design_link: editUrl,\n    last_action: editUrl ? 'canva_design_created' : 'canva_design_create_failed',\n    approval_message: editUrl\n      ? `zagn8n approved\\n\\nYour draft is approved and Canva created a social post design.\\n\\nApproved draft:\\n${approved.draft_text}\\n\\nCanva brief:\\n${approved.canva_brief}\\n\\nCanva link:\\n${editUrl}`\n      : `zagn8n approved\\n\\nThe draft was approved, but Canva did not return a design link.\\n\\nApproved draft:\\n${approved.draft_text}`\n  }\n}];"
+      },
+      "id": "b221e0cf-69ab-4c5d-bb9a-e15232ecb7f5",
+      "name": "Prepare Canva Create Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_marketing_control"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "created_at": "={{ $json.created_at }}",
+            "draft_text": "={{ $json.draft_text }}",
+            "approval_status": "={{ $json.approval_status }}",
+            "edit_request": "={{ $json.edit_request }}",
+            "version": "={{ $json.version }}",
+            "canva_status": "={{ $json.canva_status }}",
+            "canva_design_id": "={{ $json.canva_design_id }}",
+            "canva_design_link": "={{ $json.canva_design_link }}",
+            "last_action": "={{ $json.last_action }}"
+          },
+          "matchingColumns": [
+            "created_at"
+          ],
+          "schema": [
+            { "id": "created_at", "displayName": "created_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "chat_id", "displayName": "chat_id", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "trigger_word", "displayName": "trigger_word", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "performance_date", "displayName": "performance_date", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "performance_summary", "displayName": "performance_summary", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "draft_text", "displayName": "draft_text", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "approval_status", "displayName": "approval_status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "edit_request", "displayName": "edit_request", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "version", "displayName": "version", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_status", "displayName": "canva_status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_design_id", "displayName": "canva_design_id", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_design_link", "displayName": "canva_design_link", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "last_action", "displayName": "last_action", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "4e625032-1704-469f-a0e1-a3927ee63031",
+      "name": "Update Control Sheet Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1680,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.approval_message || $json.revised_message || $json.error_message }}",
+        "additionalFields": {}
+      },
+      "id": "7f82528e-b709-4892-87b5-76407cb4cd18",
+      "name": "Send Reply To Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1960,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.error_message }}",
+        "additionalFields": {}
+      },
+      "id": "bcac3a59-db3d-4709-b013-d2d8e7c2fd70",
+      "name": "Send No Draft Warning",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        840,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Telegram Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Telegram Command": {
+      "main": [
+        [
+          {
+            "node": "Is Daily?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Daily?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Daily Performance",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Approve?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Daily Performance": {
+      "main": [
+        [
+          {
+            "node": "Build Daily Draft Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Daily Draft Prompt": {
+      "main": [
+        [
+          {
+            "node": "Generate Daily Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Daily Draft": {
+      "main": [
+        [
+          {
+            "node": "Prepare Daily Draft Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Daily Draft Record": {
+      "main": [
+        [
+          {
+            "node": "Append New Draft Row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Draft To Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Approve?": {
+      "main": [
+        [
+          {
+            "node": "Read Control Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Edit?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Edit?": {
+      "main": [
+        [
+          {
+            "node": "Read Control Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Read Control Sheet": {
+      "main": [
+        [
+          {
+            "node": "Find Latest Chat Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Latest Chat Draft": {
+      "main": [
+        [
+          {
+            "node": "Latest Is Approve?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Latest Is Approve?": {
+      "main": [
+        [
+          {
+            "node": "Prepare Approve Update",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Regenerate Draft",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Approve Update": {
+      "main": [
+        [
+          {
+            "node": "Create Canva Social Design",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Canva Social Design": {
+      "main": [
+        [
+          {
+            "node": "Prepare Canva Create Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Canva Create Result": {
+      "main": [
+        [
+          {
+            "node": "Update Control Sheet Row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Reply To Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Regenerate Draft": {
+      "main": [
+        [
+          {
+            "node": "Prepare Edited Draft Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Edited Draft Update": {
+      "main": [
+        [
+          {
+            "node": "Update Control Sheet Row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Reply To Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Control Sheet Row": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "33f7db03-f15c-451f-a0a3-b899ab4e7d36",
+  "id": "zagn8n-telegram-marketing-workflow",
+  "tags": []
+}

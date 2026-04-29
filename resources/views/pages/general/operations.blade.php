@@ -375,6 +375,155 @@
       <div class="card-body">
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
           <div>
+            <h5 class="mb-1">Secondary market operations</h5>
+            <p class="text-secondary mb-0">Monitor live resale inventory, recently completed trades, and total fee capture from the share market.</p>
+          </div>
+          <div class="d-flex gap-2 flex-wrap">
+            <span class="badge bg-success">{{ $secondaryMarketSummary['tradable_miners'] ?? 0 }} tradable miners</span>
+            <span class="badge bg-primary">{{ $secondaryMarketSummary['active_listings'] ?? 0 }} active listings</span>
+          </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-4 col-xl-2">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">Tradable miners</div>
+              <div class="fw-semibold fs-5">{{ number_format((int) ($secondaryMarketSummary['tradable_miners'] ?? 0)) }}</div>
+            </div>
+          </div>
+          <div class="col-md-4 col-xl-2">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">Active listings</div>
+              <div class="fw-semibold fs-5">{{ number_format((int) ($secondaryMarketSummary['active_listings'] ?? 0)) }}</div>
+            </div>
+          </div>
+          <div class="col-md-4 col-xl-2">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">Open listing value</div>
+              <div class="fw-semibold fs-5">${{ number_format((float) ($secondaryMarketSummary['open_listing_value'] ?? 0), 2) }}</div>
+            </div>
+          </div>
+          <div class="col-md-4 col-xl-2">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">Completed sales</div>
+              <div class="fw-semibold fs-5">{{ number_format((int) ($secondaryMarketSummary['completed_sales'] ?? 0)) }}</div>
+            </div>
+          </div>
+          <div class="col-md-4 col-xl-2">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">Seller proceeds</div>
+              <div class="fw-semibold fs-5">${{ number_format((float) ($secondaryMarketSummary['seller_proceeds'] ?? 0), 2) }}</div>
+            </div>
+          </div>
+          <div class="col-md-4 col-xl-2">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">Platform fees</div>
+              <div class="fw-semibold fs-5">${{ number_format((float) ($secondaryMarketSummary['platform_fees'] ?? 0), 2) }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-4">
+          <div class="col-xl-6">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                  <h6 class="mb-1">Recent market listings</h6>
+                  <p class="text-secondary small mb-0">Newest resale listings and how much inventory is still open.</p>
+                </div>
+                <span class="badge bg-light text-dark border">{{ ($secondaryMarketListings ?? collect())->count() }} rows</span>
+              </div>
+
+              @if (($secondaryMarketListings ?? collect())->isEmpty())
+                <p class="text-secondary mb-0">No secondary market listings have been created yet.</p>
+              @else
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Miner</th>
+                        <th>Seller</th>
+                        <th>Remaining</th>
+                        <th>Price</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @foreach (($secondaryMarketListings ?? collect()) as $listing)
+                        <tr>
+                          <td>
+                            <div class="fw-semibold">{{ $listing->miner?->name ?? '—' }}</div>
+                            <div class="text-secondary small">#{{ $listing->id }}</div>
+                          </td>
+                          <td>{{ $listing->seller?->name ?? '—' }}</td>
+                          <td>{{ number_format((int) $listing->remaining_quantity) }}</td>
+                          <td>${{ number_format((float) $listing->price_per_share, 2) }}</td>
+                          <td><span class="badge bg-light text-dark border">{{ str($listing->status)->replace('_', ' ')->title() }}</span></td>
+                        </tr>
+                      @endforeach
+                    </tbody>
+                  </table>
+                </div>
+              @endif
+            </div>
+          </div>
+
+          <div class="col-xl-6">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                  <h6 class="mb-1">Recent completed sales</h6>
+                  <p class="text-secondary small mb-0">Latest finished trades, net seller proceeds, and ZagChain fee capture.</p>
+                </div>
+                <span class="badge bg-light text-dark border">{{ ($secondaryMarketSales ?? collect())->count() }} rows</span>
+              </div>
+
+              @if (($secondaryMarketSales ?? collect())->isEmpty())
+                <p class="text-secondary mb-0">No secondary market sales have completed yet.</p>
+              @else
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead>
+                      <tr>
+                        <th>Miner</th>
+                        <th>Seller → Buyer</th>
+                        <th>Quantity</th>
+                        <th>Seller net</th>
+                        <th>Fee</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @foreach (($secondaryMarketSales ?? collect()) as $sale)
+                        <tr>
+                          <td>
+                            <div class="fw-semibold">{{ $sale->miner?->name ?? '—' }}</div>
+                            <div class="text-secondary small">Sale #{{ $sale->id }}</div>
+                          </td>
+                          <td>
+                            <div>{{ $sale->seller?->name ?? '—' }}</div>
+                            <div class="text-secondary small">to {{ $sale->buyer?->name ?? '—' }}</div>
+                          </td>
+                          <td>{{ number_format((int) $sale->quantity) }}</td>
+                          <td>${{ number_format((float) $sale->seller_net_amount, 2) }}</td>
+                          <td>${{ number_format((float) $sale->platform_fee_amount, 2) }}</td>
+                        </tr>
+                      @endforeach
+                    </tbody>
+                  </table>
+                </div>
+              @endif
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 stretch-card mb-4">
+    <div class="card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+          <div>
             <h5 class="mb-1">Investor payout board</h5>
             <p class="text-secondary mb-0">Track active investors, their investment start date, the next payout countdown, and how much earnings balance they can withdraw right now.</p>
           </div>

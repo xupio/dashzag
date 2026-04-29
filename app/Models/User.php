@@ -178,6 +178,31 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(UserInvestment::class)->latest('subscribed_at');
     }
 
+    public function shareHoldings(): HasMany
+    {
+        return $this->hasMany(ShareHolding::class)->latest();
+    }
+
+    public function shareListings(): HasMany
+    {
+        return $this->hasMany(ShareListing::class, 'seller_user_id')->latest('listed_at');
+    }
+
+    public function sharePurchases(): HasMany
+    {
+        return $this->hasMany(ShareSale::class, 'buyer_user_id')->latest('created_at');
+    }
+
+    public function shareSales(): HasMany
+    {
+        return $this->hasMany(ShareSale::class, 'seller_user_id')->latest('created_at');
+    }
+
+    public function shareMarketTransactions(): HasMany
+    {
+        return $this->hasMany(ShareMarketTransaction::class)->latest();
+    }
+
     public function sentMessages(): HasMany
     {
         return $this->hasMany(InternalMessage::class, 'sender_id')->latest();

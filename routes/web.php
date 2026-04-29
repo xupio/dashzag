@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\InternalMailController;
+use App\Http\Controllers\ShareMarketController;
 use App\Http\Controllers\AdminTwoFactorController;
 use App\Http\Controllers\ProfileController;
 use App\Rules\AllowedFileSignature;
@@ -17,6 +18,9 @@ use App\Models\MockManagerScenario;
 use App\Models\PayoutRequest;
 use App\Models\ReferralCoachingNote;
 use App\Models\ReferralEvent;
+use App\Models\ShareListing;
+use App\Models\ShareMarketTransaction;
+use App\Models\ShareSale;
 use App\Models\Shareholder;
 use App\Models\User;
 use App\Models\UserLoginEvent;
@@ -253,6 +257,34 @@ Route::get('/dashboard', function (Request $request) {
 
     $weeklyHallOfFameWinner = MiningPlatform::competitionLeaderboard('weekly', 1)->first();
     $monthlyHallOfFameChampion = MiningPlatform::competitionLeaderboard('monthly', 1)->first();
+    $marketLifecycleMiners = $miners
+        ->map(function ($marketMiner) {
+            $sharesSold = (int) ($marketMiner->shares_sold ?: MiningPlatform::totalSharesSold($marketMiner));
+            $soldPercent = (int) $marketMiner->total_shares > 0
+                ? round(($sharesSold / max(1, (int) $marketMiner->total_shares)) * 100, 1)
+                : 0.0;
+            $maturityDueAt = $marketMiner->sold_out_at?->copy()->addDays((int) ($marketMiner->maturity_days ?? 0));
+            $daysUntilMaturity = $maturityDueAt && $maturityDueAt->isFuture()
+                ? now()->diffInDays($maturityDueAt)
+                : 0;
+
+            return [
+                'id' => $marketMiner->id,
+                'name' => $marketMiner->name,
+                'slug' => $marketMiner->slug,
+                'status' => $marketMiner->status,
+                'status_label' => str_replace('_', ' ', $marketMiner->status),
+                'shares_sold' => $sharesSold,
+                'total_shares' => (int) $marketMiner->total_shares,
+                'sold_percent' => $soldPercent,
+                'near_capacity_threshold_percent' => (int) ($marketMiner->near_capacity_threshold_percent ?? 90),
+                'maturity_due_at' => $maturityDueAt,
+                'days_until_maturity' => $daysUntilMaturity,
+                'secondary_market_fee_percent' => (float) ($marketMiner->secondary_market_fee_percent ?? 0),
+                'is_tradable' => $marketMiner->status === 'secondary_market_open',
+            ];
+        })
+        ->values();
 
     return view('dashboard', [
         'user' => $user,
@@ -277,12 +309,22 @@ Route::get('/dashboard', function (Request $request) {
         'shareStatusSeries' => $shareStatusBreakdown->pluck('shares')->values()->all(),
         'shareStatusDetails' => $shareStatusBreakdown->values()->all(),
         'minerInvestorPipeline' => $minerInvestorPipeline,
+        'marketLifecycleMiners' => $marketLifecycleMiners,
         'weeklyHallOfFameWinnerId' => $weeklyHallOfFameWinner['user']->id ?? null,
         'monthlyHallOfFameChampionId' => $monthlyHallOfFameChampion['user']->id ?? null,
     ]);
 })->middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->name('dashboard');
 
 Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->group(function () {
+    Route::get('/share-market', [ShareMarketController::class, 'index'])
+        ->name('share-market.index');
+    Route::post('/share-market/listings', [ShareMarketController::class, 'storeListing'])
+        ->name('share-market.listings.store');
+    Route::post('/share-market/listings/{listing}/cancel', [ShareMarketController::class, 'cancelListing'])
+        ->name('share-market.listings.cancel');
+    Route::post('/share-market/listings/{listing}/buy', [ShareMarketController::class, 'buyListing'])
+        ->name('share-market.listings.buy');
+
     Route::post('/dashboard/activity/page-visit', function (Request $request) {
         $validated = $request->validate([
             'path' => ['required', 'string', 'max:255'],
@@ -1343,6 +1385,14 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                     'team_level_5_bonus',
                 ],
             ],
+            'secondary_market_sales' => [
+                'label' => 'Secondary market sale proceeds',
+                'sources' => ['secondary_share_sale'],
+            ],
+            'secondary_market_purchases' => [
+                'label' => 'Secondary market purchases',
+                'sources' => ['secondary_share_purchase'],
+            ],
         ];
 
         if (! array_key_exists($source, $sourceMap)) {
@@ -1415,6 +1465,14 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                     'team_level_5_bonus',
                 ])->sum('amount'), 2),
             ],
+            'secondary_market_sales' => [
+                'label' => 'Secondary market sale proceeds',
+                'amount' => round((float) $earnings->where('source', 'secondary_share_sale')->sum('amount'), 2),
+            ],
+            'secondary_market_purchases' => [
+                'label' => 'Secondary market purchases',
+                'amount' => round((float) $earnings->where('source', 'secondary_share_purchase')->sum('amount'), 2),
+            ],
         ];
 
         $filteredEarnings = $source === 'all'
@@ -1470,6 +1528,14 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                     'team_level_4_bonus',
                     'team_level_5_bonus',
                 ],
+            ],
+            'secondary_market_sales' => [
+                'label' => 'Secondary market sale proceeds',
+                'sources' => ['secondary_share_sale'],
+            ],
+            'secondary_market_purchases' => [
+                'label' => 'Secondary market purchases',
+                'sources' => ['secondary_share_purchase'],
             ],
         ];
 
@@ -3684,6 +3750,38 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 })
                 ->values();
 
+            $secondaryMarketListings = ShareListing::query()
+                ->with(['miner', 'seller'])
+                ->latest('listed_at')
+                ->limit(10)
+                ->get();
+
+            $secondaryMarketSales = ShareSale::query()
+                ->with(['miner', 'seller', 'buyer'])
+                ->latest('completed_at')
+                ->limit(10)
+                ->get();
+
+            $secondaryMarketSummary = [
+                'tradable_miners' => Miner::query()->where('status', 'secondary_market_open')->count(),
+                'active_listings' => ShareListing::query()
+                    ->whereIn('status', ['active', 'partially_sold'])
+                    ->where('remaining_quantity', '>', 0)
+                    ->count(),
+                'open_listing_value' => round((float) ShareListing::query()
+                    ->whereIn('status', ['active', 'partially_sold'])
+                    ->where('remaining_quantity', '>', 0)
+                    ->get()
+                    ->sum(fn (ShareListing $listing) => (float) $listing->remaining_quantity * (float) $listing->price_per_share), 2),
+                'completed_sales' => ShareSale::query()->where('status', 'completed')->count(),
+                'seller_proceeds' => round((float) ShareSale::query()
+                    ->where('status', 'completed')
+                    ->sum('seller_net_amount'), 2),
+                'platform_fees' => round((float) ShareMarketTransaction::query()
+                    ->where('type', 'platform_fee')
+                    ->sum('amount'), 2),
+            ];
+
             return view('pages.general.operations', [
                 'payoutRequests' => PayoutRequest::with(['user', 'earnings'])->latest('requested_at')->get(),
                 'investmentOrders' => $investmentOrders,
@@ -3722,6 +3820,9 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                     'action' => $activityAction,
                 ],
                 'investorPayoutBoard' => $investorPayoutBoard,
+                'secondaryMarketListings' => $secondaryMarketListings,
+                'secondaryMarketSales' => $secondaryMarketSales,
+                'secondaryMarketSummary' => $secondaryMarketSummary,
             ]);
         })->name('dashboard.operations');
 
@@ -4502,6 +4603,15 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 ])
                 ->values();
 
+            $lifecycleStatusLabel = str_replace('_', ' ', $miner->status);
+            $soldPercent = $miner->total_shares > 0
+                ? round(($sharesSold / max(1, (int) $miner->total_shares)) * 100, 1)
+                : 0.0;
+            $maturityDueAt = $miner->sold_out_at?->copy()->addDays((int) ($miner->maturity_days ?? 0));
+            $daysUntilMaturity = $maturityDueAt && $maturityDueAt->isFuture()
+                ? now()->diffInDays($maturityDueAt)
+                : 0;
+
             return view('pages.general.miner', [
                 'miners' => $miners,
                 'miner' => $miner,
@@ -4512,6 +4622,10 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'latestLog' => $latestLog,
                 'marketSignalSummary' => $marketSignalSummary,
                 'packageDailyCaps' => $packageDailyCaps,
+                'lifecycleStatusLabel' => $lifecycleStatusLabel,
+                'soldPercent' => $soldPercent,
+                'maturityDueAt' => $maturityDueAt,
+                'daysUntilMaturity' => $daysUntilMaturity,
             ]);
         })->name('dashboard.miner');
 
@@ -4527,7 +4641,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'daily_output_usd' => ['required', 'numeric', 'min:0'],
                 'monthly_output_usd' => ['required', 'numeric', 'min:0'],
                 'base_monthly_return_rate' => ['required', 'numeric', 'min:0', 'max:100'],
-                'status' => ['required', 'in:active,paused,maintenance'],
+                'status' => ['required', 'in:active,open,nearly_full,sold_out,mature,secondary_market_open,paused,maintenance,closed'],
             ]);
 
             $miner = Miner::where('slug', $validated['miner_slug'])->firstOrFail();

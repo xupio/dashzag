@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Notifications\ActivityFeedNotification;
+use App\Services\ShareHoldingSyncService;
 use App\Support\MiningPlatform;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -30,6 +31,8 @@ class UserInvestment extends Model
     protected static function booted(): void
     {
         static::created(function (UserInvestment $investment) {
+            app(ShareHoldingSyncService::class)->syncFromInvestment($investment);
+
             $investment->loadMissing(['user.sponsor', 'package', 'miner']);
 
             if (! $investment->user || ! $investment->package) {
@@ -111,6 +114,25 @@ class UserInvestment extends Model
             }
 
             MiningPlatform::syncReferralRegistrationRewardsForUserAndAncestors($investment->user);
+        });
+
+        static::updated(function (UserInvestment $investment) {
+            if (! $investment->wasChanged([
+                'user_id',
+                'miner_id',
+                'amount',
+                'shares_owned',
+                'status',
+                'subscribed_at',
+            ])) {
+                return;
+            }
+
+            app(ShareHoldingSyncService::class)->syncFromInvestment($investment);
+        });
+
+        static::deleted(function (UserInvestment $investment) {
+            app(ShareHoldingSyncService::class)->syncFromInvestment($investment);
         });
     }
 

@@ -145,8 +145,73 @@
     <div class="card">
       <div class="card-body">
         <p class="text-secondary mb-1">Status</p>
-        <h4 class="mb-1 text-capitalize">{{ $miner->status }}</h4>
+        <h4 class="mb-1 text-capitalize">{{ $lifecycleStatusLabel }}</h4>
         <p class="text-secondary mb-0">Current operations state for this miner and its package flow.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-4">
+  <div class="col-12 stretch-card">
+    <div class="card border-info">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div>
+            <h5 class="mb-1">Market lifecycle</h5>
+            <p class="text-secondary mb-0">Follow primary sell-through, maturity timing, and when this miner becomes tradable on the secondary market.</p>
+          </div>
+          <span class="badge bg-info-subtle text-info text-capitalize">{{ $lifecycleStatusLabel }}</span>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-3">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">Sell-through</div>
+              <div class="fw-semibold fs-4">{{ number_format($soldPercent, 1) }}%</div>
+              <div class="small text-secondary">{{ number_format($sharesSold) }} of {{ number_format($miner->total_shares) }} shares sold</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">Near-capacity trigger</div>
+              <div class="fw-semibold fs-4">{{ number_format((int) $miner->near_capacity_threshold_percent) }}%</div>
+              <div class="small text-secondary">Miner moves to nearly full after this sell-through point.</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">Maturity window</div>
+              @if ($miner->status === 'sold_out' && $maturityDueAt)
+                <div class="fw-semibold fs-4">{{ $daysUntilMaturity }}</div>
+                <div class="small text-secondary">day{{ $daysUntilMaturity === 1 ? '' : 's' }} until {{ $maturityDueAt->format('M d, Y') }}</div>
+              @elseif ($miner->matured_at)
+                <div class="fw-semibold fs-4">Ready</div>
+                <div class="small text-secondary">Matured on {{ $miner->matured_at->format('M d, Y') }}</div>
+              @else
+                <div class="fw-semibold fs-4">{{ number_format((int) $miner->maturity_days) }}</div>
+                <div class="small text-secondary">days required after sold out</div>
+              @endif
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="border rounded p-3 h-100 bg-light">
+              <div class="text-secondary small">Secondary market</div>
+              @if ($miner->status === 'secondary_market_open')
+                <div class="fw-semibold fs-4 text-success">Open</div>
+                <div class="small text-secondary">Fee: {{ number_format((float) $miner->secondary_market_fee_percent, 2) }}% per resale</div>
+              @elseif ($miner->status === 'mature')
+                <div class="fw-semibold fs-4 text-info">Next sync</div>
+                <div class="small text-secondary">Eligible to open on the next lifecycle run.</div>
+              @elseif ($miner->status === 'sold_out')
+                <div class="fw-semibold fs-4 text-warning">Locked</div>
+                <div class="small text-secondary">Waiting for maturity before resale can open.</div>
+              @else
+                <div class="fw-semibold fs-4 text-secondary">Primary only</div>
+                <div class="small text-secondary">Still in initial share sale phase.</div>
+              @endif
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -247,8 +312,18 @@
             <div class="col-md-6">
               <label class="form-label">Status</label>
               <select name="status" class="form-select @error('status') is-invalid @enderror">
-                @foreach (['active', 'paused', 'maintenance'] as $status)
-                  <option value="{{ $status }}" @selected(old('status', $miner->status) === $status)>{{ ucfirst($status) }}</option>
+                @foreach ([
+                  'active' => 'Active',
+                  'open' => 'Open',
+                  'nearly_full' => 'Nearly full',
+                  'sold_out' => 'Sold out',
+                  'mature' => 'Mature',
+                  'secondary_market_open' => 'Secondary market open',
+                  'paused' => 'Paused',
+                  'maintenance' => 'Maintenance',
+                  'closed' => 'Closed',
+                ] as $status => $label)
+                  <option value="{{ $status }}" @selected(old('status', $miner->status) === $status)>{{ $label }}</option>
                 @endforeach
               </select>
               @error('status')<div class="invalid-feedback">{{ $message }}</div>@enderror

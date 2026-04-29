@@ -1,0 +1,427 @@
+{
+  "name": "zagn8n Canva Handoff Safe Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## zagn8n Canva handoff safe workflow\n\nPurpose:\n- process only one design-ready row per run\n- reduce Telegram spam while testing and in daily use\n- move content into the design queue safely\n- update the original approval row to `design_in_progress`\n\nRecommended use:\n1. keep this workflow active on a modest schedule\n2. let it pick up one `queued_for_publish` row per run\n3. once the design is finished, update downstream statuses manually or in later automations",
+        "width": 700,
+        "height": 320
+      },
+      "id": "87a327dd-c96a-4b6d-b470-c90a786b1c52",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -980,
+        -240
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "91b5fbfb-d8f7-4fe6-bc2e-edb86a4b2cfc",
+      "name": "Safe Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -720,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_approval_queue"
+        },
+        "options": {}
+      },
+      "id": "ed0f7adb-a57d-4cf2-9b07-a6ca14572218",
+      "name": "Read Approval Queue",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -460,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "58745997-c6da-4d52-81f9-3707da6d6974",
+              "leftValue": "={{ $json.approval_status }}",
+              "rightValue": "queued_for_publish",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e09958ca-a18b-47ea-a811-13f2b4bbd279",
+      "name": "Ready For Design",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -200,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "5dc8eb24-c72c-4b92-b262-31efafbb3376",
+      "name": "Process One Row",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        60,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "06f6405d-9f10-4712-a93a-48efd95feebe",
+              "name": "handed_off_at",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "14fd5333-122d-48f8-a4e4-d3a09071986f",
+              "name": "generated_at",
+              "value": "={{ $json.generated_at }}",
+              "type": "string"
+            },
+            {
+              "id": "fe3835f2-c2c9-4474-89ee-e1d4d5581b18",
+              "name": "theme",
+              "value": "={{ $json.theme || 'general' }}",
+              "type": "string"
+            },
+            {
+              "id": "dd5df502-b9bd-4b98-821e-06f511362d35",
+              "name": "platform",
+              "value": "instagram_tiktok",
+              "type": "string"
+            },
+            {
+              "id": "4bda6a3c-9b5c-4ca5-8a09-e1597ba5a78d",
+              "name": "instagram_caption",
+              "value": "={{ $json.instagram_caption }}",
+              "type": "string"
+            },
+            {
+              "id": "7d221fd7-45ff-4785-b099-7cf7b7c0e0be",
+              "name": "tiktok_hook",
+              "value": "={{ $json.tiktok_hook }}",
+              "type": "string"
+            },
+            {
+              "id": "2fe01479-68d4-41fe-96d3-9ae86f534214",
+              "name": "image_headline",
+              "value": "={{ $json.image_headline }}",
+              "type": "string"
+            },
+            {
+              "id": "68f0f826-d0b8-4791-a4ca-b73c69893d84",
+              "name": "image_subheadline",
+              "value": "={{ $json.image_subheadline }}",
+              "type": "string"
+            },
+            {
+              "id": "3ed2323c-6543-4d4b-a0c4-c586b8346ba0",
+              "name": "cta",
+              "value": "={{ $json.cta }}",
+              "type": "string"
+            },
+            {
+              "id": "8b7cc3c4-ee10-4dbf-b884-28596e41ec51",
+              "name": "canva_image_brief",
+              "value": "={{ $json.canva_image_brief }}",
+              "type": "string"
+            },
+            {
+              "id": "4a892c46-247b-4051-b0a8-113d925bb8d9",
+              "name": "canva_video_brief",
+              "value": "={{ $json.canva_video_brief }}",
+              "type": "string"
+            },
+            {
+              "id": "27df2570-1f4b-4c80-85dd-55eb8e3924ae",
+              "name": "design_status",
+              "value": "queued_for_design",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e8d2d04e-7a16-496c-b113-4c104fedb944",
+      "name": "Prepare Canva Handoff Record",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        320,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_design_queue"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "handed_off_at": "={{ $json.handed_off_at }}",
+            "generated_at": "={{ $json.generated_at }}",
+            "theme": "={{ $json.theme }}",
+            "platform": "={{ $json.platform }}",
+            "instagram_caption": "={{ $json.instagram_caption }}",
+            "tiktok_hook": "={{ $json.tiktok_hook }}",
+            "image_headline": "={{ $json.image_headline }}",
+            "image_subheadline": "={{ $json.image_subheadline }}",
+            "cta": "={{ $json.cta }}",
+            "canva_image_brief": "={{ $json.canva_image_brief }}",
+            "canva_video_brief": "={{ $json.canva_video_brief }}",
+            "design_status": "={{ $json.design_status }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            { "id": "handed_off_at", "displayName": "handed_off_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "generated_at", "displayName": "generated_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "theme", "displayName": "theme", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "platform", "displayName": "platform", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "instagram_caption", "displayName": "instagram_caption", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "tiktok_hook", "displayName": "tiktok_hook", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_headline", "displayName": "image_headline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_subheadline", "displayName": "image_subheadline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "cta", "displayName": "cta", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_image_brief", "displayName": "canva_image_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_video_brief", "displayName": "canva_video_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "design_status", "displayName": "design_status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "1d24c7ba-f6ba-4b2e-a90f-4a2a6110af83",
+      "name": "Append Design Queue",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        580,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_approval_queue"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "generated_at": "={{ $json.generated_at }}",
+            "approval_status": "design_in_progress"
+          },
+          "matchingColumns": [
+            "generated_at"
+          ],
+          "schema": [
+            { "id": "generated_at", "displayName": "generated_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "theme", "displayName": "theme", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "instagram_caption", "displayName": "instagram_caption", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "tiktok_hook", "displayName": "tiktok_hook", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "video_script_15s", "displayName": "video_script_15s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "video_script_30s", "displayName": "video_script_30s", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "story_text", "displayName": "story_text", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_headline", "displayName": "image_headline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_subheadline", "displayName": "image_subheadline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "cta", "displayName": "cta", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "hashtags", "displayName": "hashtags", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_image_brief", "displayName": "canva_image_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_video_brief", "displayName": "canva_video_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "approval_status", "displayName": "approval_status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "reviewer_notes", "displayName": "reviewer_notes", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "c64e50c3-cbab-4e56-827d-08d7d2f19f3b",
+      "name": "Mark Design In Progress",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        580,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "replace-with-your-telegram-chat-id",
+        "text": "=zagn8n design handoff ready\n\nTheme: {{$json.theme}}\nHeadline: {{$json.image_headline}}\nCTA: {{$json.cta}}\nDesign status: {{$json.design_status}}",
+        "additionalFields": {}
+      },
+      "id": "a16ec629-1a4e-4d2a-9988-5d4cc0be62f6",
+      "name": "Telegram Design Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        840,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Why this version is safer\n\nThis workflow processes one row per run using `Split In Batches`.\n\nThat helps avoid:\n- large alert floods\n- repeated bulk design queueing\n- hard-to-debug status jumps while testing",
+        "width": 420,
+        "height": 220
+      },
+      "id": "4d3a88d6-2eeb-4585-aaf8-21e54c179e94",
+      "name": "Safety Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        780,
+        -180
+      ]
+    }
+  ],
+  "connections": {
+    "Safe Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Approval Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Approval Queue": {
+      "main": [
+        [
+          {
+            "node": "Ready For Design",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ready For Design": {
+      "main": [
+        [
+          {
+            "node": "Process One Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Process One Row": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Prepare Canva Handoff Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Canva Handoff Record": {
+      "main": [
+        [
+          {
+            "node": "Append Design Queue",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mark Design In Progress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append Design Queue": {
+      "main": [
+        [
+          {
+            "node": "Telegram Design Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "0cb52f91-f98b-4d4f-b90b-c33f377628ba",
+  "id": "zagn8n-canva-handoff-safe",
+  "tags": []
+}

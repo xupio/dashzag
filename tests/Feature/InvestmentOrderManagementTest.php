@@ -5,6 +5,10 @@ use App\Models\FriendInvitation;
 use App\Models\InvestmentOrder;
 use App\Models\InvestmentPackage;
 use App\Models\Miner;
+use App\Models\ShareHolding;
+use App\Models\ShareListing;
+use App\Models\ShareMarketTransaction;
+use App\Models\ShareSale;
 use App\Models\User;
 use App\Models\UserInvestment;
 use App\Models\UserLevel;
@@ -440,6 +444,96 @@ test('admin operations page shows investor payout board with countdown and withd
         ->assertSee('withdrawable now', false)
         ->assertSee('Earnings only')
         ->assertSee('Projected next payout');
+});
+
+test('admin operations page shows secondary market activity board', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'admin',
+    ]);
+
+    $seller = User::factory()->create([
+        'email_verified_at' => now(),
+        'name' => 'Market Seller',
+    ]);
+
+    $buyer = User::factory()->create([
+        'email_verified_at' => now(),
+        'name' => 'Market Buyer',
+    ]);
+
+    $miner = Miner::query()->create([
+        'name' => 'Market Ready Miner',
+        'slug' => 'market-ready-miner',
+        'share_price' => 100,
+        'total_shares' => 1000,
+        'shares_sold' => 1000,
+        'status' => 'secondary_market_open',
+        'secondary_market_fee_percent' => 5,
+        'secondary_market_opened_at' => now()->subDay(),
+    ]);
+
+    $holding = ShareHolding::query()->create([
+        'user_id' => $seller->id,
+        'miner_id' => $miner->id,
+        'quantity' => 20,
+        'locked_quantity' => 4,
+        'avg_buy_price' => 100,
+        'status' => 'active',
+        'last_acquired_at' => now()->subDays(5),
+    ]);
+
+    $listing = ShareListing::query()->create([
+        'seller_user_id' => $seller->id,
+        'miner_id' => $miner->id,
+        'share_holding_id' => $holding->id,
+        'quantity' => 4,
+        'remaining_quantity' => 2,
+        'price_per_share' => 160,
+        'total_price' => 640,
+        'platform_fee_percent' => 5,
+        'platform_fee_amount' => 16,
+        'seller_net_amount' => 304,
+        'status' => 'partially_sold',
+        'listed_at' => now()->subHour(),
+    ]);
+
+    $sale = ShareSale::query()->create([
+        'listing_id' => $listing->id,
+        'miner_id' => $miner->id,
+        'seller_user_id' => $seller->id,
+        'buyer_user_id' => $buyer->id,
+        'quantity' => 2,
+        'price_per_share' => 160,
+        'gross_amount' => 320,
+        'platform_fee_percent' => 5,
+        'platform_fee_amount' => 16,
+        'seller_net_amount' => 304,
+        'status' => 'completed',
+        'completed_at' => now()->subMinutes(30),
+    ]);
+
+    ShareMarketTransaction::query()->create([
+        'user_id' => null,
+        'type' => 'platform_fee',
+        'reference_type' => ShareSale::class,
+        'reference_id' => $sale->id,
+        'amount' => 16,
+        'currency' => 'USD',
+        'status' => 'completed',
+        'meta' => ['miner_id' => $miner->id],
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('dashboard.operations'))
+        ->assertOk()
+        ->assertSee('Secondary market operations')
+        ->assertSee('Market Ready Miner')
+        ->assertSee('Market Seller')
+        ->assertSee('Market Buyer')
+        ->assertSee('Completed sales')
+        ->assertSee('Platform fees')
+        ->assertSee('16.00');
 });
 
 test('admin operations page can filter admin activity logs by action', function () {

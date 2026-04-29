@@ -163,3 +163,47 @@ n8n can poll this endpoint and generate:
   - stores publish-ready rows in a separate queue
   - updates the original approval row to `queued_for_publish`
   - avoids duplicate queueing on later schedule runs
+
+## Stage 12 completed
+
+- added Canva handoff workflow:
+  - `zagn8n-canva-handoff-workflow.json`
+- workflow now:
+  - reads rows marked `queued_for_publish`
+  - creates a design-ready handoff queue with approved copy and Canva briefs
+  - updates the original approval row to `design_in_progress`
+  - sends a Telegram design alert
+
+## Stage 13 completed
+
+- added safer Canva handoff workflow:
+  - `zagn8n-canva-handoff-safe-workflow.json`
+- workflow now:
+  - reads rows marked `queued_for_publish`
+  - processes one row per run
+  - creates a design-ready handoff queue with approved copy and Canva briefs
+  - updates the original approval row to `design_in_progress`
+  - reduces alert floods during testing and daily use
+
+## Stage 14 completed
+
+- added manual Canva placeholder workflow:
+  - `zagn8n-canva-manual-placeholder-workflow.json`
+- workflow now:
+  - reads one `queued_for_design` row
+  - updates the same design row with placeholder Canva tracking values
+  - sets `design_status` to `design_in_progress`
+  - sets `final_review_status` to `pending_final_review`
+  - sends a Telegram manual design task alert
+
+## Stage 15 completed
+
+- added simplified Telegram-first workflow:
+  - `zagn8n-telegram-marketing-workflow.json`
+- workflow now:
+  - starts from Telegram commands only
+  - uses one Google Sheet as the control center
+  - generates one daily draft from ZagChain performance data
+  - supports `approve` and `edit: ...` replies
+  - updates the same row through the whole conversation
+  - prepares a simple Canva handoff state after approval

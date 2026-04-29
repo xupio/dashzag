@@ -12,13 +12,13 @@
   <div class="sidebar-body">
     <ul class="nav" id="sidebarNav">
       <li class="nav-item nav-category">Dashboard</li>
-      <li class="nav-item {{ active_class(['dashboard', 'dashboard/profile', 'dashboard/hall-of-fame', 'dashboard/miner-report', 'dashboard/notifications', 'dashboard/notification-preferences', 'dashboard/investment-orders', 'dashboard/investments', 'dashboard/network', 'dashboard/wallet', 'dashboard/friends', 'dashboard/buy-shares']) }}">
-        <a class="nav-link" data-bs-toggle="collapse" href="#dashboardMenu" role="button" aria-expanded="{{ is_active_route(['dashboard', 'dashboard/profile', 'dashboard/hall-of-fame', 'dashboard/miner-report', 'dashboard/notifications', 'dashboard/notification-preferences', 'dashboard/investment-orders', 'dashboard/investments', 'dashboard/network', 'dashboard/wallet', 'dashboard/friends', 'dashboard/buy-shares']) }}" aria-controls="dashboardMenu">
+      <li class="nav-item {{ active_class(['dashboard', 'dashboard/profile', 'dashboard/hall-of-fame', 'dashboard/miner-report', 'dashboard/notifications', 'dashboard/notification-preferences', 'dashboard/investment-orders', 'dashboard/investments', 'dashboard/network', 'dashboard/wallet', 'dashboard/friends', 'dashboard/buy-shares', 'share-market']) }}">
+        <a class="nav-link" data-bs-toggle="collapse" href="#dashboardMenu" role="button" aria-expanded="{{ is_active_route(['dashboard', 'dashboard/profile', 'dashboard/hall-of-fame', 'dashboard/miner-report', 'dashboard/notifications', 'dashboard/notification-preferences', 'dashboard/investment-orders', 'dashboard/investments', 'dashboard/network', 'dashboard/wallet', 'dashboard/friends', 'dashboard/buy-shares', 'share-market']) }}" aria-controls="dashboardMenu">
           <i class="link-icon" data-lucide="home"></i>
           <span class="link-title">Dashboard</span>
           <i class="link-arrow" data-lucide="chevron-down"></i>
         </a>
-        <div class="collapse {{ show_class(['dashboard', 'dashboard/profile', 'dashboard/hall-of-fame', 'dashboard/miner-report', 'dashboard/notifications', 'dashboard/notification-preferences', 'dashboard/investment-orders', 'dashboard/investments', 'dashboard/network', 'dashboard/wallet', 'dashboard/friends', 'dashboard/buy-shares']) }}" data-bs-parent="#sidebarNav" id="dashboardMenu">
+        <div class="collapse {{ show_class(['dashboard', 'dashboard/profile', 'dashboard/hall-of-fame', 'dashboard/miner-report', 'dashboard/notifications', 'dashboard/notification-preferences', 'dashboard/investment-orders', 'dashboard/investments', 'dashboard/network', 'dashboard/wallet', 'dashboard/friends', 'dashboard/buy-shares', 'share-market']) }}" data-bs-parent="#sidebarNav" id="dashboardMenu">
           <ul class="nav sub-menu">
             <li class="nav-item">
               <a href="{{ route('dashboard') }}" class="nav-link {{ active_class(['dashboard']) }}">Overview</a>
@@ -40,6 +40,9 @@
             </li>
             <li class="nav-item">
               <a href="{{ route('dashboard.buy-shares') }}" class="nav-link {{ active_class(['dashboard/buy-shares']) }}">Buy Shares</a>
+            </li>
+            <li class="nav-item">
+              <a href="{{ route('share-market.index') }}" class="nav-link {{ active_class(['share-market']) }}">Share Market</a>
             </li>
             <li class="nav-item">
               <a href="{{ route('dashboard.miner-report') }}" class="nav-link {{ active_class(['dashboard/miner-report']) }}">Daily Miner Report</a>
@@ -150,7 +153,6 @@
     </ul>
   </div>
 </nav>
-
 
 
 

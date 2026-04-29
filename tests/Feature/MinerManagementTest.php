@@ -68,6 +68,31 @@ test('miner page shows the market signal summary for admins', function () {
     $response->assertSee('Latest performance log');
 });
 
+test('miner page shows lifecycle progress and secondary market readiness for admins', function () {
+    $user = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
+    $miner = Miner::where('slug', 'alpha-one')->firstOrFail();
+    $miner->forceFill([
+        'status' => 'sold_out',
+        'shares_sold' => 1500,
+        'total_shares' => 1500,
+        'near_capacity_threshold_percent' => 90,
+        'maturity_days' => 30,
+        'sold_out_at' => now()->subDays(7),
+    ])->save();
+
+    $response = $this->actingAs($user)->get(route('dashboard.miner', ['miner' => 'alpha-one']));
+
+    $response->assertOk();
+    $response->assertSee('Market lifecycle');
+    $response->assertSee('Sell-through');
+    $response->assertSee('Secondary market');
+    $response->assertSee('Waiting for maturity before resale can open.');
+    $response->assertSee('Sold out');
+});
+
 test('admin can update a secondary miner performance log with financial fields', function () {
     $user = User::factory()->admin()->create([
         'email_verified_at' => now(),

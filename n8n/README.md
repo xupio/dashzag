@@ -12,6 +12,10 @@ Import this file into n8n:
 - `n8n/zagn8n-approval-review-workflow.json`
 - `n8n/zagn8n-approved-content-publisher-workflow.json`
 - `n8n/zagn8n-approved-content-publisher-with-status-update-workflow.json`
+- `n8n/zagn8n-canva-handoff-workflow.json`
+- `n8n/zagn8n-canva-handoff-safe-workflow.json`
+- `n8n/zagn8n-canva-manual-placeholder-workflow.json`
+- `n8n/zagn8n-telegram-marketing-workflow.json`
 
 What it does:
 
@@ -157,6 +161,60 @@ It is used to:
 - create publish-ready queue rows
 - update the original approval row to `queued_for_publish`
 - prevent duplicate queueing on the next schedule run
+
+Canva handoff queue file:
+
+- `n8n/zagn8n-canva-handoff-workflow.json`
+
+It is used to:
+
+- read rows that are ready for design work
+- create design-ready queue rows with image/video briefs
+- update the original approval row to `design_in_progress`
+- notify you when a Canva handoff task is ready
+
+Safer Canva handoff queue file:
+
+- `n8n/zagn8n-canva-handoff-safe-workflow.json`
+
+It is used to:
+
+- process one `queued_for_publish` row per run
+- reduce alert flooding while testing or in production
+- move content into the design queue safely
+- update the original approval row to `design_in_progress`
+
+Manual Canva placeholder file:
+
+- `n8n/zagn8n-canva-manual-placeholder-workflow.json`
+
+It is used to:
+
+- read one `queued_for_design` row
+- fill placeholder Canva tracking values in the design queue
+- move the row to `design_in_progress`
+- notify you that a manual Canva task is ready
+
+Simplified single-workflow file:
+
+- `n8n/zagn8n-telegram-marketing-workflow.json`
+
+It is used to:
+
+- start from Telegram commands only
+- keep one Google Sheet as the control center
+- create one daily draft from ZagChain performance data
+- let you reply `approve` or `edit: ...`
+- update the same control row through the whole conversation
+- prepare a simple Canva handoff state after approval
+- act as the clean base for a later direct Canva auto-create step after approval
+
+To use the Telegram-first workflow fully, replace:
+
+- `replace-with-your-zagn8n-token`
+- `replace-with-your-openai-api-key`
+- `replace-with-your-google-sheet-id`
+- `replace-with-your-canva-access-token`
 
 After import:
 

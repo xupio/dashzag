@@ -1,0 +1,341 @@
+{
+  "name": "zagn8n Canva Manual Placeholder Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## zagn8n Canva manual placeholder workflow\n\nPurpose:\n- read one row marked `queued_for_design`\n- prepare it for manual Canva work\n- update the same row with placeholder Canva tracking values\n- notify you that a manual design task is ready\n\nUse this version first when you want the design workflow to be operational without automatic Canva creation yet.",
+        "width": 700,
+        "height": 300
+      },
+      "id": "e0b3ef76-14bb-4d53-b7aa-94c4c01c5839",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -960,
+        -220
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "b94655e4-b7ba-4b0f-9e50-c9475299c539",
+      "name": "Manual Design Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -700,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_design_queue"
+        },
+        "options": {}
+      },
+      "id": "5d40e74c-6b81-41da-b4ea-e981561c49bf",
+      "name": "Read Design Queue",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -440,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "0ec497c5-c29e-41ff-b777-c0a016b6dc90",
+              "leftValue": "={{ $json.design_status }}",
+              "rightValue": "queued_for_design",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2027575f-291b-4297-a3bf-67c92fe9fffa",
+      "name": "Queued For Design Only",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -180,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "7d157b1d-58ce-4b69-9084-6d4e8e87461c",
+      "name": "Process One Row",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        60,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ed40f11e-a19f-47dd-b5ad-a9d4105d788a",
+              "name": "generated_at",
+              "value": "={{ $json.generated_at }}",
+              "type": "string"
+            },
+            {
+              "id": "5af735f3-c839-4bc0-8ff8-26456f30d831",
+              "name": "theme",
+              "value": "={{ $json.theme || 'general' }}",
+              "type": "string"
+            },
+            {
+              "id": "90825b3b-421a-45d2-824a-0e432e7af90c",
+              "name": "image_headline",
+              "value": "={{ $json.image_headline || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "3987700c-73f5-4cd3-b6c3-d1ab13a97d28",
+              "name": "cta",
+              "value": "={{ $json.cta || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "9b5024c8-9e55-4e56-a9dd-6cf651a8d99d",
+              "name": "canva_design_status",
+              "value": "manual_placeholder_created",
+              "type": "string"
+            },
+            {
+              "id": "0e1d7bd6-a9c5-49dd-a0a9-70101d3018d1",
+              "name": "canva_design_id",
+              "value": "manual_pending",
+              "type": "string"
+            },
+            {
+              "id": "fa9b0983-26f3-4e12-8ce8-2f0d36dbb432",
+              "name": "canva_design_link",
+              "value": "create manually in Canva",
+              "type": "string"
+            },
+            {
+              "id": "058bdcb0-d118-40f9-84e8-b59292baf52c",
+              "name": "final_review_status",
+              "value": "pending_final_review",
+              "type": "string"
+            },
+            {
+              "id": "767cb7b4-f6c2-4a88-ae93-1afb8d683e43",
+              "name": "design_status",
+              "value": "design_in_progress",
+              "type": "string"
+            },
+            {
+              "id": "a3dfc0df-f6d9-4b31-9a36-1a4d5e4db330",
+              "name": "design_task_message",
+              "value": "=zagn8n manual Canva task ready\n\nTheme: {{$json.theme || 'general'}}\nHeadline: {{$json.image_headline || ''}}\nCTA: {{$json.cta || ''}}\nCanva image brief: {{$json.canva_image_brief || ''}}\nCanva video brief: {{$json.canva_video_brief || ''}}\nStatus: design_in_progress",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "c6931c7a-40da-4d47-bf95-a1e450716ef4",
+      "name": "Prepare Manual Canva Record",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        320,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "replace-with-your-google-sheet-id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "zagn8n_design_queue"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "generated_at": "={{ $json.generated_at }}",
+            "design_status": "={{ $json.design_status }}",
+            "canva_design_status": "={{ $json.canva_design_status }}",
+            "canva_design_id": "={{ $json.canva_design_id }}",
+            "canva_design_link": "={{ $json.canva_design_link }}",
+            "final_review_status": "={{ $json.final_review_status }}"
+          },
+          "matchingColumns": [
+            "generated_at"
+          ],
+          "schema": [
+            { "id": "handed_off_at", "displayName": "handed_off_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "generated_at", "displayName": "generated_at", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "theme", "displayName": "theme", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "platform", "displayName": "platform", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "instagram_caption", "displayName": "instagram_caption", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "tiktok_hook", "displayName": "tiktok_hook", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_headline", "displayName": "image_headline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "image_subheadline", "displayName": "image_subheadline", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "cta", "displayName": "cta", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_image_brief", "displayName": "canva_image_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_video_brief", "displayName": "canva_video_brief", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "design_status", "displayName": "design_status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_design_status", "displayName": "canva_design_status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_design_id", "displayName": "canva_design_id", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "canva_design_link", "displayName": "canva_design_link", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "final_review_status", "displayName": "final_review_status", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true },
+            { "id": "final_reviewer_notes", "displayName": "final_reviewer_notes", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "ea238710-c713-492c-8730-44a7cd0ddf8f",
+      "name": "Update Design Queue Placeholder Fields",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        580,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "replace-with-your-telegram-chat-id",
+        "text": "={{ $json.design_task_message }}",
+        "additionalFields": {}
+      },
+      "id": "5cc60b34-6977-449c-a918-8b2f2f06fa3d",
+      "name": "Telegram Manual Design Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        840,
+        180
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Design Trigger": {
+      "main": [
+        [
+          {
+            "node": "Read Design Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Design Queue": {
+      "main": [
+        [
+          {
+            "node": "Queued For Design Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queued For Design Only": {
+      "main": [
+        [
+          {
+            "node": "Process One Row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Process One Row": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Prepare Manual Canva Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Manual Canva Record": {
+      "main": [
+        [
+          {
+            "node": "Update Design Queue Placeholder Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Design Queue Placeholder Fields": {
+      "main": [
+        [
+          {
+            "node": "Telegram Manual Design Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "2850e7c3-0a5c-4f2b-ac5a-396cc700b6e2",
+  "id": "zagn8n-canva-manual-placeholder",
+  "tags": []
+}

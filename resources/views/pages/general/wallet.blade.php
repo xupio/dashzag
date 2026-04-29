@@ -88,7 +88,7 @@
         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
           <div>
             <h5 class="mb-1">Earnings source breakdown</h5>
-            <p class="text-secondary mb-0">Understand how your wallet balance is split between miner payouts, monthly returns, and network rewards.</p>
+            <p class="text-secondary mb-0">Understand how your wallet balance is split between miner payouts, monthly returns, network rewards, and secondary market activity.</p>
           </div>
           <span class="badge bg-primary">{{ count($walletSourceBreakdown) }} sources</span>
         </div>
@@ -264,6 +264,10 @@
                       $whyAmountText = 'Why this amount: credited $'.number_format((float) $earning->amount, 2)
                         .($dailyCap > 0 ? ' against a daily cap of $'.number_format($dailyCap, 2).'. ' : '. ')
                         .$statusReason;
+                    } elseif ($earning->source === 'secondary_share_sale') {
+                      $whyAmountText = 'Why this amount: net proceeds from a completed secondary market sale. This amount is now available in your wallet.';
+                    } elseif ($earning->source === 'secondary_share_purchase') {
+                      $whyAmountText = 'Why this amount: this portion of your wallet earnings was allocated to a secondary market purchase and is no longer withdrawable.';
                     }
                   @endphp
                   <tr>
@@ -271,7 +275,15 @@
                     <td>{{ str($earning->source)->replace('_', ' ')->title() }}</td>
                     <td>{{ $earning->investment?->package?->name ?? '—' }}</td>
                     <td>
-                      <span class="badge {{ $earning->status === 'available' ? 'bg-success' : ($earning->status === 'paid' ? 'bg-primary' : 'bg-warning text-dark') }}">
+                      @php
+                        $statusClass = match ($earning->status) {
+                          'available' => 'bg-success',
+                          'paid' => 'bg-primary',
+                          'market_spent' => 'bg-dark',
+                          default => 'bg-warning text-dark',
+                        };
+                      @endphp
+                      <span class="badge {{ $statusClass }}">
                         {{ str($earning->status)->replace('_', ' ')->title() }}
                       </span>
                     </td>

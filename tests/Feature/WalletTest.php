@@ -147,13 +147,17 @@ test('wallet page shows earnings source breakdown', function () {
         ['amount' => 20, 'source' => 'mining_return', 'notes' => 'Monthly mining return.'],
         ['amount' => 25, 'source' => 'referral_registration', 'notes' => 'Referral reward.'],
         ['amount' => 7.5, 'source' => 'team_level_3_bonus', 'notes' => 'MLM reward.'],
+        ['amount' => 18.4, 'source' => 'secondary_share_sale', 'notes' => 'Net proceeds from a resale.'],
+        ['amount' => 9.6, 'source' => 'secondary_share_purchase', 'notes' => 'Wallet funds allocated to a resale purchase.', 'status' => 'market_spent'],
     ] as $earning) {
-        Earning::create([
+        Earning::create(array_merge([
             'user_id' => $user->id,
             'investment_id' => null,
             'earned_on' => now()->toDateString(),
             'status' => 'available',
-        ] + $earning);
+        ], array_diff_key($earning, ['status' => true]), [
+            'status' => $earning['status'] ?? 'available',
+        ]));
     }
 
     $response = $this->actingAs($user)->get(route('dashboard.wallet'));
@@ -164,10 +168,17 @@ test('wallet page shows earnings source breakdown', function () {
     $response->assertSee('Monthly return');
     $response->assertSee('Direct referral rewards');
     $response->assertSee('MLM network rewards');
+    $response->assertSee('Secondary market sale proceeds');
+    $response->assertSee('Secondary market purchases');
     $response->assertSee('Daily miner share payout.');
     $response->assertSee('20.00');
     $response->assertSee('25.00');
     $response->assertSee('7.50');
+    $response->assertSee('18.40');
+    $response->assertSee('9.60');
+    $response->assertSee('Market Spent');
+    $response->assertSee('Why this amount: net proceeds from a completed secondary market sale.');
+    $response->assertSee('Why this amount: this portion of your wallet earnings was allocated to a secondary market purchase');
 });
 
 test('wallet page explains why mining daily share amounts were credited', function () {
@@ -242,6 +253,39 @@ test('wallet page can filter earnings history by source', function () {
     $response->assertOk();
     $response->assertSee('Daily miner share payout.');
     $response->assertDontSee('Monthly mining return.');
+});
+
+test('wallet page can filter earnings history by secondary market purchases', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'shareholder',
+    ]);
+
+    Earning::create([
+        'user_id' => $user->id,
+        'investment_id' => null,
+        'earned_on' => now()->toDateString(),
+        'amount' => 18.4,
+        'source' => 'secondary_share_sale',
+        'status' => 'available',
+        'notes' => 'Net proceeds from a resale.',
+    ]);
+
+    Earning::create([
+        'user_id' => $user->id,
+        'investment_id' => null,
+        'earned_on' => now()->toDateString(),
+        'amount' => 9.6,
+        'source' => 'secondary_share_purchase',
+        'status' => 'market_spent',
+        'notes' => 'Wallet funds allocated to a resale purchase.',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.wallet', ['source' => 'secondary_market_purchases']));
+
+    $response->assertOk();
+    $response->assertSee('Wallet funds allocated to a resale purchase.');
+    $response->assertDontSee('Net proceeds from a resale.');
 });
 
 test('wallet earnings history can be exported as csv with the active source filter', function () {

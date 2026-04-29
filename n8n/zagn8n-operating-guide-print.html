@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>zagn8n Operating Guide</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 18mm;
+    }
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.45;
+      color: #1b2433;
+      margin: 0;
+      background: #f4f6fb;
+    }
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 40px 52px 50px;
+      box-sizing: border-box;
+    }
+    h1 {
+      font-size: 28px;
+      margin: 0 0 8px;
+      color: #12233a;
+    }
+    .lead {
+      margin: 0 0 28px;
+      color: #55657f;
+      font-size: 15px;
+    }
+    h2 {
+      margin: 26px 0 10px;
+      font-size: 20px;
+      color: #173861;
+      border-bottom: 1px solid #d9e1ef;
+      padding-bottom: 6px;
+    }
+    h3 {
+      margin: 18px 0 8px;
+      font-size: 16px;
+      color: #1f4c82;
+    }
+    ul, ol {
+      margin: 8px 0 14px 22px;
+    }
+    li {
+      margin: 4px 0;
+    }
+    .card {
+      border: 1px solid #d7dfed;
+      background: #f9fbff;
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin: 12px 0;
+    }
+    .status {
+      display: inline-block;
+      margin: 4px 8px 4px 0;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 600;
+      background: #eef4ff;
+      color: #24529b;
+      border: 1px solid #c8d7f4;
+    }
+    .note {
+      margin-top: 18px;
+      padding: 14px 16px;
+      background: #fff7e8;
+      border: 1px solid #f0d8a3;
+      border-radius: 12px;
+      color: #5d4417;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media print {
+      body {
+        background: #fff;
+      }
+      .page {
+        max-width: none;
+        margin: 0;
+        padding: 0;
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <h1>zagn8n Operating Guide</h1>
+    <p class="lead">Daily operating guide for the ZagChain content pipeline: one strong content pack daily, review, approval, design handoff, then manual posting.</p>
+
+    <h2>Final Goal</h2>
+    <ol>
+      <li>Generate one strong content pack daily.</li>
+      <li>Send it for review.</li>
+      <li>Move approved items to the design queue.</li>
+      <li>Keep final posting manual.</li>
+    </ol>
+
+    <h2>Main Workflows</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>zagn8n-marketing-ai-workflow</h3>
+        <ul>
+          <li>Reads ZagChain marketing data</li>
+          <li>Generates one content pack</li>
+          <li>Sends Telegram preview</li>
+          <li>Logs to <strong>zagn8n_ai_content</strong></li>
+          <li>Forwards to approval review</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>zagn8n-approval-review-workflow</h3>
+        <ul>
+          <li>Receives generated content</li>
+          <li>Sends review alert</li>
+          <li>Stores row in <strong>zagn8n_approval_queue</strong></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Publisher With Status Update</h3>
+        <ul>
+          <li>Reads approved content</li>
+          <li>Writes to <strong>zagn8n_publish_queue</strong></li>
+          <li>Updates approval row to <strong>queued_for_publish</strong></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Safe Canva Handoff</h3>
+        <ul>
+          <li>Processes one row at a time</li>
+          <li>Writes to <strong>zagn8n_design_queue</strong></li>
+          <li>Updates approval row to <strong>design_in_progress</strong></li>
+        </ul>
+      </div>
+    </div>
+
+    <h2>Main Sheets</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>zagn8n_ai_content</h3>
+        <p>Generated content log and AI output archive.</p>
+      </div>
+      <div class="card">
+        <h3>zagn8n_approval_queue</h3>
+        <p>Review, approval, and handoff control center.</p>
+      </div>
+      <div class="card">
+        <h3>zagn8n_publish_queue</h3>
+        <p>Posting-ready queue and final posting tracking.</p>
+      </div>
+      <div class="card">
+        <h3>zagn8n_design_queue</h3>
+        <p>Design-ready records and Canva brief tracking.</p>
+      </div>
+    </div>
+
+    <h2>Status Flow</h2>
+    <h3>Approval Queue</h3>
+    <div>
+      <span class="status">pending_review</span>
+      <span class="status">approved</span>
+      <span class="status">queued_for_publish</span>
+      <span class="status">design_in_progress</span>
+    </div>
+
+    <h3>Design Queue</h3>
+    <div>
+      <span class="status">queued_for_design</span>
+      <span class="status">designed</span>
+    </div>
+
+    <h3>Publish Queue</h3>
+    <div>
+      <span class="status">queued</span>
+      <span class="status">posted</span>
+    </div>
+
+    <h2>Daily Routine</h2>
+    <ol>
+      <li>Let the marketing AI workflow generate one content pack.</li>
+      <li>Review the Telegram preview and the row in <strong>zagn8n_approval_queue</strong>.</li>
+      <li>If it is good, set <strong>approval_status = approved</strong>.</li>
+      <li>The publisher workflow moves it into <strong>zagn8n_publish_queue</strong>.</li>
+      <li>The safe Canva handoff workflow moves it into <strong>zagn8n_design_queue</strong>.</li>
+      <li>After the design is ready, mark the design row as <strong>designed</strong>.</li>
+      <li>After manual posting, mark the publish row as <strong>posted</strong>.</li>
+    </ol>
+
+    <h2>Recommended Schedules</h2>
+    <ul>
+      <li><strong>zagn8n-marketing-ai-workflow</strong>: once daily at 10:00 AM Dubai time</li>
+      <li><strong>Publisher with status update</strong>: every 1 hour or manual while tuning</li>
+      <li><strong>Safe Canva handoff</strong>: every 1 hour or manual while tuning</li>
+    </ul>
+
+    <h2>Operational Rules</h2>
+    <ul>
+      <li>Keep content generation automatic.</li>
+      <li>Keep approval human.</li>
+      <li>Keep final design approval human.</li>
+      <li>Keep final posting manual.</li>
+      <li>Use calmer schedules to avoid floods.</li>
+      <li>Use one-row safe handoff workflows where possible.</li>
+    </ul>
+
+    <div class="note">
+      <strong>Quick check:</strong> The system is healthy when one content pack is generated daily, approved rows move forward correctly, statuses update cleanly, and Telegram alerts stay useful instead of noisy.
+    </div>
+  </div>
+</body>
+</html>

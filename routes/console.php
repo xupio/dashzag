@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Notifications\AdminHealthSummaryNotification;
+use App\Services\MinerLifecycleService;
 use App\Support\MiningPlatform;
 use App\Notifications\DigestSummaryNotification;
 use Illuminate\Foundation\Inspiring;
@@ -101,6 +102,18 @@ Artisan::command('miners:generate-daily-snapshots {--date= : Generate snapshots 
     return self::SUCCESS;
 })->purpose('Generate daily miner performance snapshots and sync per-share earnings.');
 
+Artisan::command('miners:sync-lifecycle', function (MinerLifecycleService $lifecycleService) {
+    $updatedMiners = $lifecycleService->syncEligibleMiners();
+    $changedMiners = $updatedMiners->filter(function ($miner) {
+        return in_array($miner->status, ['mature', 'secondary_market_open'], true);
+    });
+
+    $this->info('Evaluated '.$updatedMiners->count().' lifecycle-eligible miners.');
+    $this->info('Miners now mature or secondary market open: '.$changedMiners->count().'.');
+
+    return self::SUCCESS;
+})->purpose('Advance sold-out miners into maturity and secondary-market availability.');
+
 Artisan::command('admin:send-health-summary', function () {
     MiningPlatform::ensureDefaults();
 
@@ -162,6 +175,7 @@ Artisan::command('hall-of-fame:capture {--category= : Limit capture to weekly or
 Schedule::command('notifications:send-digests --frequency=daily')->dailyAt('09:00');
 Schedule::command('notifications:send-digests --frequency=weekly')->weeklyOn(1, '09:30');
 Schedule::command('miners:generate-daily-snapshots')->dailyAt('00:15');
+Schedule::command('miners:sync-lifecycle')->dailyAt('00:25');
 Schedule::command('hall-of-fame:capture --category=weekly')->weeklyOn(1, '00:35');
 Schedule::command('hall-of-fame:capture --category=monthly')->monthlyOn(1, '00:45');
 Schedule::command('admin:send-health-summary')->dailyAt('10:00');

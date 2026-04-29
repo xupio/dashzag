@@ -1015,7 +1015,15 @@ class MiningPlatform
         self::ensureDefaults();
 
         return Miner::query()
-            ->whereIn('status', ['active', 'maintenance'])
+            ->whereIn('status', [
+                'active',
+                'open',
+                'nearly_full',
+                'sold_out',
+                'mature',
+                'secondary_market_open',
+                'maintenance',
+            ])
             ->orderByRaw("CASE WHEN slug = 'alpha-one' THEN 0 ELSE 1 END")
             ->orderBy('name')
             ->get();
