@@ -33,6 +33,7 @@ use App\Support\MiningPlatform;
 use App\Support\N8nWebhook;
 use App\Support\UserActivity;
 use App\Support\Zagn8nMarketingFeed;
+use App\Services\ShareMarketService;
 use Endroid\QrCode\ErrorCorrectionLevel;
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\SvgWriter;
@@ -3496,6 +3497,15 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             $allowedRiskFocuses = ['all', 'missing_proof', 'bank_without_notes', 'resubmitted', 'override_history'];
             $activityAction = (string) $request->query('activity_action', 'all');
             $allowedActivityActions = ['all', 'investment.approve', 'investment.approve_without_proof', 'investment.reject', 'payout.approve', 'payout.pay'];
+            $marketListingStatus = (string) $request->query('market_listing_status', 'all');
+            $allowedMarketListingStatuses = ['all', 'active', 'partially_sold', 'sold', 'cancelled', 'expired'];
+            $marketSaleStatus = (string) $request->query('market_sale_status', 'all');
+            $allowedMarketSaleStatuses = ['all', 'completed', 'pending', 'failed', 'reversed'];
+            $marketMinerId = $request->query('market_miner_id', 'all');
+            $marketListingFocus = (string) $request->query('market_listing_focus', 'all');
+            $allowedMarketListingFocuses = ['all', 'stale_active', 'partially_sold', 'highest_value'];
+            $marketSaleSort = (string) $request->query('market_sale_sort', 'recent');
+            $allowedMarketSaleSorts = ['recent', 'highest_fee', 'highest_gross'];
 
             if (! in_array($status, $allowedStatuses, true)) {
                 $status = 'all';
@@ -3519,6 +3529,37 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
 
             if (! in_array($activityAction, $allowedActivityActions, true)) {
                 $activityAction = 'all';
+            }
+
+            if (! in_array($marketListingStatus, $allowedMarketListingStatuses, true)) {
+                $marketListingStatus = 'all';
+            }
+
+            if (! in_array($marketSaleStatus, $allowedMarketSaleStatuses, true)) {
+                $marketSaleStatus = 'all';
+            }
+
+            if (! in_array($marketListingFocus, $allowedMarketListingFocuses, true)) {
+                $marketListingFocus = 'all';
+            }
+
+            if (! in_array($marketSaleSort, $allowedMarketSaleSorts, true)) {
+                $marketSaleSort = 'recent';
+            }
+
+            $marketMiners = Miner::query()
+                ->where(function ($query) {
+                    $query->whereIn('status', ['secondary_market_open', 'mature', 'sold_out', 'nearly_full', 'open'])
+                        ->orWhereHas('shareListings')
+                        ->orWhereHas('shareSales');
+                })
+                ->orderBy('name')
+                ->get(['id', 'name', 'status']);
+
+            $validMarketMinerIds = $marketMiners->pluck('id')->map(fn ($id) => (string) $id)->all();
+
+            if ($marketMinerId !== 'all' && ! in_array((string) $marketMinerId, $validMarketMinerIds, true)) {
+                $marketMinerId = 'all';
             }
 
             $rewardCapMeta = [
@@ -3750,16 +3791,66 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 })
                 ->values();
 
-            $secondaryMarketListings = ShareListing::query()
-                ->with(['miner', 'seller'])
-                ->latest('listed_at')
-                ->limit(10)
+            $secondaryMarketListingsQuery = ShareListing::query()
+                ->with(['miner', 'seller']);
+
+            if ($marketListingStatus !== 'all') {
+                $secondaryMarketListingsQuery->where('status', $marketListingStatus);
+            }
+
+            if ($marketMinerId !== 'all') {
+                $secondaryMarketListingsQuery->where('miner_id', (int) $marketMinerId);
+            }
+
+            if ($marketListingFocus === 'stale_active') {
+                $secondaryMarketListingsQuery
+                    ->whereIn('status', ['active', 'partially_sold'])
+                    ->where('remaining_quantity', '>', 0)
+                    ->where('listed_at', '<=', now()->subDays(3))
+                    ->orderBy('listed_at');
+            } elseif ($marketListingFocus === 'partially_sold') {
+                $secondaryMarketListingsQuery
+                    ->where('status', 'partially_sold')
+                    ->where('remaining_quantity', '>', 0)
+                    ->latest('listed_at');
+            } elseif ($marketListingFocus === 'highest_value') {
+                $secondaryMarketListingsQuery
+                    ->where('remaining_quantity', '>', 0)
+                    ->orderByRaw('(remaining_quantity * price_per_share) desc')
+                    ->orderByDesc('listed_at');
+            } else {
+                $secondaryMarketListingsQuery->latest('listed_at');
+            }
+
+            $secondaryMarketListings = $secondaryMarketListingsQuery
+                ->limit(20)
                 ->get();
 
-            $secondaryMarketSales = ShareSale::query()
-                ->with(['miner', 'seller', 'buyer'])
-                ->latest('completed_at')
-                ->limit(10)
+            $secondaryMarketSalesQuery = ShareSale::query()
+                ->with(['miner', 'seller', 'buyer']);
+
+            if ($marketSaleStatus !== 'all') {
+                $secondaryMarketSalesQuery->where('status', $marketSaleStatus);
+            }
+
+            if ($marketMinerId !== 'all') {
+                $secondaryMarketSalesQuery->where('miner_id', (int) $marketMinerId);
+            }
+
+            if ($marketSaleSort === 'highest_fee') {
+                $secondaryMarketSalesQuery
+                    ->orderByDesc('platform_fee_amount')
+                    ->orderByDesc('completed_at');
+            } elseif ($marketSaleSort === 'highest_gross') {
+                $secondaryMarketSalesQuery
+                    ->orderByDesc('gross_amount')
+                    ->orderByDesc('completed_at');
+            } else {
+                $secondaryMarketSalesQuery->latest('completed_at');
+            }
+
+            $secondaryMarketSales = $secondaryMarketSalesQuery
+                ->limit(20)
                 ->get();
 
             $secondaryMarketSummary = [
@@ -3781,6 +3872,40 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                     ->where('type', 'platform_fee')
                     ->sum('amount'), 2),
             ];
+
+            $listingActivityByMiner = ShareListing::query()
+                ->select('miner_id')
+                ->selectRaw("SUM(CASE WHEN status IN ('active', 'partially_sold') AND remaining_quantity > 0 THEN 1 ELSE 0 END) as active_listings_count")
+                ->selectRaw("SUM(CASE WHEN status IN ('active', 'partially_sold') AND remaining_quantity > 0 THEN remaining_quantity * price_per_share ELSE 0 END) as open_listing_value")
+                ->groupBy('miner_id')
+                ->get()
+                ->keyBy('miner_id');
+
+            $salesActivityByMiner = ShareSale::query()
+                ->select('miner_id')
+                ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed_sales_count")
+                ->selectRaw("SUM(CASE WHEN status = 'completed' THEN seller_net_amount ELSE 0 END) as seller_proceeds_total")
+                ->selectRaw("SUM(CASE WHEN status = 'completed' THEN platform_fee_amount ELSE 0 END) as platform_fee_total")
+                ->groupBy('miner_id')
+                ->get()
+                ->keyBy('miner_id');
+
+            $secondaryMarketMinerActivity = $marketMiners
+                ->map(function (Miner $miner) use ($listingActivityByMiner, $salesActivityByMiner) {
+                    $listingStats = $listingActivityByMiner->get($miner->id);
+                    $salesStats = $salesActivityByMiner->get($miner->id);
+
+                    return [
+                        'miner' => $miner,
+                        'active_listings_count' => (int) round((float) ($listingStats->active_listings_count ?? 0)),
+                        'open_listing_value' => round((float) ($listingStats->open_listing_value ?? 0), 2),
+                        'completed_sales_count' => (int) round((float) ($salesStats->completed_sales_count ?? 0)),
+                        'seller_proceeds_total' => round((float) ($salesStats->seller_proceeds_total ?? 0), 2),
+                        'platform_fee_total' => round((float) ($salesStats->platform_fee_total ?? 0), 2),
+                    ];
+                })
+                ->filter(fn (array $row) => $row['active_listings_count'] > 0 || $row['completed_sales_count'] > 0 || in_array($row['miner']->status, ['secondary_market_open', 'mature'], true))
+                ->values();
 
             return view('pages.general.operations', [
                 'payoutRequests' => PayoutRequest::with(['user', 'earnings'])->latest('requested_at')->get(),
@@ -3823,6 +3948,15 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'secondaryMarketListings' => $secondaryMarketListings,
                 'secondaryMarketSales' => $secondaryMarketSales,
                 'secondaryMarketSummary' => $secondaryMarketSummary,
+                'secondaryMarketFilters' => [
+                    'listing_status' => $marketListingStatus,
+                    'sale_status' => $marketSaleStatus,
+                    'miner_id' => $marketMinerId,
+                    'listing_focus' => $marketListingFocus,
+                    'sale_sort' => $marketSaleSort,
+                ],
+                'secondaryMarketMinerOptions' => $marketMiners,
+                'secondaryMarketMinerActivity' => $secondaryMarketMinerActivity,
             ]);
         })->name('dashboard.operations');
 
@@ -4107,6 +4241,31 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
 
             return redirect()->route('dashboard.operations')->with('operations_success', 'Payout request marked as paid.');
         })->middleware('throttle:20,1')->name('dashboard.operations.payouts.pay');
+
+        Route::post('/dashboard/operations/share-market/listings/{shareListing}/cancel', function (Request $request, ShareListing $shareListing, ShareMarketService $shareMarketService) {
+            try {
+                $cancelledListing = $shareMarketService->cancelListing($shareListing);
+            } catch (\InvalidArgumentException $exception) {
+                return redirect()->route('dashboard.operations')->withErrors([
+                    'market' => $exception->getMessage(),
+                ]);
+            }
+
+            MiningPlatform::logAdminActivity(
+                $request->user(),
+                'share_market.cancel_listing',
+                'Cancelled secondary market listing #'.$cancelledListing->id,
+                $cancelledListing,
+                [
+                    'listing_id' => $cancelledListing->id,
+                    'seller_user_id' => $cancelledListing->seller_user_id,
+                    'miner_id' => $cancelledListing->miner_id,
+                    'remaining_quantity' => $cancelledListing->remaining_quantity,
+                ]
+            );
+
+            return redirect()->route('dashboard.operations')->with('operations_success', 'Secondary market listing cancelled successfully.');
+        })->middleware('throttle:20,1')->name('dashboard.operations.share-market.listings.cancel');
 
         Route::post('/dashboard/operations/investment-orders/{investmentOrder}/approve', function (Request $request, InvestmentOrder $investmentOrder) {
             $validated = $request->validate([

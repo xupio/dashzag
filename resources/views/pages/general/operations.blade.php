@@ -24,8 +24,8 @@
   <div class="alert alert-success">{{ session('operations_success') }}</div>
 @endif
 
-@if ($errors->has('approval') || $errors->has('admin_notes') || $errors->has('cancel'))
-  <div class="alert alert-danger">{{ $errors->first('approval') ?: ($errors->first('admin_notes') ?: $errors->first('cancel')) }}</div>
+@if ($errors->has('approval') || $errors->has('admin_notes') || $errors->has('cancel') || $errors->has('market'))
+  <div class="alert alert-danger">{{ $errors->first('approval') ?: ($errors->first('admin_notes') ?: ($errors->first('cancel') ?: $errors->first('market'))) }}</div>
 @endif
 
 <div class="row mb-4">
@@ -423,6 +423,101 @@
           </div>
         </div>
 
+        <form method="GET" action="{{ route('dashboard.operations') }}" class="row g-2 mb-4">
+          <input type="hidden" name="investment_search" value="{{ $investmentFilters['search'] ?? '' }}">
+          <input type="hidden" name="investment_status" value="{{ $investmentFilters['status'] ?? 'all' }}">
+          <input type="hidden" name="investment_payment_method" value="{{ $investmentFilters['payment_method'] ?? 'all' }}">
+          <input type="hidden" name="investment_proof_state" value="{{ $investmentFilters['proof_state'] ?? 'all' }}">
+          <input type="hidden" name="investment_risk_state" value="{{ $investmentFilters['risk_state'] ?? 'all' }}">
+          <input type="hidden" name="activity_action" value="{{ $activityFilters['action'] ?? 'all' }}">
+          <div class="col-md-3">
+            <select name="market_miner_id" class="form-select">
+              <option value="all" @selected(($secondaryMarketFilters['miner_id'] ?? 'all') === 'all')>All market miners</option>
+              @foreach (($secondaryMarketMinerOptions ?? collect()) as $marketMiner)
+                <option value="{{ $marketMiner->id }}" @selected((string) ($secondaryMarketFilters['miner_id'] ?? 'all') === (string) $marketMiner->id)>{{ $marketMiner->name }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div class="col-md-3">
+            <select name="market_listing_status" class="form-select">
+              <option value="all" @selected(($secondaryMarketFilters['listing_status'] ?? 'all') === 'all')>All listing statuses</option>
+              @foreach (['active' => 'Active', 'partially_sold' => 'Partially sold', 'sold' => 'Sold', 'cancelled' => 'Cancelled', 'expired' => 'Expired'] as $listingStatusValue => $listingStatusLabel)
+                <option value="{{ $listingStatusValue }}" @selected(($secondaryMarketFilters['listing_status'] ?? '') === $listingStatusValue)>{{ $listingStatusLabel }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div class="col-md-3">
+            <select name="market_sale_status" class="form-select">
+              <option value="all" @selected(($secondaryMarketFilters['sale_status'] ?? 'all') === 'all')>All sale statuses</option>
+              @foreach (['completed' => 'Completed', 'pending' => 'Pending', 'failed' => 'Failed', 'reversed' => 'Reversed'] as $saleStatusValue => $saleStatusLabel)
+                <option value="{{ $saleStatusValue }}" @selected(($secondaryMarketFilters['sale_status'] ?? '') === $saleStatusValue)>{{ $saleStatusLabel }}</option>
+              @endforeach
+            </select>
+          </div>
+          <div class="col-md-3">
+            <select name="market_listing_focus" class="form-select">
+              <option value="all" @selected(($secondaryMarketFilters['listing_focus'] ?? 'all') === 'all')>All listing focus views</option>
+              <option value="stale_active" @selected(($secondaryMarketFilters['listing_focus'] ?? '') === 'stale_active')>Stale active listings (3+ days)</option>
+              <option value="partially_sold" @selected(($secondaryMarketFilters['listing_focus'] ?? '') === 'partially_sold')>Partially sold inventory</option>
+              <option value="highest_value" @selected(($secondaryMarketFilters['listing_focus'] ?? '') === 'highest_value')>Highest open listing value</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <select name="market_sale_sort" class="form-select">
+              <option value="recent" @selected(($secondaryMarketFilters['sale_sort'] ?? 'recent') === 'recent')>Newest completed sales first</option>
+              <option value="highest_fee" @selected(($secondaryMarketFilters['sale_sort'] ?? '') === 'highest_fee')>Highest fee trades first</option>
+              <option value="highest_gross" @selected(($secondaryMarketFilters['sale_sort'] ?? '') === 'highest_gross')>Highest gross trades first</option>
+            </select>
+          </div>
+          <div class="col-md-12 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Filter market</button>
+            <a href="{{ route('dashboard.operations') }}" class="btn btn-outline-secondary">Reset</a>
+          </div>
+        </form>
+
+        <div class="border rounded p-3 mb-4 bg-light">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h6 class="mb-1">Per-miner market activity</h6>
+              <p class="text-secondary small mb-0">Spot which miners are attracting resale volume, where open inventory is piling up, and where ZagChain is capturing the most fees.</p>
+            </div>
+            <span class="badge bg-light text-dark border">{{ ($secondaryMarketMinerActivity ?? collect())->count() }} miners</span>
+          </div>
+
+          @if (($secondaryMarketMinerActivity ?? collect())->isEmpty())
+            <p class="text-secondary mb-0">No miner-level secondary market activity is available yet.</p>
+          @else
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Miner</th>
+                    <th>Status</th>
+                    <th>Active listings</th>
+                    <th>Open listing value</th>
+                    <th>Completed sales</th>
+                    <th>Seller proceeds</th>
+                    <th>Platform fees</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @foreach (($secondaryMarketMinerActivity ?? collect()) as $marketActivityRow)
+                    <tr>
+                      <td class="fw-semibold">{{ $marketActivityRow['miner']->name }}</td>
+                      <td><span class="badge bg-light text-dark border">{{ str($marketActivityRow['miner']->status)->replace('_', ' ')->title() }}</span></td>
+                      <td>{{ number_format((int) $marketActivityRow['active_listings_count']) }}</td>
+                      <td>${{ number_format((float) $marketActivityRow['open_listing_value'], 2) }}</td>
+                      <td>{{ number_format((int) $marketActivityRow['completed_sales_count']) }}</td>
+                      <td>${{ number_format((float) $marketActivityRow['seller_proceeds_total'], 2) }}</td>
+                      <td>${{ number_format((float) $marketActivityRow['platform_fee_total'], 2) }}</td>
+                    </tr>
+                  @endforeach
+                </tbody>
+              </table>
+            </div>
+          @endif
+        </div>
+
         <div class="row g-4">
           <div class="col-xl-6">
             <div class="border rounded p-3 h-100 bg-light">
@@ -446,6 +541,7 @@
                         <th>Remaining</th>
                         <th>Price</th>
                         <th>Status</th>
+                        <th class="text-end">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -459,6 +555,16 @@
                           <td>{{ number_format((int) $listing->remaining_quantity) }}</td>
                           <td>${{ number_format((float) $listing->price_per_share, 2) }}</td>
                           <td><span class="badge bg-light text-dark border">{{ str($listing->status)->replace('_', ' ')->title() }}</span></td>
+                          <td class="text-end">
+                            @if (in_array($listing->status, ['active', 'partially_sold'], true))
+                              <form method="POST" action="{{ route('dashboard.operations.share-market.listings.cancel', $listing) }}">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Cancel listing</button>
+                              </form>
+                            @else
+                              <span class="text-secondary small">No action</span>
+                            @endif
+                          </td>
                         </tr>
                       @endforeach
                     </tbody>
@@ -488,6 +594,7 @@
                         <th>Miner</th>
                         <th>Seller → Buyer</th>
                         <th>Quantity</th>
+                        <th>Status</th>
                         <th>Seller net</th>
                         <th>Fee</th>
                       </tr>
@@ -504,6 +611,7 @@
                             <div class="text-secondary small">to {{ $sale->buyer?->name ?? '—' }}</div>
                           </td>
                           <td>{{ number_format((int) $sale->quantity) }}</td>
+                          <td><span class="badge bg-light text-dark border">{{ str($sale->status)->replace('_', ' ')->title() }}</span></td>
                           <td>${{ number_format((float) $sale->seller_net_amount, 2) }}</td>
                           <td>${{ number_format((float) $sale->platform_fee_amount, 2) }}</td>
                         </tr>

@@ -536,6 +536,296 @@ test('admin operations page shows secondary market activity board', function () 
         ->assertSee('16.00');
 });
 
+test('admin can filter and cancel secondary market listings from operations page', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'admin',
+    ]);
+
+    $seller = User::factory()->create([
+        'email_verified_at' => now(),
+        'name' => 'Ops Market Seller',
+    ]);
+
+    $openMiner = Miner::query()->create([
+        'name' => 'Ops Open Miner',
+        'slug' => 'ops-open-miner',
+        'share_price' => 100,
+        'total_shares' => 1000,
+        'shares_sold' => 1000,
+        'status' => 'secondary_market_open',
+        'secondary_market_fee_percent' => 5,
+        'secondary_market_opened_at' => now()->subDay(),
+    ]);
+
+    $otherMiner = Miner::query()->create([
+        'name' => 'Ops Mature Miner',
+        'slug' => 'ops-mature-miner',
+        'share_price' => 120,
+        'total_shares' => 1000,
+        'shares_sold' => 1000,
+        'status' => 'mature',
+        'secondary_market_fee_percent' => 5,
+        'matured_at' => now()->subDay(),
+    ]);
+
+    $openHolding = ShareHolding::query()->create([
+        'user_id' => $seller->id,
+        'miner_id' => $openMiner->id,
+        'quantity' => 15,
+        'locked_quantity' => 3,
+        'avg_buy_price' => 100,
+        'status' => 'active',
+        'last_acquired_at' => now()->subDays(3),
+    ]);
+
+    $otherHolding = ShareHolding::query()->create([
+        'user_id' => $seller->id,
+        'miner_id' => $otherMiner->id,
+        'quantity' => 15,
+        'locked_quantity' => 2,
+        'avg_buy_price' => 120,
+        'status' => 'active',
+        'last_acquired_at' => now()->subDays(3),
+    ]);
+
+    $activeListing = ShareListing::query()->create([
+        'seller_user_id' => $seller->id,
+        'miner_id' => $openMiner->id,
+        'share_holding_id' => $openHolding->id,
+        'quantity' => 3,
+        'remaining_quantity' => 3,
+        'price_per_share' => 150,
+        'total_price' => 450,
+        'platform_fee_percent' => 5,
+        'platform_fee_amount' => 22.5,
+        'seller_net_amount' => 427.5,
+        'status' => 'active',
+        'listed_at' => now()->subMinutes(10),
+    ]);
+
+    ShareListing::query()->create([
+        'seller_user_id' => $seller->id,
+        'miner_id' => $otherMiner->id,
+        'share_holding_id' => $otherHolding->id,
+        'quantity' => 2,
+        'remaining_quantity' => 0,
+        'price_per_share' => 155,
+        'total_price' => 310,
+        'platform_fee_percent' => 5,
+        'platform_fee_amount' => 15.5,
+        'seller_net_amount' => 294.5,
+        'status' => 'sold',
+        'listed_at' => now()->subHour(),
+        'sold_at' => now()->subMinutes(30),
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('dashboard.operations', [
+            'market_miner_id' => $openMiner->id,
+            'market_listing_status' => 'active',
+            'market_sale_status' => 'all',
+        ]))
+        ->assertOk()
+        ->assertSee('Ops Open Miner')
+        ->assertSee('Cancel listing')
+        ->assertViewHas('secondaryMarketListings', function ($listings) use ($activeListing, $openMiner) {
+            return $listings->count() === 1
+                && (int) $listings->first()->id === (int) $activeListing->id
+                && (int) $listings->first()->miner_id === (int) $openMiner->id;
+        });
+
+    $response = $this->actingAs($admin)
+        ->post(route('dashboard.operations.share-market.listings.cancel', $activeListing));
+
+    $response->assertRedirect(route('dashboard.operations'));
+
+    $activeListing->refresh();
+    $openHolding->refresh();
+
+    expect($activeListing->status)->toBe('cancelled')
+        ->and($activeListing->remaining_quantity)->toBe(0)
+        ->and($openHolding->locked_quantity)->toBe(0);
+});
+
+test('admin operations page can focus stale listings and highest fee trades', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'admin',
+    ]);
+
+    $seller = User::factory()->create([
+        'email_verified_at' => now(),
+        'name' => 'Filter Market Seller',
+    ]);
+
+    $buyer = User::factory()->create([
+        'email_verified_at' => now(),
+        'name' => 'Filter Market Buyer',
+    ]);
+
+    $staleMiner = Miner::query()->create([
+        'name' => 'Stale Market Miner',
+        'slug' => 'stale-market-miner',
+        'share_price' => 110,
+        'total_shares' => 1000,
+        'shares_sold' => 1000,
+        'status' => 'secondary_market_open',
+        'secondary_market_fee_percent' => 5,
+        'secondary_market_opened_at' => now()->subDays(10),
+    ]);
+
+    $hotMiner = Miner::query()->create([
+        'name' => 'Hot Market Miner',
+        'slug' => 'hot-market-miner',
+        'share_price' => 140,
+        'total_shares' => 1000,
+        'shares_sold' => 1000,
+        'status' => 'secondary_market_open',
+        'secondary_market_fee_percent' => 5,
+        'secondary_market_opened_at' => now()->subDays(12),
+    ]);
+
+    $staleHolding = ShareHolding::query()->create([
+        'user_id' => $seller->id,
+        'miner_id' => $staleMiner->id,
+        'quantity' => 20,
+        'locked_quantity' => 4,
+        'avg_buy_price' => 110,
+        'status' => 'active',
+        'last_acquired_at' => now()->subDays(10),
+    ]);
+
+    $hotHolding = ShareHolding::query()->create([
+        'user_id' => $seller->id,
+        'miner_id' => $hotMiner->id,
+        'quantity' => 20,
+        'locked_quantity' => 5,
+        'avg_buy_price' => 140,
+        'status' => 'active',
+        'last_acquired_at' => now()->subDays(12),
+    ]);
+
+    $staleListing = ShareListing::query()->create([
+        'seller_user_id' => $seller->id,
+        'miner_id' => $staleMiner->id,
+        'share_holding_id' => $staleHolding->id,
+        'quantity' => 4,
+        'remaining_quantity' => 4,
+        'price_per_share' => 170,
+        'total_price' => 680,
+        'platform_fee_percent' => 5,
+        'platform_fee_amount' => 34,
+        'seller_net_amount' => 646,
+        'status' => 'active',
+        'listed_at' => now()->subDays(5),
+    ]);
+
+    ShareListing::query()->create([
+        'seller_user_id' => $seller->id,
+        'miner_id' => $hotMiner->id,
+        'share_holding_id' => $hotHolding->id,
+        'quantity' => 5,
+        'remaining_quantity' => 3,
+        'price_per_share' => 190,
+        'total_price' => 950,
+        'platform_fee_percent' => 5,
+        'platform_fee_amount' => 47.5,
+        'seller_net_amount' => 902.5,
+        'status' => 'partially_sold',
+        'listed_at' => now()->subHours(5),
+    ]);
+
+    $lowerFeeListing = ShareListing::query()->create([
+        'seller_user_id' => $seller->id,
+        'miner_id' => $staleMiner->id,
+        'share_holding_id' => $staleHolding->id,
+        'quantity' => 2,
+        'remaining_quantity' => 0,
+        'price_per_share' => 155,
+        'total_price' => 310,
+        'platform_fee_percent' => 5,
+        'platform_fee_amount' => 15.5,
+        'seller_net_amount' => 294.5,
+        'status' => 'sold',
+        'listed_at' => now()->subDays(4),
+        'sold_at' => now()->subHours(8),
+    ]);
+
+    $higherFeeListing = ShareListing::query()->create([
+        'seller_user_id' => $seller->id,
+        'miner_id' => $hotMiner->id,
+        'share_holding_id' => $hotHolding->id,
+        'quantity' => 3,
+        'remaining_quantity' => 0,
+        'price_per_share' => 220,
+        'total_price' => 660,
+        'platform_fee_percent' => 5,
+        'platform_fee_amount' => 33,
+        'seller_net_amount' => 627,
+        'status' => 'sold',
+        'listed_at' => now()->subDays(2),
+        'sold_at' => now()->subHours(2),
+    ]);
+
+    $lowerFeeSale = ShareSale::query()->create([
+        'listing_id' => $lowerFeeListing->id,
+        'miner_id' => $staleMiner->id,
+        'seller_user_id' => $seller->id,
+        'buyer_user_id' => $buyer->id,
+        'quantity' => 2,
+        'price_per_share' => 155,
+        'gross_amount' => 310,
+        'platform_fee_percent' => 5,
+        'platform_fee_amount' => 15.5,
+        'seller_net_amount' => 294.5,
+        'status' => 'completed',
+        'completed_at' => now()->subHours(8),
+    ]);
+
+    $higherFeeSale = ShareSale::query()->create([
+        'listing_id' => $higherFeeListing->id,
+        'miner_id' => $hotMiner->id,
+        'seller_user_id' => $seller->id,
+        'buyer_user_id' => $buyer->id,
+        'quantity' => 3,
+        'price_per_share' => 220,
+        'gross_amount' => 660,
+        'platform_fee_percent' => 5,
+        'platform_fee_amount' => 33,
+        'seller_net_amount' => 627,
+        'status' => 'completed',
+        'completed_at' => now()->subHours(2),
+    ]);
+
+    $this->actingAs($admin)
+        ->get(route('dashboard.operations', [
+            'market_listing_focus' => 'stale_active',
+            'market_sale_status' => 'completed',
+            'market_sale_sort' => 'highest_fee',
+        ]))
+        ->assertOk()
+        ->assertSee('Per-miner market activity')
+        ->assertSee('Stale active listings (3+ days)')
+        ->assertViewHas('secondaryMarketFilters', function (array $filters) {
+            return $filters['listing_focus'] === 'stale_active'
+                && $filters['sale_sort'] === 'highest_fee';
+        })
+        ->assertViewHas('secondaryMarketListings', function ($listings) use ($staleListing) {
+            return $listings->count() === 1
+                && (int) $listings->first()->id === (int) $staleListing->id;
+        })
+        ->assertViewHas('secondaryMarketSales', function ($sales) use ($higherFeeSale, $lowerFeeSale) {
+            return $sales->count() === 2
+                && (int) $sales->first()->id === (int) $higherFeeSale->id
+                && (int) $sales->last()->id === (int) $lowerFeeSale->id;
+        })
+        ->assertViewHas('secondaryMarketMinerActivity', function ($rows) use ($staleMiner, $hotMiner) {
+            return $rows->contains(fn (array $row) => (int) $row['miner']->id === (int) $staleMiner->id && (int) $row['active_listings_count'] === 1)
+                && $rows->contains(fn (array $row) => (int) $row['miner']->id === (int) $hotMiner->id && (float) $row['platform_fee_total'] >= 33);
+        });
+});
+
 test('admin operations page can filter admin activity logs by action', function () {
     $admin = User::factory()->create([
         'email_verified_at' => now(),
