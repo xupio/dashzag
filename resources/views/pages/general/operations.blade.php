@@ -469,9 +469,16 @@
               <option value="highest_gross" @selected(($secondaryMarketFilters['sale_sort'] ?? '') === 'highest_gross')>Highest gross trades first</option>
             </select>
           </div>
-          <div class="col-md-12 d-flex gap-2">
+          <div class="col-md-12 d-flex gap-2 flex-wrap">
             <button type="submit" class="btn btn-primary">Filter market</button>
             <a href="{{ route('dashboard.operations') }}" class="btn btn-outline-secondary">Reset</a>
+            <a href="{{ route('dashboard.operations.share-market.export', [
+              'market_miner_id' => $secondaryMarketFilters['miner_id'] ?? 'all',
+              'market_listing_status' => $secondaryMarketFilters['listing_status'] ?? 'all',
+              'market_sale_status' => $secondaryMarketFilters['sale_status'] ?? 'all',
+              'market_listing_focus' => $secondaryMarketFilters['listing_focus'] ?? 'all',
+              'market_sale_sort' => $secondaryMarketFilters['sale_sort'] ?? 'recent',
+            ]) }}" class="btn btn-outline-dark">Export market CSV</a>
           </div>
         </form>
 

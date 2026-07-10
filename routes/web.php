@@ -4045,6 +4045,174 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             }, $filename, ['Content-Type' => 'text/csv']);
         })->name('dashboard.operations.export');
 
+        Route::get('/dashboard/operations/share-market/export', function (Request $request) {
+            MiningPlatform::ensureDefaults();
+
+            $marketListingStatus = (string) $request->query('market_listing_status', 'all');
+            $allowedMarketListingStatuses = ['all', 'active', 'partially_sold', 'sold', 'cancelled', 'expired'];
+            $marketSaleStatus = (string) $request->query('market_sale_status', 'all');
+            $allowedMarketSaleStatuses = ['all', 'completed', 'pending', 'failed', 'reversed'];
+            $marketMinerId = $request->query('market_miner_id', 'all');
+            $marketListingFocus = (string) $request->query('market_listing_focus', 'all');
+            $allowedMarketListingFocuses = ['all', 'stale_active', 'partially_sold', 'highest_value'];
+            $marketSaleSort = (string) $request->query('market_sale_sort', 'recent');
+            $allowedMarketSaleSorts = ['recent', 'highest_fee', 'highest_gross'];
+
+            if (! in_array($marketListingStatus, $allowedMarketListingStatuses, true)) {
+                $marketListingStatus = 'all';
+            }
+
+            if (! in_array($marketSaleStatus, $allowedMarketSaleStatuses, true)) {
+                $marketSaleStatus = 'all';
+            }
+
+            if (! in_array($marketListingFocus, $allowedMarketListingFocuses, true)) {
+                $marketListingFocus = 'all';
+            }
+
+            if (! in_array($marketSaleSort, $allowedMarketSaleSorts, true)) {
+                $marketSaleSort = 'recent';
+            }
+
+            $marketMiners = Miner::query()
+                ->where(function ($query) {
+                    $query->whereIn('status', ['secondary_market_open', 'mature', 'sold_out', 'nearly_full', 'open'])
+                        ->orWhereHas('shareListings')
+                        ->orWhereHas('shareSales');
+                })
+                ->orderBy('name')
+                ->get(['id', 'name', 'status']);
+
+            $validMarketMinerIds = $marketMiners->pluck('id')->map(fn ($id) => (string) $id)->all();
+
+            if ($marketMinerId !== 'all' && ! in_array((string) $marketMinerId, $validMarketMinerIds, true)) {
+                $marketMinerId = 'all';
+            }
+
+            $secondaryMarketListingsQuery = ShareListing::query()
+                ->with(['miner', 'seller']);
+
+            if ($marketListingStatus !== 'all') {
+                $secondaryMarketListingsQuery->where('status', $marketListingStatus);
+            }
+
+            if ($marketMinerId !== 'all') {
+                $secondaryMarketListingsQuery->where('miner_id', (int) $marketMinerId);
+            }
+
+            if ($marketListingFocus === 'stale_active') {
+                $secondaryMarketListingsQuery
+                    ->whereIn('status', ['active', 'partially_sold'])
+                    ->where('remaining_quantity', '>', 0)
+                    ->where('listed_at', '<=', now()->subDays(3))
+                    ->orderBy('listed_at');
+            } elseif ($marketListingFocus === 'partially_sold') {
+                $secondaryMarketListingsQuery
+                    ->where('status', 'partially_sold')
+                    ->where('remaining_quantity', '>', 0)
+                    ->latest('listed_at');
+            } elseif ($marketListingFocus === 'highest_value') {
+                $secondaryMarketListingsQuery
+                    ->where('remaining_quantity', '>', 0)
+                    ->orderByRaw('(remaining_quantity * price_per_share) desc')
+                    ->orderByDesc('listed_at');
+            } else {
+                $secondaryMarketListingsQuery->latest('listed_at');
+            }
+
+            $secondaryMarketSalesQuery = ShareSale::query()
+                ->with(['miner', 'seller', 'buyer']);
+
+            if ($marketSaleStatus !== 'all') {
+                $secondaryMarketSalesQuery->where('status', $marketSaleStatus);
+            }
+
+            if ($marketMinerId !== 'all') {
+                $secondaryMarketSalesQuery->where('miner_id', (int) $marketMinerId);
+            }
+
+            if ($marketSaleSort === 'highest_fee') {
+                $secondaryMarketSalesQuery
+                    ->orderByDesc('platform_fee_amount')
+                    ->orderByDesc('completed_at');
+            } elseif ($marketSaleSort === 'highest_gross') {
+                $secondaryMarketSalesQuery
+                    ->orderByDesc('gross_amount')
+                    ->orderByDesc('completed_at');
+            } else {
+                $secondaryMarketSalesQuery->latest('completed_at');
+            }
+
+            $secondaryMarketListings = $secondaryMarketListingsQuery->get();
+            $secondaryMarketSales = $secondaryMarketSalesQuery->get();
+            $selectedMiner = $marketMinerId === 'all'
+                ? null
+                : $marketMiners->firstWhere('id', (int) $marketMinerId);
+            $filename = 'secondary-market-operations-'.now()->format('Ymd-His').'.csv';
+
+            return response()->streamDownload(function () use (
+                $secondaryMarketListings,
+                $secondaryMarketSales,
+                $marketListingStatus,
+                $marketSaleStatus,
+                $marketListingFocus,
+                $marketSaleSort,
+                $selectedMiner
+            ) {
+                $handle = fopen('php://output', 'w');
+
+                fputcsv($handle, ['Filter', 'Value']);
+                fputcsv($handle, ['Miner', $selectedMiner?->name ?? 'all']);
+                fputcsv($handle, ['Listing status', $marketListingStatus]);
+                fputcsv($handle, ['Listing focus', $marketListingFocus]);
+                fputcsv($handle, ['Sale status', $marketSaleStatus]);
+                fputcsv($handle, ['Sale sort', $marketSaleSort]);
+                fputcsv($handle, []);
+
+                fputcsv($handle, ['Listings']);
+                fputcsv($handle, ['Listing ID', 'Miner', 'Seller', 'Status', 'Quantity', 'Remaining Quantity', 'Price Per Share', 'Open Listing Value', 'Platform Fee %', 'Seller Net Amount', 'Listed At', 'Sold At']);
+
+                foreach ($secondaryMarketListings as $listing) {
+                    fputcsv($handle, [
+                        $listing->id,
+                        $listing->miner?->name,
+                        $listing->seller?->name,
+                        $listing->status,
+                        $listing->quantity,
+                        $listing->remaining_quantity,
+                        number_format((float) $listing->price_per_share, 2, '.', ''),
+                        number_format((float) $listing->remaining_quantity * (float) $listing->price_per_share, 2, '.', ''),
+                        number_format((float) $listing->platform_fee_percent, 2, '.', ''),
+                        number_format((float) $listing->seller_net_amount, 2, '.', ''),
+                        optional($listing->listed_at)->format('Y-m-d H:i:s'),
+                        optional($listing->sold_at)->format('Y-m-d H:i:s'),
+                    ]);
+                }
+
+                fputcsv($handle, []);
+                fputcsv($handle, ['Sales']);
+                fputcsv($handle, ['Sale ID', 'Miner', 'Seller', 'Buyer', 'Status', 'Quantity', 'Price Per Share', 'Gross Amount', 'Seller Net Amount', 'Platform Fee Amount', 'Completed At']);
+
+                foreach ($secondaryMarketSales as $sale) {
+                    fputcsv($handle, [
+                        $sale->id,
+                        $sale->miner?->name,
+                        $sale->seller?->name,
+                        $sale->buyer?->name,
+                        $sale->status,
+                        $sale->quantity,
+                        number_format((float) $sale->price_per_share, 2, '.', ''),
+                        number_format((float) $sale->gross_amount, 2, '.', ''),
+                        number_format((float) $sale->seller_net_amount, 2, '.', ''),
+                        number_format((float) $sale->platform_fee_amount, 2, '.', ''),
+                        optional($sale->completed_at)->format('Y-m-d H:i:s'),
+                    ]);
+                }
+
+                fclose($handle);
+            }, $filename, ['Content-Type' => 'text/csv']);
+        })->name('dashboard.operations.share-market.export');
+
         Route::get('/dashboard/operations/investment-orders/export', function (Request $request) {
             MiningPlatform::ensureDefaults();
 

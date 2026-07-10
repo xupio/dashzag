@@ -826,6 +826,132 @@ test('admin operations page can focus stale listings and highest fee trades', fu
         });
 });
 
+test('admin can export filtered secondary market operations csv', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'admin',
+    ]);
+
+    $seller = User::factory()->create([
+        'email_verified_at' => now(),
+        'name' => 'CSV Market Seller',
+    ]);
+
+    $buyer = User::factory()->create([
+        'email_verified_at' => now(),
+        'name' => 'CSV Market Buyer',
+    ]);
+
+    $staleMiner = Miner::query()->create([
+        'name' => 'CSV Stale Miner',
+        'slug' => 'csv-stale-miner',
+        'share_price' => 130,
+        'total_shares' => 1000,
+        'shares_sold' => 1000,
+        'status' => 'secondary_market_open',
+        'secondary_market_fee_percent' => 5,
+        'secondary_market_opened_at' => now()->subDays(10),
+    ]);
+
+    $recentMiner = Miner::query()->create([
+        'name' => 'CSV Recent Miner',
+        'slug' => 'csv-recent-miner',
+        'share_price' => 150,
+        'total_shares' => 1000,
+        'shares_sold' => 1000,
+        'status' => 'secondary_market_open',
+        'secondary_market_fee_percent' => 5,
+        'secondary_market_opened_at' => now()->subDays(5),
+    ]);
+
+    $staleHolding = ShareHolding::query()->create([
+        'user_id' => $seller->id,
+        'miner_id' => $staleMiner->id,
+        'quantity' => 25,
+        'locked_quantity' => 4,
+        'avg_buy_price' => 130,
+        'status' => 'active',
+        'last_acquired_at' => now()->subDays(10),
+    ]);
+
+    $recentHolding = ShareHolding::query()->create([
+        'user_id' => $seller->id,
+        'miner_id' => $recentMiner->id,
+        'quantity' => 25,
+        'locked_quantity' => 3,
+        'avg_buy_price' => 150,
+        'status' => 'active',
+        'last_acquired_at' => now()->subDays(5),
+    ]);
+
+    ShareListing::query()->create([
+        'seller_user_id' => $seller->id,
+        'miner_id' => $staleMiner->id,
+        'share_holding_id' => $staleHolding->id,
+        'quantity' => 4,
+        'remaining_quantity' => 4,
+        'price_per_share' => 180,
+        'total_price' => 720,
+        'platform_fee_percent' => 5,
+        'platform_fee_amount' => 36,
+        'seller_net_amount' => 684,
+        'status' => 'active',
+        'listed_at' => now()->subDays(4),
+    ]);
+
+    $recentListing = ShareListing::query()->create([
+        'seller_user_id' => $seller->id,
+        'miner_id' => $recentMiner->id,
+        'share_holding_id' => $recentHolding->id,
+        'quantity' => 3,
+        'remaining_quantity' => 0,
+        'price_per_share' => 200,
+        'total_price' => 600,
+        'platform_fee_percent' => 5,
+        'platform_fee_amount' => 30,
+        'seller_net_amount' => 570,
+        'status' => 'sold',
+        'listed_at' => now()->subDays(2),
+        'sold_at' => now()->subHours(3),
+    ]);
+
+    ShareSale::query()->create([
+        'listing_id' => $recentListing->id,
+        'miner_id' => $recentMiner->id,
+        'seller_user_id' => $seller->id,
+        'buyer_user_id' => $buyer->id,
+        'quantity' => 3,
+        'price_per_share' => 200,
+        'gross_amount' => 600,
+        'platform_fee_percent' => 5,
+        'platform_fee_amount' => 30,
+        'seller_net_amount' => 570,
+        'status' => 'completed',
+        'completed_at' => now()->subHours(3),
+    ]);
+
+    $response = $this->actingAs($admin)
+        ->get(route('dashboard.operations.share-market.export', [
+            'market_miner_id' => 'all',
+            'market_listing_status' => 'all',
+            'market_sale_status' => 'completed',
+            'market_listing_focus' => 'stale_active',
+            'market_sale_sort' => 'highest_fee',
+        ]));
+
+    $response->assertOk()
+        ->assertHeader('content-type', 'text/csv; charset=UTF-8');
+
+    $content = $response->streamedContent();
+
+    expect($content)->toContain('"Listing focus",stale_active')
+        ->and($content)->toContain('"Sale sort",highest_fee')
+        ->and($content)->toContain('CSV Stale Miner')
+        ->and($content)->toContain('CSV Market Seller')
+        ->and($content)->toContain('CSV Recent Miner')
+        ->and($content)->toContain('CSV Market Buyer');
+});
+
 test('admin operations page can filter admin activity logs by action', function () {
     $admin = User::factory()->create([
         'email_verified_at' => now(),
