@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use App\Models\UserInvestment;
 use App\Notifications\AdminHealthSummaryNotification;
 use App\Services\MinerLifecycleService;
 use App\Support\MiningPlatform;
@@ -171,6 +172,79 @@ Artisan::command('hall-of-fame:capture {--category= : Limit capture to weekly or
 
     return self::SUCCESS;
 })->purpose('Capture weekly and monthly Hall of Fame snapshots.');
+
+Artisan::command('miners:repair-daily-share-earnings {--user= : Limit repair to one user ID} {--investment= : Limit repair to one investment ID} {--dry-run : Preview affected investments without changing data}', function () {
+    $userOption = $this->option('user');
+    $investmentOption = $this->option('investment');
+    $dryRun = (bool) $this->option('dry-run');
+
+    MiningPlatform::ensureDefaults();
+
+    $investments = UserInvestment::query()
+        ->with(['user', 'miner', 'package'])
+        ->where('amount', '>', 0)
+        ->when($userOption, fn ($query) => $query->where('user_id', (int) $userOption))
+        ->when($investmentOption, fn ($query) => $query->where('id', (int) $investmentOption))
+        ->orderBy('id')
+        ->get();
+
+    if ($investments->isEmpty()) {
+        $this->warn('No matching investments found.');
+
+        return self::SUCCESS;
+    }
+
+    $affected = 0;
+    $deleted = 0;
+    $rebuilt = 0;
+
+    $investments->each(function (UserInvestment $investment) use ($dryRun, &$affected, &$deleted, &$rebuilt) {
+        if (! $investment->subscribed_at) {
+            return;
+        }
+
+        $invalidCount = $investment->earnings()
+            ->where('source', 'mining_daily_share')
+            ->whereDate('earned_on', '<', $investment->subscribed_at->toDateString())
+            ->count();
+
+        if ($invalidCount === 0) {
+            return;
+        }
+
+        $affected++;
+
+        $label = 'Investment #'.$investment->id
+            .' user='.($investment->user?->email ?? $investment->user_id)
+            .' invalid_rows='.$invalidCount
+            .' subscribed_at='.$investment->subscribed_at->toDateString();
+
+        if ($dryRun) {
+            $this->line('[dry-run] '.$label);
+
+            return;
+        }
+
+        $result = MiningPlatform::rebuildMiningDailyShareEarningsForInvestment($investment);
+
+        $deleted += (int) ($result['deleted'] ?? 0);
+        $rebuilt += (int) ($result['rebuilt'] ?? 0);
+
+        $this->info($label.' deleted='.$result['deleted'].' rebuilt='.$result['rebuilt']);
+    });
+
+    if ($dryRun) {
+        $this->info('Dry run complete. Affected investments: '.$affected.'.');
+
+        return self::SUCCESS;
+    }
+
+    $this->info('Repair complete. Affected investments: '.$affected.'.');
+    $this->info('Deleted mining_daily_share rows: '.$deleted.'.');
+    $this->info('Rebuilt mining_daily_share rows: '.$rebuilt.'.');
+
+    return self::SUCCESS;
+})->purpose('Repair backdated mining daily share earnings by rebuilding affected investments from their subscription date.');
 
 Schedule::command('notifications:send-digests --frequency=daily')->dailyAt('09:00');
 Schedule::command('notifications:send-digests --frequency=weekly')->weeklyOn(1, '09:30');

@@ -2343,37 +2343,91 @@ class MiningPlatform
             ->where('miner_id', $log->miner_id)
             ->where('status', 'active')
             ->where('amount', '>', 0)
+            ->whereNotNull('subscribed_at')
+            ->where('subscribed_at', '<=', $log->logged_on->copy()->endOfDay())
             ->get()
-            ->map(function (UserInvestment $investment) use ($log, $dailySharePerformanceFactor) {
-                $rawAmount = round((float) $investment->shares_owned * (float) $log->revenue_per_share_usd, 2);
-                $packageDailyCap = self::investmentBaseDailyShareCap($investment);
-                $amount = self::dailyShareRoundedAmount($packageDailyCap, $dailySharePerformanceFactor, $rawAmount);
-                $isUnlocked = self::investmentHasCompletedInitialCycle($investment, $log->logged_on);
+            ->map(fn (UserInvestment $investment) => self::upsertDailyPerformanceEarningForInvestment(
+                $investment,
+                $log,
+                $dailySharePerformanceFactor,
+            ))
+            ->filter();
+    }
 
-                $earning = Earning::query()
-                    ->where('user_id', $investment->user_id)
-                    ->where('investment_id', $investment->id)
-                    ->whereDate('earned_on', $log->logged_on->toDateString())
-                    ->where('source', 'mining_daily_share')
-                    ->first() ?? new Earning([
-                        'user_id' => $investment->user_id,
-                        'investment_id' => $investment->id,
-                        'earned_on' => $log->logged_on->toDateString(),
-                        'source' => 'mining_daily_share',
-                    ]);
+    public static function upsertDailyPerformanceEarningForInvestment(
+        UserInvestment $investment,
+        MinerPerformanceLog $log,
+        ?float $dailySharePerformanceFactor = null,
+    ): ?Earning {
+        $investment->loadMissing(['user', 'package']);
+        $log->loadMissing('miner');
 
-                $earning->fill([
-                    'amount' => $amount,
-                    'status' => $isUnlocked ? 'available' : 'pending',
-                    'notes' => $isUnlocked
-                        ? 'Daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' credited $'.number_format($amount, 2).' after applying the miner\'s daily hashrate, BTC price, revenue strength, and the package daily cap.'
-                        : 'Locked daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' credited $'.number_format($amount, 2).' after applying the miner\'s daily hashrate, BTC price, revenue strength, and the package daily cap. It unlocks after the first 30-day cycle.',
-                ]);
+        if (! $investment->subscribed_at || $log->logged_on->lt($investment->subscribed_at->copy()->startOfDay())) {
+            return null;
+        }
 
-                $earning->save();
+        $dailySharePerformanceFactor ??= self::dailySharePerformanceFactorForLog($log);
 
-                return $earning;
-                });
+        $rawAmount = round((float) $investment->shares_owned * (float) $log->revenue_per_share_usd, 2);
+        $packageDailyCap = self::investmentBaseDailyShareCap($investment);
+        $amount = self::dailyShareRoundedAmount($packageDailyCap, $dailySharePerformanceFactor, $rawAmount);
+        $isUnlocked = self::investmentHasCompletedInitialCycle($investment, $log->logged_on);
+
+        $earning = Earning::query()
+            ->where('user_id', $investment->user_id)
+            ->where('investment_id', $investment->id)
+            ->whereDate('earned_on', $log->logged_on->toDateString())
+            ->where('source', 'mining_daily_share')
+            ->first() ?? new Earning([
+                'user_id' => $investment->user_id,
+                'investment_id' => $investment->id,
+                'earned_on' => $log->logged_on->toDateString(),
+                'source' => 'mining_daily_share',
+            ]);
+
+        $earning->fill([
+            'amount' => $amount,
+            'status' => $isUnlocked ? 'available' : 'pending',
+            'notes' => $isUnlocked
+                ? 'Daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' credited $'.number_format($amount, 2).' after applying the miner\'s daily hashrate, BTC price, revenue strength, and the package daily cap.'
+                : 'Locked daily miner distribution from '.$log->miner->name.' on '.$log->logged_on->format('Y-m-d').' credited $'.number_format($amount, 2).' after applying the miner\'s daily hashrate, BTC price, revenue strength, and the package daily cap. It unlocks after the first 30-day cycle.',
+        ]);
+
+        $earning->save();
+
+        return $earning;
+    }
+
+    public static function rebuildMiningDailyShareEarningsForInvestment(UserInvestment $investment): array
+    {
+        $investment->loadMissing(['miner', 'package', 'user']);
+
+        if (! $investment->miner || ! $investment->subscribed_at) {
+            return [
+                'deleted' => 0,
+                'rebuilt' => 0,
+            ];
+        }
+
+        $deleted = Earning::query()
+            ->where('investment_id', $investment->id)
+            ->where('source', 'mining_daily_share')
+            ->delete();
+
+        $logs = MinerPerformanceLog::query()
+            ->where('miner_id', $investment->miner_id)
+            ->whereDate('logged_on', '>=', $investment->subscribed_at->toDateString())
+            ->orderBy('logged_on')
+            ->get();
+
+        $rebuilt = $logs->map(function (MinerPerformanceLog $log) use ($investment) {
+            return self::upsertDailyPerformanceEarningForInvestment($investment, $log);
+        })->filter()->count();
+
+        return [
+            'deleted' => $deleted,
+            'rebuilt' => $rebuilt,
+        ];
     }
 
     public static function dailySharePerformanceFactorForLog(MinerPerformanceLog $log): float
