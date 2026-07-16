@@ -248,6 +248,29 @@ test('admin can bulk approve only pending investment orders that already have pr
     expect($pendingWithoutProof->fresh()->status)->toBe('pending');
 });
 
+test('admin approving an already processed investment order gets a friendly validation error instead of a server error', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'admin',
+    ]);
+
+    $investor = User::factory()->create(['email_verified_at' => now()]);
+    $order = pendingInvestmentOrderFor($investor, 'APPROVE-TWICE-001', 'approved');
+    $order->forceFill([
+        'payment_proof_path' => 'investment-proofs/approve-twice-proof.pdf',
+        'payment_proof_original_name' => 'approve-twice-proof.pdf',
+        'proof_uploaded_at' => now(),
+    ])->save();
+
+    $this->actingAs($admin)
+        ->from(route('dashboard.operations'))
+        ->post(route('dashboard.operations.investment-orders.approve', $order), [])
+        ->assertRedirect(route('dashboard.operations'))
+        ->assertSessionHasErrors([
+            'approval' => 'This investment order has already been processed.',
+        ]);
+});
+
 test('admin can bulk reject pending investment orders with one shared note', function () {
     $admin = User::factory()->create([
         'email_verified_at' => now(),

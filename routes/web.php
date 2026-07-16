@@ -4321,6 +4321,14 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 }
 
                 foreach ($approvableOrders as $order) {
+                    $order->refresh();
+
+                    if ($order->status !== 'pending') {
+                        $skippedCount++;
+
+                        continue;
+                    }
+
                     MiningPlatform::approveInvestmentOrder($order, $request->user());
 
                     $approvedOrder = $order->fresh(['user', 'package']);
@@ -4440,6 +4448,14 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'allow_without_proof' => ['nullable', 'boolean'],
                 'admin_notes' => ['nullable', 'string', 'max:1000'],
             ]);
+
+            $investmentOrder->refresh();
+
+            if ($investmentOrder->status !== 'pending') {
+                return redirect()->route('dashboard.operations')->withErrors([
+                    'approval' => 'This investment order has already been processed.',
+                ]);
+            }
 
             $allowWithoutProof = (bool) ($validated['allow_without_proof'] ?? false);
 
