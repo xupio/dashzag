@@ -34,7 +34,7 @@ class ZiinaGatewayService
                 'cancel_url' => $cancelUrl,
                 'failure_url' => $failureUrl,
                 'test' => (bool) config('services.ziina.test_mode', false),
-                'expiry' => (string) Carbon::now()->addMinutes((int) config('services.ziina.intent_expiry_minutes', 30))->timestamp,
+                'expiry' => (string) Carbon::now()->addMinutes((int) config('services.ziina.intent_expiry_minutes', 30))->valueOf(),
                 'allow_tips' => (bool) config('services.ziina.allow_tips', false),
             ]);
 
