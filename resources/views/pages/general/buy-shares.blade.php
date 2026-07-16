@@ -514,11 +514,11 @@
           </div>
 
           <div class="border rounded p-3 bg-light" data-purchase-method-panel>
-            <div class="text-secondary">Select a payment method to open the QR code, destination details, and transfer instructions.</div>
+            <div class="text-secondary">Select a payment method to continue to secure checkout or view transfer instructions.</div>
             <div class="small text-success mt-2 d-none" data-payment-copy-feedback>Copied to clipboard.</div>
           </div>
 
-          <div>
+          <div data-payment-reference-group>
             <label for="purchase_payment_reference" class="form-label">Payment reference</label>
             <input type="text" id="purchase_payment_reference" name="payment_reference" class="form-control @error('payment_reference') is-invalid @enderror" data-payment-reference-input placeholder="Transaction hash or payment reference" value="{{ old('payment_reference') }}">
             @error('payment_reference')
@@ -686,6 +686,7 @@
         const methodSelect = modalElement?.querySelector('[data-purchase-method-select]');
         const methodPanel = modalElement?.querySelector('[data-purchase-method-panel]');
         const referenceInput = modalElement?.querySelector('[data-payment-reference-input]');
+        const referenceGroup = modalElement?.querySelector('[data-payment-reference-group]');
         const orderForm = modalElement?.querySelector('[data-purchase-order-form]');
         const proofSection = modalElement?.querySelector('[data-proof-upload-section]');
         const proofForm = modalElement?.querySelector('[data-proof-upload-form]');
@@ -708,8 +709,9 @@
             const method = paymentMethodByKey[methodKey] ?? null;
 
             if (!method) {
-                methodPanel.innerHTML = '<span class="text-muted">Select a payment method to open the QR code, destination details, and transfer instructions.</span><div class="small text-success mt-2 d-none" data-payment-copy-feedback>Copied to clipboard.</div>';
+                methodPanel.innerHTML = '<span class="text-muted">Select a payment method to continue to secure checkout or view transfer instructions.</span><div class="small text-success mt-2 d-none" data-payment-copy-feedback>Copied to clipboard.</div>';
                 referenceInput.placeholder = 'Transaction hash or payment reference';
+                referenceGroup?.classList.remove('d-none');
                 return;
             }
 
@@ -725,7 +727,7 @@
                     <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
                         <div>
                             <div class="fw-semibold text-dark">${method.label}</div>
-                            <div class="text-muted small">Use these details to complete your transfer inside this popup.</div>
+                            <div class="text-muted small">${isZiina ? 'Continue to secure hosted checkout for card or Apple Pay.' : 'Use these details to complete your transfer inside this popup.'}</div>
                         </div>
                         <span class="badge ${isCrypto ? 'bg-warning text-dark' : 'bg-primary-subtle text-primary'}">${meta.networkLabel}</span>
                     </div>
@@ -742,8 +744,15 @@
                             <div class="alert ${isCrypto ? 'alert-warning' : 'alert-info'} py-2 px-3 small mb-3">${meta.warning}</div>
                             <div class="text-muted text-uppercase small mb-1">Instructions</div>
                             <div class="text-muted mb-3">${instructions}</div>
+                            ${isZiina ? `
+                            <div class="border rounded bg-white p-3">
+                                <div class="fw-semibold text-dark mb-1">Pay with Card or Apple Pay</div>
+                                <div class="text-muted small">When you continue, Ziina will open a secure checkout page where the customer can pay like a normal online store checkout.</div>
+                            </div>
+                            ` : `
                             <div class="text-muted text-uppercase small mb-1">What to submit after payment</div>
                             <div class="text-muted">${meta.referenceLabel}</div>
+                            `}
                             ${isZiina ? '' : '<div class="text-success small d-none mt-2" data-payment-copy-feedback>Copied to clipboard.</div>'}
                         </div>
                         ${qrDataUri ? `
@@ -762,9 +771,13 @@
                 referenceInput.value = '';
                 referenceInput.setAttribute('readonly', 'readonly');
                 referenceInput.removeAttribute('required');
+                referenceGroup?.classList.add('d-none');
+                orderForm?.querySelector('[data-purchase-submit-button]')?.textContent = 'Pay with Card / Apple Pay';
             } else {
                 referenceInput.removeAttribute('readonly');
                 referenceInput.setAttribute('required', 'required');
+                referenceGroup?.classList.remove('d-none');
+                orderForm?.querySelector('[data-purchase-submit-button]')?.textContent = 'Continue payment';
             }
         };
 
@@ -777,7 +790,11 @@
 
             if (!matchingOrder) {
                 existingOrderSummary.classList.add('d-none');
-                proofSection.classList.add('d-none');
+                if (methodSelect?.value === 'ziina') {
+                    proofSection.classList.add('d-none');
+                } else {
+                    proofSection.classList.add('d-none');
+                }
                 orderForm?.classList.remove('d-none');
                 proofForm.setAttribute('action', '#');
                 if (proofViewLink) {
@@ -795,7 +812,11 @@
             }
 
             existingOrderSummary.classList.remove('d-none');
-            proofSection.classList.remove('d-none');
+            if (matchingOrder.payment_method === 'ziina') {
+                proofSection.classList.add('d-none');
+            } else {
+                proofSection.classList.remove('d-none');
+            }
             orderForm?.classList.add('d-none');
 
             if (existingOrderStatus) {
@@ -844,7 +865,7 @@
             }
             if (modalSubtitleElement) {
                 modalSubtitleElement.textContent = matchingOrder.payment_method === 'ziina'
-                    ? 'This Ziina order is already created. Complete the hosted checkout and we will confirm the payment automatically.'
+                    ? 'This Ziina order is already created. Continue to secure card or Apple Pay checkout and we will confirm the payment automatically.'
                     : 'This order is already created. Confirm the destination, scan the QR code, and upload your proof in the same popup.';
             }
         };
@@ -866,7 +887,7 @@
 
             if (modalSubtitleElement) {
                 modalSubtitleElement.textContent = methodSelect?.value === 'ziina'
-                    ? 'Ziina will send you to secure hosted checkout after you submit this order.'
+                    ? 'Ziina will send you to a normal secure card or Apple Pay checkout after you continue.'
                     : 'Choose a payment method, copy the destination, then submit your proof in the same popup.';
             }
 
@@ -896,7 +917,7 @@
             renderMethod(methodSelect.value);
             if (modalSubtitleElement) {
                 modalSubtitleElement.textContent = methodSelect.value === 'ziina'
-                    ? 'Ziina will send you to secure hosted checkout after you submit this order.'
+                    ? 'Ziina will send you to a normal secure card or Apple Pay checkout after you continue.'
                     : 'Choose a payment method, copy the destination, then submit your proof in the same popup.';
             }
         });
