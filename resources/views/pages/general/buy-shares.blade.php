@@ -7,14 +7,21 @@
   $displayTierName = $user->account_type === 'starter'
     ? ($user->investments->firstWhere('package.slug', \App\Support\MiningPlatform::FREE_STARTER_PACKAGE_SLUG)?->package?->name ?? 'Free Starter')
     : $level->name;
-  $manualPaymentMethods = ['btc_transfer', 'usdt_transfer', 'bank_transfer'];
-  $proofUploadOrder = collect([$pendingInvestmentOrder, $rejectedInvestmentOrder])
-    ->filter()
-    ->first(fn ($order) => in_array($order->payment_method, $manualPaymentMethods, true) && ! $order->payment_proof_path);
-  $paymentMethods = collect($paymentMethods ?? [])->values();
-  $proofUploadOrderData = $proofUploadOrder
-    ? [
-        'id' => $proofUploadOrder->id,
+    $manualPaymentMethods = ['btc_transfer', 'usdt_transfer', 'bank_transfer'];
+    $proofUploadOrder = collect([$pendingInvestmentOrder, $rejectedInvestmentOrder])
+      ->filter()
+      ->first(fn ($order) => in_array($order->payment_method, $manualPaymentMethods, true) && ! $order->payment_proof_path);
+    $paymentMethods = collect($paymentMethods ?? [])->values();
+    $defaultPaymentMethod = old('payment_method');
+    if (blank($defaultPaymentMethod) && $paymentMethods->count() === 1) {
+      $defaultPaymentMethod = $paymentMethods->first()['key'] ?? null;
+    }
+    $defaultPaymentMethodData = filled($defaultPaymentMethod)
+      ? $paymentMethods->firstWhere('key', $defaultPaymentMethod)
+      : null;
+    $proofUploadOrderData = $proofUploadOrder
+      ? [
+          'id' => $proofUploadOrder->id,
         'package_slug' => $proofUploadOrder->package?->slug,
         'package_name' => $proofUploadOrder->package?->name,
         'payment_method' => $proofUploadOrder->payment_method,
@@ -203,7 +210,7 @@
               class="btn btn-sm btn-dark top-payment-alert__button"
               data-bs-toggle="modal"
               data-bs-target="#purchaseFlowModal"
-              onclick="window.openPurchaseFlowModal && window.openPurchaseFlowModal(this)"
+              onclick="(function(btn){var modal=document.getElementById('purchaseFlowModal');if(!modal)return;var slug=btn.getAttribute('data-package-slug')||'';var name=btn.getAttribute('data-package-name')||'Selected package';var price=btn.getAttribute('data-package-price')||'0.00';var input=modal.querySelector('[data-purchase-package-input]');var nameEl=modal.querySelector('[data-purchase-package-name]');var priceEl=modal.querySelector('[data-purchase-package-price]');if(input)input.value=slug;if(nameEl)nameEl.textContent=name;if(priceEl)priceEl.textContent='$'+price;if(window.openPurchaseFlowModal){window.openPurchaseFlowModal(btn);}})(this)"
               data-open-purchase-modal
               data-package-slug="{{ $proofUploadOrder->package?->slug }}"
               data-package-name="{{ $proofUploadOrder->package?->name }}"
@@ -433,7 +440,7 @@
                 class="btn btn-{{ $accent }}"
                 data-bs-toggle="modal"
                 data-bs-target="#purchaseFlowModal"
-                onclick="window.openPurchaseFlowModal && window.openPurchaseFlowModal(this)"
+                onclick="(function(btn){var modal=document.getElementById('purchaseFlowModal');if(!modal)return;var slug=btn.getAttribute('data-package-slug')||'';var name=btn.getAttribute('data-package-name')||'Selected package';var price=btn.getAttribute('data-package-price')||'0.00';var input=modal.querySelector('[data-purchase-package-input]');var nameEl=modal.querySelector('[data-purchase-package-name]');var priceEl=modal.querySelector('[data-purchase-package-price]');if(input)input.value=slug;if(nameEl)nameEl.textContent=name;if(priceEl)priceEl.textContent='$'+price;if(window.openPurchaseFlowModal){window.openPurchaseFlowModal(btn);}})(this)"
                 data-open-purchase-modal
                 data-package-slug="{{ $package->slug }}"
                 data-package-name="{{ $package->name }}"
@@ -502,7 +509,7 @@
           <div class="text-secondary small mb-0" data-existing-order-proof-summary>Upload your proof below to complete the popup flow.</div>
         </div>
 
-        <form method="POST" action="{{ route('dashboard.buy-shares.subscribe') }}" class="d-grid gap-3" data-purchase-order-form>
+        <form method="POST" action="{{ route('dashboard.buy-shares.subscribe') }}" class="d-grid gap-3" data-purchase-order-form onsubmit="(function(form){var method=form.querySelector('[data-purchase-method-select]');if(method&&method.value==='ziina'){var popupName='ziinaCheckout'+Date.now();var paymentWindow=window.open('',popupName,'popup=yes,width=520,height=760,resizable=yes,scrollbars=yes');form.target=paymentWindow?popupName:'_blank';}else{form.removeAttribute('target');}})(this)">
           @csrf
           <input type="hidden" name="package" value="{{ old('package') }}" data-purchase-package-input>
           <div>
@@ -510,7 +517,7 @@
             <select name="payment_method" id="purchase_payment_method" class="form-select @error('payment_method') is-invalid @enderror" data-purchase-method-select required>
               <option value="">Select payment method</option>
               @foreach ($paymentMethods as $paymentMethod)
-                <option value="{{ $paymentMethod['key'] }}" @selected(old('payment_method') === $paymentMethod['key'])>{{ $paymentMethod['label'] }}</option>
+                <option value="{{ $paymentMethod['key'] }}" @selected($defaultPaymentMethod === $paymentMethod['key'])>{{ $paymentMethod['label'] }}</option>
               @endforeach
             </select>
             @error('payment_method')
@@ -519,8 +526,24 @@
           </div>
 
           <div class="border rounded p-3 bg-light" data-purchase-method-panel>
-            <div class="text-secondary">Select a payment method to continue to secure checkout or view transfer instructions.</div>
-            <div class="small text-success mt-2 d-none" data-payment-copy-feedback>Copied to clipboard.</div>
+            @if (($defaultPaymentMethodData['key'] ?? null) === 'ziina')
+              <div class="d-flex flex-column gap-3">
+                <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                  <div>
+                    <div class="fw-semibold text-dark">{{ $defaultPaymentMethodData['label'] ?? 'Ziina Card Checkout' }}</div>
+                    <div class="text-muted small">Continue to secure hosted checkout for card or Apple Pay.</div>
+                  </div>
+                  <span class="badge bg-primary-subtle text-primary">Ziina secure checkout</span>
+                </div>
+                <div class="border rounded bg-white p-3">
+                  <div class="fw-semibold text-dark mb-1">Pay with Card or Apple Pay</div>
+                  <div class="text-muted small">When you continue, Ziina will open a secure checkout popup where the customer can pay like a normal online store checkout.</div>
+                </div>
+              </div>
+            @else
+              <div class="text-secondary">Select a payment method to continue to secure checkout or view transfer instructions.</div>
+              <div class="small text-success mt-2 d-none" data-payment-copy-feedback>Copied to clipboard.</div>
+            @endif
           </div>
 
           <div data-payment-reference-group>
