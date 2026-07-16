@@ -607,6 +607,57 @@
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="manualPaymentModal" tabindex="-1" aria-labelledby="manualPaymentModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="manualPaymentModalLabel">Complete manual payment</h5>
+          <div class="text-secondary small">Use the payment details below, complete the transfer, then submit your reference for review.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="border rounded p-3 bg-light mb-3">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <div class="text-secondary text-uppercase small">Selected package</div>
+              <div class="fw-semibold" data-manual-package-name>Package</div>
+            </div>
+            <div class="text-end">
+              <div class="text-secondary text-uppercase small">Amount</div>
+              <div class="fw-semibold" data-manual-package-price>$0.00</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="border rounded p-3 bg-white mb-3" data-manual-method-details>
+          <div class="text-secondary">Choose a manual payment method first.</div>
+        </div>
+
+        <form method="POST" action="{{ route('dashboard.buy-shares.subscribe') }}" class="d-grid gap-3" data-manual-payment-form>
+          @csrf
+          <input type="hidden" name="package" value="{{ old('package') }}" data-manual-package-input>
+          <input type="hidden" name="payment_method" value="" data-manual-method-input>
+
+          <div>
+            <label for="manual_payment_reference" class="form-label">Payment reference</label>
+            <input type="text" id="manual_payment_reference" name="payment_reference" class="form-control" data-manual-reference-input placeholder="Transaction hash or payment reference" required>
+            <div class="form-text" data-manual-reference-help>Submit the payment reference after completing the transfer.</div>
+          </div>
+
+          <div>
+            <label for="manual_payment_notes" class="form-label">Notes</label>
+            <textarea id="manual_payment_notes" name="notes" rows="2" class="form-control" data-manual-notes-input placeholder="Optional payment notes"></textarea>
+          </div>
+
+          <button class="btn btn-primary" type="submit">I completed the transfer</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
 @endsection
 
 
@@ -707,6 +758,7 @@
             },
         };
         const modalElement = document.getElementById('purchaseFlowModal');
+        const manualPaymentModalElement = document.getElementById('manualPaymentModal');
         const packageNameElement = modalElement?.querySelector('[data-purchase-package-name]');
         const packagePriceElement = modalElement?.querySelector('[data-purchase-package-price]');
         const modalSubtitleElement = modalElement?.querySelector('[data-purchase-modal-subtitle]');
@@ -726,6 +778,18 @@
         const existingOrderMethodLabel = modalElement?.querySelector('[data-existing-order-method-label]');
         const existingOrderReference = modalElement?.querySelector('[data-existing-order-reference]');
         const existingOrderProofSummary = modalElement?.querySelector('[data-existing-order-proof-summary]');
+        const manualPaymentModal = manualPaymentModalElement && window.bootstrap?.Modal
+            ? window.bootstrap.Modal.getOrCreateInstance(manualPaymentModalElement)
+            : null;
+        const manualPackageNameElement = manualPaymentModalElement?.querySelector('[data-manual-package-name]');
+        const manualPackagePriceElement = manualPaymentModalElement?.querySelector('[data-manual-package-price]');
+        const manualMethodDetailsElement = manualPaymentModalElement?.querySelector('[data-manual-method-details]');
+        const manualPaymentForm = manualPaymentModalElement?.querySelector('[data-manual-payment-form]');
+        const manualPackageInput = manualPaymentModalElement?.querySelector('[data-manual-package-input]');
+        const manualMethodInput = manualPaymentModalElement?.querySelector('[data-manual-method-input]');
+        const manualReferenceInput = manualPaymentModalElement?.querySelector('[data-manual-reference-input]');
+        const manualReferenceHelp = manualPaymentModalElement?.querySelector('[data-manual-reference-help]');
+        const manualNotesInput = manualPaymentModalElement?.querySelector('[data-manual-notes-input]');
 
         let activePackage = null;
         let lastPurchaseTrigger = null;
@@ -808,6 +872,78 @@
                 referenceGroup?.classList.remove('d-none');
                 orderForm?.querySelector('[data-purchase-submit-button]')?.textContent = 'Continue payment';
             }
+        };
+
+        const openManualPaymentModal = (methodKey) => {
+            const method = paymentMethodByKey[methodKey] ?? null;
+            if (!method || !manualPaymentModalElement || !manualMethodDetailsElement || !manualPackageInput || !manualMethodInput) {
+                return;
+            }
+
+            const destination = method.destination || 'Destination details will be shared by the team.';
+            const instructions = method.instruction || 'Follow the payment instructions from the admin team.';
+            const meta = methodMeta[method.key] ?? methodMeta.bank_transfer;
+            const isCrypto = cryptoMethods.includes(method.key);
+            const qrDataUri = isCrypto ? method.qr_code_data_uri : null;
+
+            if (manualPackageNameElement) {
+                manualPackageNameElement.textContent = activePackage?.name || 'Selected package';
+            }
+            if (manualPackagePriceElement) {
+                manualPackagePriceElement.textContent = `$${activePackage?.price || '0.00'}`;
+            }
+
+            manualPackageInput.value = activePackage?.slug || packageInput?.value || '';
+            manualMethodInput.value = method.key;
+
+            if (manualReferenceInput) {
+                manualReferenceInput.value = referenceInput?.value || '';
+                manualReferenceInput.placeholder = method.reference_hint || 'Transaction hash or payment reference';
+            }
+            if (manualReferenceHelp) {
+                manualReferenceHelp.textContent = meta.referenceLabel;
+            }
+            if (manualNotesInput) {
+                manualNotesInput.value = modalElement?.querySelector('#purchase_notes')?.value || '';
+            }
+
+            manualMethodDetailsElement.innerHTML = `
+                <div class="d-flex flex-column gap-3">
+                    <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                        <div>
+                            <div class="fw-semibold text-dark">${method.label}</div>
+                            <div class="text-muted small">Use these details to complete your transfer before you submit the payment reference.</div>
+                        </div>
+                        <span class="badge ${isCrypto ? 'bg-warning text-dark' : 'bg-primary-subtle text-primary'}">${meta.networkLabel}</span>
+                    </div>
+                    <div class="d-flex flex-column flex-md-row gap-3 align-items-start">
+                        <div class="flex-grow-1">
+                            <div class="text-muted text-uppercase small mb-1">Send payment to</div>
+                            <div class="fw-semibold text-dark mb-2 text-break" data-payment-destination>${destination}</div>
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                <button type="button" class="btn btn-sm btn-outline-primary" data-copy-payment-destination>Copy details</button>
+                                ${isCrypto ? '<span class="badge bg-success-subtle text-success align-self-center">QR ready</span>' : ''}
+                            </div>
+                            <div class="alert ${isCrypto ? 'alert-warning' : 'alert-info'} py-2 px-3 small mb-3">${meta.warning}</div>
+                            <div class="text-muted text-uppercase small mb-1">Instructions</div>
+                            <div class="text-muted mb-3">${instructions}</div>
+                            <div class="text-muted text-uppercase small mb-1">What to submit after payment</div>
+                            <div class="text-muted">${meta.referenceLabel}</div>
+                            <div class="text-success small d-none mt-2" data-payment-copy-feedback>Copied to clipboard.</div>
+                        </div>
+                        ${qrDataUri ? `
+                            <div class="text-center border rounded p-2 bg-white">
+                                <div class="text-muted text-uppercase small mb-2">Scan QR</div>
+                                <img src="${qrDataUri}" alt="${method.label} QR code" class="img-fluid" style="max-width: 180px;">
+                                <div class="text-muted small mt-2">Confirm the destination text matches before sending.</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+
+            window.bootstrap?.Modal?.getInstance(modalElement)?.hide();
+            manualPaymentModal?.show();
         };
 
         const syncOrderState = (packageSlug) => {
@@ -980,7 +1116,7 @@
             }
         });
 
-        orderForm?.addEventListener('submit', () => {
+        orderForm?.addEventListener('submit', (event) => {
             if (methodSelect?.value === 'ziina') {
                 const popupName = `ziinaCheckout${Date.now()}`;
                 const paymentWindow = window.open('', popupName, 'popup=yes,width=520,height=760,resizable=yes,scrollbars=yes');
@@ -991,7 +1127,9 @@
                     orderForm.setAttribute('target', '_blank');
                 }
             } else {
+                event.preventDefault();
                 orderForm.removeAttribute('target');
+                openManualPaymentModal(methodSelect?.value ?? '');
             }
         });
 
