@@ -428,8 +428,6 @@
               <button
                 type="button"
                 class="btn btn-{{ $accent }}"
-                data-bs-toggle="modal"
-                data-bs-target="#purchaseFlowModal"
                 data-open-purchase-modal
                 data-package-slug="{{ $package->slug }}"
                 data-package-name="{{ $package->name }}"
@@ -653,6 +651,7 @@
         const paymentMethodByKey = Object.fromEntries(paymentMethods.map((method) => [method.key, method]));
         const proofUploadOrder = @json($proofUploadOrderData);
         const oldPackageSlug = @json(old('package'));
+        const oldPaymentMethod = @json(old('payment_method'));
         const hasErrors = @json($errors->any());
         const subscriptionSuccess = @json(session('subscription_success'));
         const cryptoMethods = ['btc_transfer', 'usdt_transfer'];
@@ -701,6 +700,9 @@
 
         let activePackage = null;
         let lastPurchaseTrigger = null;
+        const modalInstance = modalElement && window.bootstrap?.Modal
+            ? window.bootstrap.Modal.getOrCreateInstance(modalElement)
+            : null;
 
         const renderMethod = (methodKey) => {
             if (!methodPanel || !referenceInput) {
@@ -876,6 +878,8 @@
                 return;
             }
 
+            const previousMethod = oldPackageSlug === (trigger.dataset.packageSlug || '') ? oldPaymentMethod : '';
+
             activePackage = {
                 slug: trigger.dataset.packageSlug || oldPackageSlug || proofUploadOrder?.package_slug || '',
                 name: trigger.dataset.packageName || proofUploadOrder?.package_name || 'Selected package',
@@ -885,13 +889,15 @@
             packageInput.value = activePackage.slug;
             packageNameElement.textContent = activePackage.name;
             packagePriceElement.textContent = `$${activePackage.price}`;
-            referenceInput.value = '';
-
-            if (methodSelect) {
-                methodSelect.value = '';
+            if (referenceInput) {
+                referenceInput.value = '';
             }
 
-            renderMethod('');
+            if (methodSelect) {
+                methodSelect.value = previousMethod || '';
+            }
+
+            renderMethod(previousMethod || '');
 
             if (modalSubtitleElement) {
                 modalSubtitleElement.textContent = 'Choose a payment method. Manual transfers stay in this popup, while Ziina will send you to secure hosted checkout.';
@@ -901,12 +907,22 @@
 
             if (!proofUploadOrder || proofUploadOrder.package_slug !== activePackage.slug) {
                 orderForm?.classList.remove('d-none');
-                if (methodSelect && oldPackageSlug === activePackage.slug && methodSelect.value) {
+                if (methodSelect && methodSelect.value) {
                     renderMethod(methodSelect.value);
                 } else {
                     renderMethod(methodSelect?.value ?? '');
                 }
             }
+        };
+
+        const openPurchaseModal = (trigger) => {
+            if (!trigger) {
+                return;
+            }
+
+            lastPurchaseTrigger = trigger;
+            hydratePurchaseModal(trigger);
+            modalInstance?.show();
         };
 
         document.addEventListener('click', (event) => {
@@ -915,7 +931,8 @@
                 return;
             }
 
-            lastPurchaseTrigger = trigger;
+            event.preventDefault();
+            openPurchaseModal(trigger);
         }, true);
 
         modalElement?.addEventListener('show.bs.modal', (event) => {
@@ -960,14 +977,12 @@
         if (hasErrors && modalElement) {
             const packageButton = document.querySelector(`[data-open-purchase-modal][data-package-slug="${oldPackageSlug || proofUploadOrder?.package_slug || ''}"]`);
             if (packageButton) {
-                hydratePurchaseModal(packageButton);
-                window.bootstrap?.Modal?.getOrCreateInstance(modalElement)?.show();
+                openPurchaseModal(packageButton);
             }
         } else if (subscriptionSuccess && proofUploadOrder && modalElement) {
             const packageButton = document.querySelector(`[data-open-purchase-modal][data-package-slug="${proofUploadOrder.package_slug}"]`);
             if (packageButton) {
-                hydratePurchaseModal(packageButton);
-                window.bootstrap?.Modal?.getOrCreateInstance(modalElement)?.show();
+                openPurchaseModal(packageButton);
             }
         }
     });
