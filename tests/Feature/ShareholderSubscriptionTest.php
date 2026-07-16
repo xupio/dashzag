@@ -158,6 +158,10 @@ test('verified user can start Ziina checkout for a package', function () {
 });
 
 test('ziina webhook can auto approve a pending investment order', function () {
+    config([
+        'services.ziina.webhook_secret' => '',
+    ]);
+
     $user = User::factory()->create([
         'email_verified_at' => now(),
         'account_type' => 'user',
