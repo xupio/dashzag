@@ -804,7 +804,10 @@
             if (!method) {
                 methodPanel.innerHTML = '<span class="text-muted">Select a payment method to continue to secure checkout or view transfer instructions.</span><div class="small text-success mt-2 d-none" data-payment-copy-feedback>Copied to clipboard.</div>';
                 referenceInput.placeholder = 'Transaction hash or payment reference';
+                referenceInput.removeAttribute('readonly');
+                referenceInput.removeAttribute('required');
                 referenceGroup?.classList.remove('d-none');
+                orderForm?.querySelector('[data-purchase-submit-button]')?.textContent = 'Continue payment';
                 return;
             }
 
@@ -867,10 +870,11 @@
                 referenceGroup?.classList.add('d-none');
                 orderForm?.querySelector('[data-purchase-submit-button]')?.textContent = 'Pay with Card / Apple Pay';
             } else {
+                referenceInput.value = '';
                 referenceInput.removeAttribute('readonly');
-                referenceInput.setAttribute('required', 'required');
-                referenceGroup?.classList.remove('d-none');
-                orderForm?.querySelector('[data-purchase-submit-button]')?.textContent = 'Continue payment';
+                referenceInput.removeAttribute('required');
+                referenceGroup?.classList.add('d-none');
+                orderForm?.querySelector('[data-purchase-submit-button]')?.textContent = 'Open payment details';
             }
         };
 
@@ -1139,7 +1143,7 @@
                 return;
             }
 
-            const panel = button.closest('[data-purchase-method-panel]') || button.closest('[data-payment-method-panel]');
+            const panel = button.closest('[data-purchase-method-panel]') || button.closest('[data-payment-method-panel]') || button.closest('[data-manual-method-details]');
             const destination = panel?.querySelector('[data-payment-destination]')?.textContent?.trim();
             const feedback = panel?.querySelector('[data-payment-copy-feedback]');
 
