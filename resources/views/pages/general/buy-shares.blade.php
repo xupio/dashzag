@@ -700,6 +700,7 @@
         const existingOrderProofSummary = modalElement?.querySelector('[data-existing-order-proof-summary]');
 
         let activePackage = null;
+        let lastPurchaseTrigger = null;
 
         const renderMethod = (methodKey) => {
             if (!methodPanel || !referenceInput) {
@@ -884,15 +885,16 @@
             packageInput.value = activePackage.slug;
             packageNameElement.textContent = activePackage.name;
             packagePriceElement.textContent = `$${activePackage.price}`;
+            referenceInput.value = '';
 
-            if (modalSubtitleElement) {
-                modalSubtitleElement.textContent = methodSelect?.value === 'ziina'
-                    ? 'Ziina will send you to a normal secure card or Apple Pay checkout after you continue.'
-                    : 'Choose a payment method, copy the destination, then submit your proof in the same popup.';
+            if (methodSelect) {
+                methodSelect.value = '';
             }
 
-            if (methodSelect && !proofUploadOrder) {
-                methodSelect.value = methodSelect.value || '';
+            renderMethod('');
+
+            if (modalSubtitleElement) {
+                modalSubtitleElement.textContent = 'Choose a payment method. Manual transfers stay in this popup, while Ziina will send you to secure hosted checkout.';
             }
 
             syncOrderState(activePackage.slug);
@@ -907,8 +909,17 @@
             }
         };
 
+        document.addEventListener('click', (event) => {
+            const trigger = event.target.closest('[data-open-purchase-modal]');
+            if (!trigger) {
+                return;
+            }
+
+            lastPurchaseTrigger = trigger;
+        }, true);
+
         modalElement?.addEventListener('show.bs.modal', (event) => {
-            const trigger = event.relatedTarget?.closest?.('[data-open-purchase-modal]') ?? event.relatedTarget;
+            const trigger = event.relatedTarget?.closest?.('[data-open-purchase-modal]') ?? event.relatedTarget ?? lastPurchaseTrigger;
             hydratePurchaseModal(trigger);
         });
 
