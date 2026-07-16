@@ -201,6 +201,8 @@
             <button
               type="button"
               class="btn btn-sm btn-dark top-payment-alert__button"
+              data-bs-toggle="modal"
+              data-bs-target="#purchaseFlowModal"
               data-open-purchase-modal
               data-package-slug="{{ $proofUploadOrder->package?->slug }}"
               data-package-name="{{ $proofUploadOrder->package?->name }}"
@@ -428,6 +430,8 @@
               <button
                 type="button"
                 class="btn btn-{{ $accent }}"
+                data-bs-toggle="modal"
+                data-bs-target="#purchaseFlowModal"
                 data-open-purchase-modal
                 data-package-slug="{{ $package->slug }}"
                 data-package-name="{{ $package->name }}"
@@ -700,9 +704,6 @@
 
         let activePackage = null;
         let lastPurchaseTrigger = null;
-        const modalInstance = modalElement && window.bootstrap?.Modal
-            ? window.bootstrap.Modal.getOrCreateInstance(modalElement)
-            : null;
 
         const renderMethod = (methodKey) => {
             if (!methodPanel || !referenceInput) {
@@ -922,7 +923,9 @@
 
             lastPurchaseTrigger = trigger;
             hydratePurchaseModal(trigger);
-            modalInstance?.show();
+            if (!trigger.hasAttribute('data-bs-toggle')) {
+                window.bootstrap?.Modal?.getOrCreateInstance(modalElement)?.show();
+            }
         };
 
         document.addEventListener('click', (event) => {
@@ -931,8 +934,8 @@
                 return;
             }
 
-            event.preventDefault();
-            openPurchaseModal(trigger);
+            lastPurchaseTrigger = trigger;
+            hydratePurchaseModal(trigger);
         }, true);
 
         modalElement?.addEventListener('show.bs.modal', (event) => {
