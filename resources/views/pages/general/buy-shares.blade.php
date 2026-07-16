@@ -428,6 +428,8 @@
               <button
                 type="button"
                 class="btn btn-{{ $accent }}"
+                data-bs-toggle="modal"
+                data-bs-target="#purchaseFlowModal"
                 data-open-purchase-modal
                 data-package-slug="{{ $package->slug }}"
                 data-package-name="{{ $package->name }}"
@@ -677,7 +679,6 @@
             },
         };
         const modalElement = document.getElementById('purchaseFlowModal');
-        const modalInstance = modalElement && window.bootstrap ? new bootstrap.Modal(modalElement) : null;
         const packageNameElement = modalElement?.querySelector('[data-purchase-package-name]');
         const packagePriceElement = modalElement?.querySelector('[data-purchase-package-price]');
         const modalSubtitleElement = modalElement?.querySelector('[data-purchase-modal-subtitle]');
@@ -870,9 +871,11 @@
         };
 
         const openPurchaseModal = (trigger) => {
-            if (!modalInstance || !packageInput || !packageNameElement || !packagePriceElement) {
+            if (!modalElement || !packageInput || !packageNameElement || !packagePriceElement) {
                 return;
             }
+
+            const modal = window.bootstrap?.Modal?.getOrCreateInstance(modalElement);
 
             activePackage = {
                 slug: trigger.dataset.packageSlug || oldPackageSlug || proofUploadOrder?.package_slug || '',
@@ -905,11 +908,16 @@
                 }
             }
 
-            modalInstance.show();
+            modal?.show();
         };
 
-        document.querySelectorAll('[data-open-purchase-modal]').forEach((button) => {
-            button.addEventListener('click', () => openPurchaseModal(button));
+        document.addEventListener('click', (event) => {
+            const trigger = event.target.closest('[data-open-purchase-modal]');
+            if (!trigger) {
+                return;
+            }
+
+            openPurchaseModal(trigger);
         });
 
         methodSelect?.addEventListener('change', () => {
@@ -946,12 +954,12 @@
             }
         });
 
-        if (hasErrors && modalInstance) {
+        if (hasErrors && modalElement) {
             const packageButton = document.querySelector(`[data-open-purchase-modal][data-package-slug="${oldPackageSlug || proofUploadOrder?.package_slug || ''}"]`);
             if (packageButton) {
                 openPurchaseModal(packageButton);
             }
-        } else if (subscriptionSuccess && proofUploadOrder && modalInstance) {
+        } else if (subscriptionSuccess && proofUploadOrder && modalElement) {
             const packageButton = document.querySelector(`[data-open-purchase-modal][data-package-slug="${proofUploadOrder.package_slug}"]`);
             if (packageButton) {
                 openPurchaseModal(packageButton);
