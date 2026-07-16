@@ -203,6 +203,7 @@
               class="btn btn-sm btn-dark top-payment-alert__button"
               data-bs-toggle="modal"
               data-bs-target="#purchaseFlowModal"
+              onclick="window.openPurchaseFlowModal && window.openPurchaseFlowModal(this)"
               data-open-purchase-modal
               data-package-slug="{{ $proofUploadOrder->package?->slug }}"
               data-package-name="{{ $proofUploadOrder->package?->name }}"
@@ -432,6 +433,7 @@
                 class="btn btn-{{ $accent }}"
                 data-bs-toggle="modal"
                 data-bs-target="#purchaseFlowModal"
+                onclick="window.openPurchaseFlowModal && window.openPurchaseFlowModal(this)"
                 data-open-purchase-modal
                 data-package-slug="{{ $package->slug }}"
                 data-package-name="{{ $package->name }}"
@@ -875,16 +877,17 @@
         };
 
         const hydratePurchaseModal = (trigger) => {
-            if (!trigger || !modalElement || !packageInput || !packageNameElement || !packagePriceElement) {
+            if (!modalElement || !packageInput || !packageNameElement || !packagePriceElement) {
                 return;
             }
 
-            const previousMethod = oldPackageSlug === (trigger.dataset.packageSlug || '') ? oldPaymentMethod : '';
+            const triggerPackageSlug = trigger?.dataset?.packageSlug || oldPackageSlug || proofUploadOrder?.package_slug || '';
+            const previousMethod = oldPackageSlug === triggerPackageSlug ? oldPaymentMethod : '';
 
             activePackage = {
-                slug: trigger.dataset.packageSlug || oldPackageSlug || proofUploadOrder?.package_slug || '',
-                name: trigger.dataset.packageName || proofUploadOrder?.package_name || 'Selected package',
-                price: trigger.dataset.packagePrice || '0.00',
+                slug: triggerPackageSlug,
+                name: trigger?.dataset?.packageName || proofUploadOrder?.package_name || 'Selected package',
+                price: trigger?.dataset?.packagePrice || '0.00',
             };
 
             packageInput.value = activePackage.slug;
@@ -928,6 +931,8 @@
             }
         };
 
+        window.openPurchaseFlowModal = openPurchaseModal;
+
         document.addEventListener('click', (event) => {
             const trigger = event.target.closest('[data-open-purchase-modal]');
             if (!trigger) {
@@ -949,6 +954,21 @@
                 modalSubtitleElement.textContent = methodSelect.value === 'ziina'
                     ? 'Ziina will send you to a normal secure card or Apple Pay checkout after you continue.'
                     : 'Choose a payment method, copy the destination, then submit your proof in the same popup.';
+            }
+        });
+
+        orderForm?.addEventListener('submit', () => {
+            if (methodSelect?.value === 'ziina') {
+                const popupName = `ziinaCheckout${Date.now()}`;
+                const paymentWindow = window.open('', popupName, 'popup=yes,width=520,height=760,resizable=yes,scrollbars=yes');
+
+                if (paymentWindow) {
+                    orderForm.setAttribute('target', popupName);
+                } else {
+                    orderForm.setAttribute('target', '_blank');
+                }
+            } else {
+                orderForm.removeAttribute('target');
             }
         });
 
