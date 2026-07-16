@@ -870,12 +870,10 @@
             }
         };
 
-        const openPurchaseModal = (trigger) => {
-            if (!modalElement || !packageInput || !packageNameElement || !packagePriceElement) {
+        const hydratePurchaseModal = (trigger) => {
+            if (!trigger || !modalElement || !packageInput || !packageNameElement || !packagePriceElement) {
                 return;
             }
-
-            const modal = window.bootstrap?.Modal?.getOrCreateInstance(modalElement);
 
             activePackage = {
                 slug: trigger.dataset.packageSlug || oldPackageSlug || proofUploadOrder?.package_slug || '',
@@ -907,17 +905,11 @@
                     renderMethod(methodSelect?.value ?? '');
                 }
             }
-
-            modal?.show();
         };
 
-        document.addEventListener('click', (event) => {
-            const trigger = event.target.closest('[data-open-purchase-modal]');
-            if (!trigger) {
-                return;
-            }
-
-            openPurchaseModal(trigger);
+        modalElement?.addEventListener('show.bs.modal', (event) => {
+            const trigger = event.relatedTarget?.closest?.('[data-open-purchase-modal]') ?? event.relatedTarget;
+            hydratePurchaseModal(trigger);
         });
 
         methodSelect?.addEventListener('change', () => {
@@ -957,12 +949,14 @@
         if (hasErrors && modalElement) {
             const packageButton = document.querySelector(`[data-open-purchase-modal][data-package-slug="${oldPackageSlug || proofUploadOrder?.package_slug || ''}"]`);
             if (packageButton) {
-                openPurchaseModal(packageButton);
+                hydratePurchaseModal(packageButton);
+                window.bootstrap?.Modal?.getOrCreateInstance(modalElement)?.show();
             }
         } else if (subscriptionSuccess && proofUploadOrder && modalElement) {
             const packageButton = document.querySelector(`[data-open-purchase-modal][data-package-slug="${proofUploadOrder.package_slug}"]`);
             if (packageButton) {
-                openPurchaseModal(packageButton);
+                hydratePurchaseModal(packageButton);
+                window.bootstrap?.Modal?.getOrCreateInstance(modalElement)?.show();
             }
         }
     });
