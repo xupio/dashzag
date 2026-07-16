@@ -5847,10 +5847,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
 
         if ($existingPendingOrder) {
             if ($existingPendingOrder->payment_method === 'ziina' && filled($existingPendingOrder->gateway_redirect_url)) {
-                return redirect()
-                    ->route('dashboard.buy-shares', ['miner' => $package->miner?->slug])
-                    ->with('subscription_success', 'You already have a pending Ziina checkout for the '.$package->name.' package. We are reopening it for you.')
-                    ->with('reopen_pending_order', true);
+                return redirect()->away($existingPendingOrder->gateway_redirect_url);
             }
 
             if ($existingPendingOrder->payment_method !== 'ziina') {
