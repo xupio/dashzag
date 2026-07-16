@@ -410,19 +410,19 @@
                 <div class="fw-semibold mb-2">Payment completed checklist</div>
                 <div class="text-secondary d-flex align-items-start gap-2 mb-2">
                   <span class="badge bg-primary-subtle text-primary mt-1">1</span>
-                  <span>Select a payment method and review the destination details in the popup carefully.</span>
+                  <span>Select a payment method and review the checkout or transfer details in the popup carefully.</span>
                 </div>
                 <div class="text-secondary d-flex align-items-start gap-2 mb-2">
                   <span class="badge bg-primary-subtle text-primary mt-1">2</span>
-                  <span>Send the transfer and keep the transaction hash or bank reference ready.</span>
+                  <span>For Ziina, continue to secure card or Apple Pay checkout. For manual methods, complete the transfer and keep the payment reference ready.</span>
                 </div>
                 <div class="text-secondary d-flex align-items-start gap-2 mb-2">
                   <span class="badge bg-primary-subtle text-primary mt-1">3</span>
-                  <span>Stay in the same popup to submit the payment reference and upload proof.</span>
+                  <span>Manual methods need proof upload. Ziina orders should confirm automatically after successful payment.</span>
                 </div>
                 <div class="text-secondary d-flex align-items-start gap-2">
                   <span class="badge bg-primary-subtle text-primary mt-1">4</span>
-                  <span>Wait for admin review. You will be notified once the order is approved or rejected.</span>
+                  <span>Wait for automatic or admin confirmation. You will be notified once the order is approved or rejected.</span>
                 </div>
               </div>
               <button
@@ -432,9 +432,8 @@
                 data-package-slug="{{ $package->slug }}"
                 data-package-name="{{ $package->name }}"
                 data-package-price="{{ number_format((float) $package->price, 2) }}"
-                {{ $isPending ? 'disabled' : '' }}
               >
-                {{ $isPending ? 'Pending approval' : ($isCurrent ? 'Buy in popup' : 'Choose method and pay') }}
+                {{ $isPending ? 'Continue payment' : ($isCurrent ? 'Buy in popup' : 'Choose method and pay') }}
               </button>
             </div>
           @endif
