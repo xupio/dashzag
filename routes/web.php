@@ -33,6 +33,7 @@ use App\Support\MiningPlatform;
 use App\Support\N8nWebhook;
 use App\Support\UserActivity;
 use App\Support\Zagn8nMarketingFeed;
+use App\Services\ZiinaGatewayService;
 use App\Services\ShareMarketService;
 use Endroid\QrCode\ErrorCorrectionLevel;
 use Endroid\QrCode\QrCode;
@@ -315,6 +316,52 @@ Route::get('/dashboard', function (Request $request) {
         'monthlyHallOfFameChampionId' => $monthlyHallOfFameChampion['user']->id ?? null,
     ]);
 })->middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->name('dashboard');
+
+Route::post('/payment-gateways/ziina/webhook', function (Request $request, ZiinaGatewayService $ziinaGateway) {
+    $payload = $request->getContent();
+    $signature = $request->header('X-Hmac-Signature');
+
+    abort_unless($ziinaGateway->verifyWebhookSignature($payload, $signature), 403);
+
+    $event = (string) $request->input('event', '');
+    $data = $request->input('data', []);
+
+    if ($event !== 'payment_intent.status.updated' || ! is_array($data)) {
+        return response()->json(['received' => true]);
+    }
+
+    $paymentIntentId = (string) ($data['id'] ?? '');
+    $status = strtolower((string) ($data['status'] ?? ''));
+
+    if ($paymentIntentId === '') {
+        return response()->json(['received' => true]);
+    }
+
+    $order = InvestmentOrder::query()
+        ->where('gateway_provider', 'ziina')
+        ->where(function ($query) use ($paymentIntentId) {
+            $query->where('gateway_reference', $paymentIntentId)
+                ->orWhere('payment_reference', $paymentIntentId);
+        })
+        ->latest('id')
+        ->first();
+
+    if (! $order) {
+        return response()->json(['received' => true]);
+    }
+
+    $order->forceFill([
+        'gateway_status' => $status,
+        'gateway_payload' => $data,
+        'gateway_paid_at' => $status === 'completed' ? now() : $order->gateway_paid_at,
+    ])->save();
+
+    if ($status === 'completed' && $order->status === 'pending') {
+        MiningPlatform::approveGatewayInvestmentOrder($order->fresh(), 'ziina', $data);
+    }
+
+    return response()->json(['received' => true]);
+})->withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])->name('payment-gateways.ziina.webhook');
 
 Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->group(function () {
     Route::get('/share-market', [ShareMarketController::class, 'index'])
@@ -2078,6 +2125,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                     'btc_transfer' => MiningPlatform::platformSetting('payment_btc_transfer_admin_review_note'),
                     'usdt_transfer' => MiningPlatform::platformSetting('payment_usdt_transfer_admin_review_note'),
                     'bank_transfer' => MiningPlatform::platformSetting('payment_bank_transfer_admin_review_note'),
+                    'ziina' => MiningPlatform::platformSetting('payment_ziina_admin_review_note'),
                 ]),
             ]);
         })->name('dashboard.digests');
@@ -3488,7 +3536,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             $allowedStatuses = ['all', 'pending', 'approved', 'rejected', 'cancelled'];
             $search = trim((string) $request->query('investment_search', ''));
             $paymentMethod = (string) $request->query('investment_payment_method', 'all');
-            $allowedPaymentMethods = ['all', 'btc_transfer', 'usdt_transfer', 'bank_transfer'];
+            $allowedPaymentMethods = ['all', 'btc_transfer', 'usdt_transfer', 'bank_transfer', 'ziina'];
             $proofState = (string) $request->query('investment_proof_state', 'all');
             $allowedProofStates = ['all', 'proof_needed', 'proof_uploaded'];
             $riskState = (string) $request->query('investment_risk_state', 'all');
@@ -3923,6 +3971,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                     'btc_transfer' => $investmentPaymentMethodCounts->get('btc_transfer', 0),
                     'usdt_transfer' => $investmentPaymentMethodCounts->get('usdt_transfer', 0),
                     'bank_transfer' => $investmentPaymentMethodCounts->get('bank_transfer', 0),
+                    'ziina' => $investmentPaymentMethodCounts->get('ziina', 0),
                 ]),
                 'investmentProofStateCounts' => $investmentProofStateCounts,
                 'investmentRiskStateCounts' => $investmentRiskStateCounts,
@@ -3937,6 +3986,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                     'btc_transfer' => MiningPlatform::platformSetting('payment_btc_transfer_admin_review_note'),
                     'usdt_transfer' => MiningPlatform::platformSetting('payment_usdt_transfer_admin_review_note'),
                     'bank_transfer' => MiningPlatform::platformSetting('payment_bank_transfer_admin_review_note'),
+                    'ziina' => MiningPlatform::platformSetting('payment_ziina_admin_review_note'),
                 ]),
                 'investmentOrderRewardCaps' => $investmentOrderRewardCaps,
                 'investmentRewardCapSummary' => $investmentRewardCapSummary,
@@ -4220,7 +4270,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             $allowedStatuses = ['all', 'pending', 'approved', 'rejected', 'cancelled'];
             $search = trim((string) $request->query('investment_search', ''));
             $paymentMethod = (string) $request->query('investment_payment_method', 'all');
-            $allowedPaymentMethods = ['all', 'btc_transfer', 'usdt_transfer', 'bank_transfer'];
+            $allowedPaymentMethods = ['all', 'btc_transfer', 'usdt_transfer', 'bank_transfer', 'ziina'];
 
             if (! in_array($status, $allowedStatuses, true)) {
                 $status = 'all';
@@ -4705,6 +4755,11 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'payment_bank_transfer_reference_hint' => ['required', 'string', 'max:255'],
                 'payment_bank_transfer_instruction' => ['required', 'string', 'max:255'],
                 'payment_bank_transfer_admin_review_note' => ['required', 'string', 'max:255'],
+                'payment_ziina_enabled' => ['required', 'boolean'],
+                'payment_ziina_label' => ['required', 'string', 'max:255'],
+                'payment_ziina_reference_hint' => ['required', 'string', 'max:255'],
+                'payment_ziina_instruction' => ['required', 'string', 'max:255'],
+                'payment_ziina_admin_review_note' => ['required', 'string', 'max:255'],
             ]);
 
             MiningPlatform::updatePlatformSettings($validated);
@@ -5721,6 +5776,15 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'reference_hint' => MiningPlatform::platformSetting('payment_bank_transfer_reference_hint'),
                 'instruction' => MiningPlatform::platformSetting('payment_bank_transfer_instruction'),
             ],
+            [
+                'key' => 'ziina',
+                'label' => MiningPlatform::platformSetting('payment_ziina_label'),
+                'enabled' => MiningPlatform::platformSetting('payment_ziina_enabled') === '1',
+                'destination' => 'Secure hosted checkout powered by Ziina.',
+                'reference_hint' => MiningPlatform::platformSetting('payment_ziina_reference_hint'),
+                'instruction' => MiningPlatform::platformSetting('payment_ziina_instruction'),
+                'checkout_mode' => 'redirect',
+            ],
         ])->map(function (array $method) use ($qrWriter) {
             $destination = trim((string) ($method['destination'] ?? ''));
             $method['qr_code_data_uri'] = null;
@@ -5759,12 +5823,13 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             MiningPlatform::platformSetting('payment_btc_transfer_enabled') === '1' ? 'btc_transfer' : null,
             MiningPlatform::platformSetting('payment_usdt_transfer_enabled') === '1' ? 'usdt_transfer' : null,
             MiningPlatform::platformSetting('payment_bank_transfer_enabled') === '1' ? 'bank_transfer' : null,
+            MiningPlatform::platformSetting('payment_ziina_enabled') === '1' ? 'ziina' : null,
         ])->filter()->values()->all();
 
         $validated = $request->validate([
             'package' => ['required', 'string', 'exists:investment_packages,slug'],
             'payment_method' => ['required', 'string', Rule::in($paymentMethodKeys)],
-            'payment_reference' => ['required', 'string', 'max:255'],
+            'payment_reference' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -5784,6 +5849,60 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             return redirect()
                 ->route('dashboard.buy-shares', ['miner' => $package->miner?->slug])
                 ->with('subscription_success', 'You already have a pending payment review for the '.$package->name.' package.');
+        }
+
+        if ($validated['payment_method'] !== 'ziina' && blank($validated['payment_reference'] ?? null)) {
+            return back()
+                ->withErrors(['payment_reference' => 'Payment reference is required for manual payment methods.'])
+                ->withInput();
+        }
+
+        if ($validated['payment_method'] === 'ziina') {
+            $ziinaGateway = app(ZiinaGatewayService::class);
+            $reference = $ziinaGateway->generateReference();
+
+            $investmentOrder = MiningPlatform::submitInvestmentOrder($user, $package, [
+                'payment_method' => 'ziina',
+                'gateway_provider' => 'ziina',
+                'payment_reference' => $reference,
+                'gateway_reference' => $reference,
+                'gateway_status' => 'requires_payment_instrument',
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            $intent = $ziinaGateway->createPaymentIntent(
+                $investmentOrder->loadMissing('package'),
+                route('dashboard.buy-shares.ziina.return', ['investmentOrder' => $investmentOrder, 'result' => 'success']),
+                route('dashboard.buy-shares.ziina.return', ['investmentOrder' => $investmentOrder, 'result' => 'cancel']),
+                route('dashboard.buy-shares.ziina.return', ['investmentOrder' => $investmentOrder, 'result' => 'failure']),
+            );
+
+            $investmentOrder->forceFill([
+                'payment_reference' => (string) ($intent['id'] ?? $reference),
+                'gateway_reference' => (string) ($intent['id'] ?? $reference),
+                'gateway_status' => strtolower((string) ($intent['status'] ?? 'requires_payment_instrument')),
+                'gateway_redirect_url' => $intent['redirect_url'] ?? null,
+                'gateway_embedded_url' => $intent['embedded_url'] ?? null,
+                'gateway_payload' => $intent,
+            ])->save();
+
+            $submittedTemplate = MiningPlatform::activityTemplate('investment_payment_checkout', [
+                'package_name' => $package->name,
+            ]);
+
+            $user->notify(new ActivityFeedNotification([
+                'category' => 'investment',
+                'status' => 'info',
+                'subject' => $submittedTemplate['subject'],
+                'message' => $submittedTemplate['message'],
+                'context_label' => 'Payment intent',
+                'context_value' => $investmentOrder->payment_reference,
+                'amount' => (float) $investmentOrder->amount,
+                'amount_label' => 'Checkout amount',
+                'force_mail' => true,
+            ]));
+
+            return redirect()->away((string) ($intent['redirect_url'] ?? route('dashboard.buy-shares', ['miner' => $package->miner?->slug])));
         }
 
         $investmentOrder = MiningPlatform::submitInvestmentOrder($user, $package, $validated);
@@ -5807,6 +5926,41 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             ->route('dashboard.buy-shares', ['miner' => $package->miner?->slug])
             ->with('subscription_success', 'Your payment for '.$package->name.' has been submitted. Upload the payment proof after you complete the transfer.');
     })->middleware('throttle:8,1')->name('dashboard.buy-shares.subscribe');
+
+    Route::get('/dashboard/buy-shares/{investmentOrder}/ziina/{result}', function (Request $request, InvestmentOrder $investmentOrder, string $result) {
+        abort_unless($investmentOrder->user_id === $request->user()->id, 403);
+        abort_unless($investmentOrder->gateway_provider === 'ziina', 404);
+
+        $result = strtolower($result);
+
+        if ($investmentOrder->gateway_reference && in_array($result, ['success', 'cancel', 'failure'], true)) {
+            try {
+                $intent = app(ZiinaGatewayService::class)->getPaymentIntent($investmentOrder->gateway_reference);
+
+                $investmentOrder->forceFill([
+                    'gateway_status' => strtolower((string) ($intent['status'] ?? $investmentOrder->gateway_status)),
+                    'gateway_payload' => $intent,
+                    'gateway_paid_at' => strtolower((string) ($intent['status'] ?? '')) === 'completed' ? now() : $investmentOrder->gateway_paid_at,
+                ])->save();
+
+                if (strtolower((string) ($intent['status'] ?? '')) === 'completed' && $investmentOrder->status === 'pending') {
+                    MiningPlatform::approveGatewayInvestmentOrder($investmentOrder->fresh(), 'ziina', $intent);
+                }
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        }
+
+        $message = match ($result) {
+            'success' => 'Ziina sent you back successfully. We are checking the payment confirmation now.',
+            'cancel' => 'Ziina checkout was cancelled. You can restart it any time from Buy Shares.',
+            default => 'Ziina checkout did not complete. Please try again or contact support if the charge was captured.',
+        };
+
+        return redirect()
+            ->route('dashboard.buy-shares', ['miner' => $investmentOrder->miner?->slug])
+            ->with('subscription_success', $message);
+    })->name('dashboard.buy-shares.ziina.return');
 
     Route::post('/dashboard/buy-shares/{investmentOrder}/proof', function (Request $request, InvestmentOrder $investmentOrder) {
         MiningPlatform::ensureDefaults();

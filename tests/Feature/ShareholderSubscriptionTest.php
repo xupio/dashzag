@@ -5,6 +5,7 @@ use App\Models\InvestmentOrder;
 use App\Models\User;
 use App\Support\MiningPlatform;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
@@ -74,7 +75,7 @@ test('paid package flow uses popup payment instructions', function () {
     $response->assertSee('Choose method and pay');
     $response->assertSee('Complete package payment');
     $response->assertSee('Upload payment proof');
-    $response->assertSee('Choose a payment method, copy the destination, then submit your proof in the same popup.');
+    $response->assertSee('Choose a payment method. Manual transfers stay in this popup, while Ziina will send you to secure hosted checkout.');
 });
 
 test('verified user submits a package payment for admin approval', function () {
@@ -108,6 +109,84 @@ test('verified user submits a package payment for admin approval', function () {
     expect($order->payment_proof_original_name)->toBeNull();
     expect($order->proof_uploaded_at)->toBeNull();
     Storage::disk('public')->assertDirectoryEmpty('investment-proofs');
+});
+
+test('verified user can start Ziina checkout for a package', function () {
+    config([
+        'services.ziina.enabled' => true,
+        'services.ziina.access_token' => 'ziina-test-token',
+        'services.ziina.test_mode' => true,
+    ]);
+
+    MiningPlatform::updatePlatformSettings([
+        'payment_ziina_enabled' => '1',
+        'payment_ziina_label' => 'Ziina Checkout',
+        'payment_ziina_reference_hint' => 'Ziina will create the payment reference automatically.',
+        'payment_ziina_instruction' => 'Pay by card with Ziina.',
+        'payment_ziina_admin_review_note' => 'Automatic confirmation expected from webhook.',
+    ]);
+
+    Http::fake([
+        'https://api-v2.ziina.com/api/payment_intent' => Http::response([
+            'id' => 'pi_test_123',
+            'status' => 'requires_user_action',
+            'redirect_url' => 'https://pay.ziina.com/checkout/pi_test_123',
+            'embedded_url' => 'https://pay.ziina.com/embed/pi_test_123',
+        ], 200),
+    ]);
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+    ]);
+
+    $response = $this->actingAs($user)->post(route('dashboard.buy-shares.subscribe'), [
+        'package' => 'growth-500',
+        'payment_method' => 'ziina',
+        'notes' => 'Card checkout',
+    ]);
+
+    $response->assertRedirect('https://pay.ziina.com/checkout/pi_test_123');
+
+    $order = InvestmentOrder::query()->firstOrFail();
+
+    expect($order->payment_method)->toBe('ziina');
+    expect($order->gateway_provider)->toBe('ziina');
+    expect($order->payment_reference)->toBe('pi_test_123');
+    expect($order->gateway_reference)->toBe('pi_test_123');
+    expect($order->gateway_redirect_url)->toBe('https://pay.ziina.com/checkout/pi_test_123');
+});
+
+test('ziina webhook can auto approve a pending investment order', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+    ]);
+
+    $package = \App\Models\InvestmentPackage::where('slug', 'growth-500')->firstOrFail();
+
+    $order = MiningPlatform::submitInvestmentOrder($user, $package, [
+        'payment_method' => 'ziina',
+        'gateway_provider' => 'ziina',
+        'payment_reference' => 'pi_test_approve',
+        'gateway_reference' => 'pi_test_approve',
+        'gateway_status' => 'pending',
+    ]);
+
+    $this->postJson(route('payment-gateways.ziina.webhook'), [
+        'event' => 'payment_intent.status.updated',
+        'data' => [
+            'id' => 'pi_test_approve',
+            'status' => 'completed',
+        ],
+    ])->assertOk();
+
+    $order->refresh();
+    $user->refresh();
+
+    expect($order->status)->toBe('approved');
+    expect($order->gateway_status)->toBe('completed');
+    expect($user->investments()->count())->toBe(1);
 });
 
 test('pending order page keeps the payment popup flow available', function () {

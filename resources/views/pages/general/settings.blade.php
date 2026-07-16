@@ -230,6 +230,45 @@
                   </div>
                 </div>
               @endforeach
+
+              <div class="border rounded p-3 mb-3 bg-light">
+                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+                  <div>
+                    <div class="fw-semibold">Ziina hosted checkout</div>
+                    <div class="text-secondary small">This method sends the user to Ziina for card payment and expects automatic confirmation from the Ziina webhook.</div>
+                  </div>
+                  <span class="badge bg-primary-subtle text-primary">Gateway</span>
+                </div>
+                <div class="form-check form-switch mb-3">
+                  <input type="hidden" name="payment_ziina_enabled" value="0">
+                  <input class="form-check-input" type="checkbox" role="switch" id="payment_ziina_enabled" name="payment_ziina_enabled" value="1" @checked(old('payment_ziina_enabled', $settings['payment_ziina_enabled']) == '1')>
+                  <label class="form-check-label fw-semibold" for="payment_ziina_enabled">Enable Ziina checkout</label>
+                </div>
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label class="form-label">Label</label>
+                    <input type="text" name="payment_ziina_label" class="form-control @error('payment_ziina_label') is-invalid @enderror" value="{{ old('payment_ziina_label', $settings['payment_ziina_label']) }}" required>
+                    @error('payment_ziina_label')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                  </div>
+                  <div class="col-md-8">
+                    <label class="form-label">Reference hint</label>
+                    <input type="text" name="payment_ziina_reference_hint" class="form-control @error('payment_ziina_reference_hint') is-invalid @enderror" value="{{ old('payment_ziina_reference_hint', $settings['payment_ziina_reference_hint']) }}" required>
+                    <div class="form-text">Shown in the buy-shares popup before the hosted checkout starts.</div>
+                    @error('payment_ziina_reference_hint')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Client instruction text</label>
+                    <input type="text" name="payment_ziina_instruction" class="form-control @error('payment_ziina_instruction') is-invalid @enderror" value="{{ old('payment_ziina_instruction', $settings['payment_ziina_instruction']) }}" required>
+                    @error('payment_ziina_instruction')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Admin review note</label>
+                    <input type="text" name="payment_ziina_admin_review_note" class="form-control @error('payment_ziina_admin_review_note') is-invalid @enderror" value="{{ old('payment_ziina_admin_review_note', $settings['payment_ziina_admin_review_note']) }}" required>
+                    <div class="form-text">Describe the expected Ziina webhook/payment-intent confirmation for operations.</div>
+                    @error('payment_ziina_admin_review_note')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                  </div>
+                </div>
+              </div>
             </div>
           <div class="d-flex justify-content-end">
             <button type="submit" class="btn btn-primary">Save platform defaults</button>

@@ -151,6 +151,11 @@ class MiningPlatform
             'payment_bank_transfer_reference_hint' => 'Enter the bank transfer reference, receipt number, or SWIFT trace.',
             'payment_bank_transfer_instruction' => 'Transfer the package amount to the listed beneficiary account, then submit the bank reference for manual review.',
             'payment_bank_transfer_admin_review_note' => 'Match the beneficiary details, receipt date, and reference number before marking the order approved.',
+            'payment_ziina_enabled' => '0',
+            'payment_ziina_label' => 'Ziina Card Checkout',
+            'payment_ziina_reference_hint' => 'Ziina checkout will create the payment reference automatically.',
+            'payment_ziina_instruction' => 'Pay securely using Ziina checkout. After payment, your order will be confirmed automatically.',
+            'payment_ziina_admin_review_note' => 'Ziina orders should be confirmed automatically by webhook after the payment intent reaches completed status.',
             'notification_payout_in_app' => '1',
             'notification_payout_email' => '1',
             'notification_reward_in_app' => '1',
@@ -179,6 +184,8 @@ class MiningPlatform
             'template_basic_unlocked_message' => 'Your Starter Free mission is complete and the Basic 100 package is now active on your account.',
             'template_investment_payment_submitted_subject' => 'Investment payment submitted',
             'template_investment_payment_submitted_message' => 'Your payment for :package_name has been submitted and is now waiting for admin review.',
+            'template_investment_payment_checkout_subject' => 'Ziina checkout started',
+            'template_investment_payment_checkout_message' => 'Your Ziina checkout for :package_name has been created. Complete the card payment to activate your investment automatically.',
             'template_investment_payment_proof_subject' => 'Payment proof uploaded',
             'template_investment_payment_proof_message' => 'Your payment proof for :package_name has been uploaded successfully and is now waiting for admin review.',
             'template_investment_payment_approved_subject' => 'Investment payment approved',
@@ -2083,7 +2090,13 @@ class MiningPlatform
             'amount' => $package->price,
             'shares_owned' => $package->shares_count,
             'payment_method' => $paymentData['payment_method'],
+            'gateway_provider' => $paymentData['gateway_provider'] ?? null,
             'payment_reference' => $paymentData['payment_reference'],
+            'gateway_reference' => $paymentData['gateway_reference'] ?? null,
+            'gateway_status' => $paymentData['gateway_status'] ?? null,
+            'gateway_redirect_url' => $paymentData['gateway_redirect_url'] ?? null,
+            'gateway_embedded_url' => $paymentData['gateway_embedded_url'] ?? null,
+            'gateway_payload' => $paymentData['gateway_payload'] ?? null,
             'payment_proof_path' => $paymentData['payment_proof_path'] ?? null,
             'payment_proof_original_name' => $paymentData['payment_proof_original_name'] ?? null,
             'notes' => $paymentData['notes'] ?? null,
@@ -2212,6 +2225,109 @@ class MiningPlatform
             return $investment;
         });
     }
+
+    public static function approveGatewayInvestmentOrder(InvestmentOrder $order, string $provider, array $gatewayPayload = []): ?UserInvestment
+    {
+        if ($order->status === 'approved') {
+            return UserInvestment::query()
+                ->where('user_id', $order->user_id)
+                ->where('package_id', $order->package_id)
+                ->latest('id')
+                ->first();
+        }
+
+        if ($order->status !== 'pending') {
+            throw new RuntimeException('Only pending investment orders can be activated from gateway confirmation.');
+        }
+
+        return DB::transaction(function () use ($order, $provider, $gatewayPayload) {
+            $order->loadMissing(['user.sponsor', 'package.miner']);
+
+            if (! $order->user || ! $order->package) {
+                throw new RuntimeException('Investment order is missing its related user or package.');
+            }
+
+            $user = $order->user;
+            $package = $order->package;
+            $level = self::syncUserLevel($user);
+            $teamBonusRate = self::teamBonusRate($user);
+
+            $shareholder = Shareholder::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'package_name' => $package->name,
+                    'price' => $package->price,
+                    'billing_cycle' => 'monthly',
+                    'units_limit' => $package->units_limit,
+                    'status' => 'active',
+                    'subscribed_at' => now(),
+                ],
+            );
+
+            $investment = UserInvestment::create([
+                'user_id' => $user->id,
+                'miner_id' => $package->miner_id,
+                'package_id' => $package->id,
+                'shareholder_id' => $shareholder->id,
+                'amount' => $package->price,
+                'shares_owned' => $package->shares_count,
+                'monthly_return_rate' => $package->monthly_return_rate,
+                'level_bonus_rate' => $level->bonus_rate,
+                'team_bonus_rate' => $teamBonusRate,
+                'status' => 'active',
+                'subscribed_at' => now(),
+            ]);
+
+            $user->forceFill(['account_type' => 'shareholder'])->save();
+            $refreshedUser = self::refreshInvestmentBonusRates($user->fresh());
+            $investment->refresh();
+            self::maybeCelebrateProfilePower($refreshedUser->fresh());
+
+            Earning::firstOrCreate(
+                [
+                    'user_id' => $refreshedUser->id,
+                    'investment_id' => $investment->id,
+                    'earned_on' => now()->toDateString(),
+                    'source' => 'projected_return',
+                ],
+                [
+                    'amount' => self::investmentProjectedRewardAmount($investment),
+                    'status' => 'pending',
+                    'notes' => 'Initial estimated monthly return preview generated after gateway payment confirmation. Final monthly return is confirmed only after the full 30-day cycle.',
+                ],
+            );
+
+            self::awardReferralSubscription($refreshedUser, $investment);
+
+            $order->forceFill([
+                'status' => 'approved',
+                'approved_by_id' => null,
+                'approved_at' => now(),
+                'admin_notes' => ucfirst($provider).' payment confirmed automatically by gateway webhook.',
+                'gateway_paid_at' => now(),
+                'gateway_payload' => $gatewayPayload ?: $order->gateway_payload,
+            ])->save();
+
+            $approvalTemplate = self::activityTemplate('investment_payment_approved', [
+                'package_name' => $package->name,
+            ]);
+
+            $user->notify(new ActivityFeedNotification([
+                'category' => 'investment',
+                'status' => 'success',
+                'subject' => $approvalTemplate['subject'],
+                'message' => $approvalTemplate['message'],
+                'context_label' => 'Payment method',
+                'context_value' => strtoupper($provider).' gateway',
+                'amount' => (float) $order->amount,
+                'amount_label' => 'Approved amount',
+                'force_mail' => true,
+            ]));
+
+            return $investment;
+        });
+    }
+
     public static function assignSponsorFromInvitations(User $user): ?User
     {
         if ($user->sponsor_user_id) {

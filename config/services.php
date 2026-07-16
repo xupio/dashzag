@@ -46,4 +46,15 @@ return [
         'token' => env('ZAGN8N_TOKEN'),
     ],
 
+    'ziina' => [
+        'enabled' => env('ZIINA_ENABLED', false),
+        'base_url' => env('ZIINA_BASE_URL', 'https://api-v2.ziina.com/api'),
+        'access_token' => env('ZIINA_ACCESS_TOKEN'),
+        'webhook_secret' => env('ZIINA_WEBHOOK_SECRET'),
+        'test_mode' => env('ZIINA_TEST_MODE', false),
+        'currency' => env('ZIINA_CURRENCY', 'AED'),
+        'allow_tips' => env('ZIINA_ALLOW_TIPS', false),
+        'intent_expiry_minutes' => env('ZIINA_INTENT_EXPIRY_MINUTES', 30),
+    ],
+
 ];

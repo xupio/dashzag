@@ -94,6 +94,11 @@ test('admin can update platform settings and miner creation uses them', function
             'payment_bank_transfer_reference_hint' => 'Enter your bank transfer receipt or trace number',
             'payment_bank_transfer_instruction' => 'Use your full name in the transfer note and submit the bank trace number.',
             'payment_bank_transfer_admin_review_note' => 'Check the beneficiary name, receipt date, and bank trace before approval.',
+            'payment_ziina_enabled' => 1,
+            'payment_ziina_label' => 'Ziina Checkout',
+            'payment_ziina_reference_hint' => 'Ziina creates the payment reference automatically.',
+            'payment_ziina_instruction' => 'Pay by card with Ziina hosted checkout.',
+            'payment_ziina_admin_review_note' => 'Expect automatic confirmation from Ziina webhook.',
         ])
         ->assertRedirect(route('dashboard.settings'));
 
@@ -107,6 +112,7 @@ test('admin can update platform settings and miner creation uses them', function
     expect(MiningPlatform::platformSetting('payment_btc_transfer_destination'))->toBe('bc1qexamplecompanywallet');
     expect(MiningPlatform::platformSetting('payment_bank_transfer_label'))->toBe('Company Bank Transfer');
     expect(MiningPlatform::platformSetting('payment_usdt_transfer_admin_review_note'))->toBe('Match the network and amount with the treasury wallet before approval.');
+    expect(MiningPlatform::platformSetting('payment_ziina_label'))->toBe('Ziina Checkout');
 
     $this->actingAs($admin)
         ->post(route('dashboard.miners.store'), [

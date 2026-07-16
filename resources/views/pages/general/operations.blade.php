@@ -42,7 +42,7 @@
               $counts = $investmentOrderCounts ?? ['all' => 0, 'pending' => 0, 'approved' => 0, 'rejected' => 0, 'cancelled' => 0];
               $activeStatus = $investmentFilters['status'] ?? 'all';
               $activePaymentMethod = $investmentFilters['payment_method'] ?? 'all';
-              $paymentMethodCounts = $investmentPaymentMethodCounts ?? collect(['all' => 0, 'btc_transfer' => 0, 'usdt_transfer' => 0, 'bank_transfer' => 0]);
+              $paymentMethodCounts = $investmentPaymentMethodCounts ?? collect(['all' => 0, 'btc_transfer' => 0, 'usdt_transfer' => 0, 'bank_transfer' => 0, 'ziina' => 0]);
               $activeProofState = $investmentFilters['proof_state'] ?? 'all';
               $proofStateCounts = $investmentProofStateCounts ?? collect(['all' => 0, 'proof_needed' => 0, 'proof_uploaded' => 0]);
               $activeRiskState = $investmentFilters['risk_state'] ?? 'all';
@@ -62,7 +62,7 @@
         </div>
 
         <div class="d-flex flex-wrap gap-2 mb-3">
-          @foreach (['all' => 'All methods', 'btc_transfer' => 'BTC', 'usdt_transfer' => 'USDT', 'bank_transfer' => 'Bank'] as $methodKey => $methodLabel)
+          @foreach (['all' => 'All methods', 'btc_transfer' => 'BTC', 'usdt_transfer' => 'USDT', 'bank_transfer' => 'Bank', 'ziina' => 'Ziina'] as $methodKey => $methodLabel)
             <a href="{{ route('dashboard.operations', ['investment_status' => $investmentFilters['status'] ?? 'all', 'investment_search' => $investmentFilters['search'] ?? '', 'investment_payment_method' => $methodKey]) }}" class="btn btn-sm {{ $activePaymentMethod === $methodKey ? 'btn-primary' : 'btn-outline-primary' }}">
               {{ $methodLabel }}: {{ $paymentMethodCounts[$methodKey] ?? 0 }}
             </a>
@@ -117,6 +117,7 @@
               <option value="btc_transfer" @selected(($investmentFilters['payment_method'] ?? '') === 'btc_transfer')>BTC</option>
               <option value="usdt_transfer" @selected(($investmentFilters['payment_method'] ?? '') === 'usdt_transfer')>USDT</option>
               <option value="bank_transfer" @selected(($investmentFilters['payment_method'] ?? '') === 'bank_transfer')>Bank</option>
+              <option value="ziina" @selected(($investmentFilters['payment_method'] ?? '') === 'ziina')>Ziina</option>
             </select>
           </div>
           <div class="col-md-2">

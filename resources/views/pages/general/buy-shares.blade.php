@@ -7,9 +7,10 @@
   $displayTierName = $user->account_type === 'starter'
     ? ($user->investments->firstWhere('package.slug', \App\Support\MiningPlatform::FREE_STARTER_PACKAGE_SLUG)?->package?->name ?? 'Free Starter')
     : $level->name;
+  $manualPaymentMethods = ['btc_transfer', 'usdt_transfer', 'bank_transfer'];
   $proofUploadOrder = collect([$pendingInvestmentOrder, $rejectedInvestmentOrder])
     ->filter()
-    ->first(fn ($order) => ! $order->payment_proof_path);
+    ->first(fn ($order) => in_array($order->payment_method, $manualPaymentMethods, true) && ! $order->payment_proof_path);
   $paymentMethods = collect($paymentMethods ?? [])->values();
   $proofUploadOrderData = $proofUploadOrder
     ? [
@@ -31,7 +32,7 @@
 <div class="d-flex justify-content-between align-items-center flex-wrap grid-margin gap-3">
   <div>
     <h4 class="mb-1">Buy {{ $miner->name }} Shares</h4>
-    <p class="text-secondary mb-0">Choose a package, submit your payment reference, and complete the proof upload after the transfer.</p>
+    <p class="text-secondary mb-0">Choose a package, then either pay instantly with Ziina or use a manual transfer and upload proof after payment.</p>
   </div>
   <div class="d-flex gap-2 flex-wrap">
     <a href="{{ route('dashboard') }}?miner={{ $miner->slug }}" class="btn btn-outline-primary btn-sm">Back to overview</a>
@@ -109,9 +110,9 @@
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
           <div>
             <h5 class="mb-1">Client payment flow</h5>
-            <p class="text-secondary mb-0">Choose one method, copy the details exactly, send the payment once, then submit the reference and proof for review.</p>
+            <p class="text-secondary mb-0">Choose one method for each order. Ziina can confirm automatically, while manual transfers still require a reference and proof upload.</p>
           </div>
-          <span class="badge bg-warning text-dark">Manual review enabled</span>
+          <span class="badge bg-primary text-white">Mixed checkout</span>
         </div>
         <div class="row g-3">
           <div class="col-md-4">
@@ -122,14 +123,14 @@
           </div>
           <div class="col-md-4">
             <div class="border rounded p-3 h-100 bg-white">
-              <div class="fw-semibold mb-1">2. Copy and confirm</div>
-              <div class="text-secondary small">Use the copy button or QR and verify the destination before sending.</div>
+              <div class="fw-semibold mb-1">2. Pay securely</div>
+              <div class="text-secondary small">Use QR or copied details for manual transfers, or continue to Ziina for hosted card checkout.</div>
             </div>
           </div>
           <div class="col-md-4">
             <div class="border rounded p-3 h-100 bg-white">
-              <div class="fw-semibold mb-1">3. Submit the proof</div>
-              <div class="text-secondary small">Keep the transfer hash or receipt ready for the admin review step.</div>
+              <div class="fw-semibold mb-1">3. Final confirmation</div>
+              <div class="text-secondary small">Manual transfers need proof upload. Ziina orders should confirm automatically after successful payment.</div>
             </div>
           </div>
         </div>
@@ -468,7 +469,7 @@
       <div class="modal-header">
         <div>
           <h5 class="modal-title" id="purchaseFlowModalLabel">Complete package payment</h5>
-          <div class="text-secondary small" data-purchase-modal-subtitle>Choose a payment method, copy the destination, then submit your proof in the same popup.</div>
+          <div class="text-secondary small" data-purchase-modal-subtitle>Choose a payment method. Manual transfers stay in this popup, while Ziina will send you to secure hosted checkout.</div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -519,7 +520,7 @@
 
           <div>
             <label for="purchase_payment_reference" class="form-label">Payment reference</label>
-            <input type="text" id="purchase_payment_reference" name="payment_reference" class="form-control @error('payment_reference') is-invalid @enderror" data-payment-reference-input placeholder="Transaction hash or payment reference" value="{{ old('payment_reference') }}" required>
+            <input type="text" id="purchase_payment_reference" name="payment_reference" class="form-control @error('payment_reference') is-invalid @enderror" data-payment-reference-input placeholder="Transaction hash or payment reference" value="{{ old('payment_reference') }}">
             @error('payment_reference')
               <div class="invalid-feedback d-block">{{ $message }}</div>
             @enderror
@@ -533,7 +534,7 @@
             @enderror
           </div>
 
-          <button class="btn btn-primary" type="submit" data-purchase-submit-button>Continue to proof upload</button>
+          <button class="btn btn-primary" type="submit" data-purchase-submit-button>Continue payment</button>
         </form>
 
         <div class="border-top my-4"></div>
@@ -670,6 +671,11 @@
                 warning: 'Use the exact beneficiary details and keep the transfer receipt for review.',
                 referenceLabel: 'Submit the bank reference, receipt number, or SWIFT trace.',
             },
+            ziina: {
+                networkLabel: 'Ziina secure checkout',
+                warning: 'You will be redirected to Ziina to pay by card. Your order should confirm automatically after successful payment.',
+                referenceLabel: 'No manual hash is needed. Ziina will create and update the payment intent automatically.',
+            },
         };
         const modalElement = document.getElementById('purchaseFlowModal');
         const modalInstance = modalElement && window.bootstrap ? new bootstrap.Modal(modalElement) : null;
@@ -712,6 +718,7 @@
             const isCrypto = cryptoMethods.includes(method.key);
             const meta = methodMeta[method.key] ?? methodMeta.bank_transfer;
             const qrDataUri = isCrypto ? method.qr_code_data_uri : null;
+            const isZiina = method.key === 'ziina';
 
             methodPanel.innerHTML = `
                 <div class="d-flex flex-column gap-3">
@@ -724,18 +731,20 @@
                     </div>
                     <div class="d-flex flex-column flex-md-row gap-3 align-items-start">
                         <div class="flex-grow-1">
-                            <div class="text-muted text-uppercase small mb-1">Send payment to</div>
+                            <div class="text-muted text-uppercase small mb-1">${isZiina ? 'Checkout flow' : 'Send payment to'}</div>
                             <div class="fw-semibold text-dark mb-2 text-break" data-payment-destination>${destination}</div>
+                            ${isZiina ? '' : `
                             <div class="d-flex flex-wrap gap-2 mb-3">
                                 <button type="button" class="btn btn-sm btn-outline-primary" data-copy-payment-destination>Copy details</button>
                                 ${isCrypto ? '<span class="badge bg-success-subtle text-success align-self-center">QR ready</span>' : ''}
                             </div>
+                            `}
                             <div class="alert ${isCrypto ? 'alert-warning' : 'alert-info'} py-2 px-3 small mb-3">${meta.warning}</div>
                             <div class="text-muted text-uppercase small mb-1">Instructions</div>
                             <div class="text-muted mb-3">${instructions}</div>
                             <div class="text-muted text-uppercase small mb-1">What to submit after payment</div>
                             <div class="text-muted">${meta.referenceLabel}</div>
-                            <div class="text-success small d-none mt-2" data-payment-copy-feedback>Copied to clipboard.</div>
+                            ${isZiina ? '' : '<div class="text-success small d-none mt-2" data-payment-copy-feedback>Copied to clipboard.</div>'}
                         </div>
                         ${qrDataUri ? `
                             <div class="text-center border rounded p-2 bg-white">
@@ -749,6 +758,14 @@
             `;
 
             referenceInput.placeholder = method.reference_hint || 'Transaction hash or payment reference';
+            if (method.key === 'ziina') {
+                referenceInput.value = '';
+                referenceInput.setAttribute('readonly', 'readonly');
+                referenceInput.removeAttribute('required');
+            } else {
+                referenceInput.removeAttribute('readonly');
+                referenceInput.setAttribute('required', 'required');
+            }
         };
 
         const syncOrderState = (packageSlug) => {
@@ -826,7 +843,9 @@
                 referenceInput.value = matchingOrder.payment_reference ?? '';
             }
             if (modalSubtitleElement) {
-                modalSubtitleElement.textContent = 'This order is already created. Confirm the destination, scan the QR code, and upload your proof in the same popup.';
+                modalSubtitleElement.textContent = matchingOrder.payment_method === 'ziina'
+                    ? 'This Ziina order is already created. Complete the hosted checkout and we will confirm the payment automatically.'
+                    : 'This order is already created. Confirm the destination, scan the QR code, and upload your proof in the same popup.';
             }
         };
 
@@ -846,7 +865,9 @@
             packagePriceElement.textContent = `$${activePackage.price}`;
 
             if (modalSubtitleElement) {
-                modalSubtitleElement.textContent = 'Choose a payment method, copy the destination, then submit your proof in the same popup.';
+                modalSubtitleElement.textContent = methodSelect?.value === 'ziina'
+                    ? 'Ziina will send you to secure hosted checkout after you submit this order.'
+                    : 'Choose a payment method, copy the destination, then submit your proof in the same popup.';
             }
 
             if (methodSelect && !proofUploadOrder) {
@@ -873,6 +894,11 @@
 
         methodSelect?.addEventListener('change', () => {
             renderMethod(methodSelect.value);
+            if (modalSubtitleElement) {
+                modalSubtitleElement.textContent = methodSelect.value === 'ziina'
+                    ? 'Ziina will send you to secure hosted checkout after you submit this order.'
+                    : 'Choose a payment method, copy the destination, then submit your proof in the same popup.';
+            }
         });
 
         document.addEventListener('click', async (event) => {
