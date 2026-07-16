@@ -19,6 +19,24 @@
     $defaultPaymentMethodData = filled($defaultPaymentMethod)
       ? $paymentMethods->firstWhere('key', $defaultPaymentMethod)
       : null;
+    $pendingOrderData = $pendingInvestmentOrder
+      ? [
+          'id' => $pendingInvestmentOrder->id,
+          'package_slug' => $pendingInvestmentOrder->package?->slug,
+          'package_name' => $pendingInvestmentOrder->package?->name,
+          'amount' => number_format((float) $pendingInvestmentOrder->amount, 2, '.', ''),
+          'payment_method' => $pendingInvestmentOrder->payment_method,
+          'payment_reference' => $pendingInvestmentOrder->payment_reference,
+          'gateway_provider' => $pendingInvestmentOrder->gateway_provider,
+          'gateway_redirect_url' => $pendingInvestmentOrder->gateway_redirect_url,
+          'gateway_status' => $pendingInvestmentOrder->gateway_status,
+          'has_proof' => (bool) $pendingInvestmentOrder->payment_proof_path,
+          'proof_upload_url' => route('dashboard.buy-shares.proof', $pendingInvestmentOrder),
+          'proof_view_url' => $pendingInvestmentOrder->payment_proof_path ? route('investment-orders.proof-file', $pendingInvestmentOrder) : null,
+          'proof_file_name' => $pendingInvestmentOrder->payment_proof_original_name,
+          'proof_uploaded_at' => $pendingInvestmentOrder->proof_uploaded_at?->format('M d, Y h:i A'),
+        ]
+      : null;
     $proofUploadOrderData = $proofUploadOrder
       ? [
           'id' => $proofUploadOrder->id,
@@ -729,10 +747,12 @@
     document.addEventListener('DOMContentLoaded', () => {
         const paymentMethods = @json($paymentMethods->values());
         const paymentMethodByKey = Object.fromEntries(paymentMethods.map((method) => [method.key, method]));
+        const pendingOrder = @json($pendingOrderData);
         const proofUploadOrder = @json($proofUploadOrderData);
         const oldPackageSlug = @json(old('package'));
         const oldPaymentMethod = @json(old('payment_method'));
         const hasErrors = @json($errors->any());
+        const reopenPendingOrder = @json(session('reopen_pending_order'));
         const subscriptionSuccess = @json(session('subscription_success'));
         const cryptoMethods = ['btc_transfer', 'usdt_transfer'];
         const methodMeta = {
@@ -950,6 +970,27 @@
             manualPaymentModal?.show();
         };
 
+        const resumeExistingPendingOrder = () => {
+            if (!pendingOrder || pendingOrder.package_slug !== (activePackage?.slug || packageInput?.value || '')) {
+                return false;
+            }
+
+            if (pendingOrder.payment_method === 'ziina' && pendingOrder.gateway_redirect_url) {
+                window.open(pendingOrder.gateway_redirect_url, `ziinaCheckoutResume${Date.now()}`, 'popup=yes,width=520,height=760,resizable=yes,scrollbars=yes');
+                return true;
+            }
+
+            if (pendingOrder.payment_method && pendingOrder.payment_method !== 'ziina') {
+                if (referenceInput) {
+                    referenceInput.value = pendingOrder.payment_reference || '';
+                }
+                openManualPaymentModal(pendingOrder.payment_method);
+                return true;
+            }
+
+            return false;
+        };
+
         const syncOrderState = (packageSlug) => {
             const matchingOrder = proofUploadOrder && proofUploadOrder.package_slug === packageSlug ? proofUploadOrder : null;
 
@@ -1121,6 +1162,12 @@
         });
 
         orderForm?.addEventListener('submit', (event) => {
+            if (resumeExistingPendingOrder()) {
+                event.preventDefault();
+                orderForm.removeAttribute('target');
+                return;
+            }
+
             if (methodSelect?.value === 'ziina') {
                 const popupName = `ziinaCheckout${Date.now()}`;
                 const paymentWindow = window.open('', popupName, 'popup=yes,width=520,height=760,resizable=yes,scrollbars=yes');
@@ -1171,6 +1218,14 @@
             const packageButton = document.querySelector(`[data-open-purchase-modal][data-package-slug="${proofUploadOrder.package_slug}"]`);
             if (packageButton) {
                 openPurchaseModal(packageButton);
+            }
+        } else if (reopenPendingOrder && pendingOrder && modalElement) {
+            const packageButton = document.querySelector(`[data-open-purchase-modal][data-package-slug="${pendingOrder.package_slug}"]`);
+            if (packageButton) {
+                openPurchaseModal(packageButton);
+                setTimeout(() => {
+                    resumeExistingPendingOrder();
+                }, 250);
             }
         }
     });
