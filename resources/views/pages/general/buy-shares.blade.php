@@ -527,7 +527,7 @@
           <div class="text-secondary small mb-0" data-existing-order-proof-summary>Upload your proof below to complete the popup flow.</div>
         </div>
 
-        <form method="POST" action="{{ route('dashboard.buy-shares.subscribe') }}" class="d-grid gap-3" data-purchase-order-form onsubmit="(function(form){var method=form.querySelector('[data-purchase-method-select]');if(method&&method.value==='ziina'){var popupName='ziinaCheckout'+Date.now();var paymentWindow=window.open('',popupName,'popup=yes,width=520,height=760,resizable=yes,scrollbars=yes');form.target=paymentWindow?popupName:'_blank';}else{form.removeAttribute('target');}})(this)">
+        <form method="POST" action="{{ route('dashboard.buy-shares.subscribe') }}" class="d-grid gap-3" data-purchase-order-form>
           @csrf
           <input type="hidden" name="package" value="{{ old('package') }}" data-purchase-package-input>
           <div>
@@ -580,7 +580,7 @@
             @enderror
           </div>
 
-          <button class="btn btn-primary" type="submit" data-purchase-submit-button>Continue payment</button>
+          <button class="btn btn-primary" type="button" data-purchase-submit-button>Continue payment</button>
         </form>
 
         <div class="border-top my-4"></div>
@@ -788,6 +788,7 @@
         const referenceInput = modalElement?.querySelector('[data-payment-reference-input]');
         const referenceGroup = modalElement?.querySelector('[data-payment-reference-group]');
         const orderForm = modalElement?.querySelector('[data-purchase-order-form]');
+        const orderSubmitButton = modalElement?.querySelector('[data-purchase-submit-button]');
         const proofSection = modalElement?.querySelector('[data-proof-upload-section]');
         const proofForm = modalElement?.querySelector('[data-proof-upload-form]');
         const proofViewLink = modalElement?.querySelector('[data-proof-view-link]');
@@ -827,7 +828,7 @@
                 referenceInput.removeAttribute('readonly');
                 referenceInput.removeAttribute('required');
                 referenceGroup?.classList.remove('d-none');
-                orderForm?.querySelector('[data-purchase-submit-button]')?.textContent = 'Continue payment';
+                orderSubmitButton.textContent = 'Continue payment';
                 return;
             }
 
@@ -888,13 +889,13 @@
                 referenceInput.setAttribute('readonly', 'readonly');
                 referenceInput.removeAttribute('required');
                 referenceGroup?.classList.add('d-none');
-                orderForm?.querySelector('[data-purchase-submit-button]')?.textContent = 'Pay with Card / Apple Pay';
+                orderSubmitButton.textContent = 'Pay with Card / Apple Pay';
             } else {
                 referenceInput.value = '';
                 referenceInput.removeAttribute('readonly');
                 referenceInput.removeAttribute('required');
                 referenceGroup?.classList.add('d-none');
-                orderForm?.querySelector('[data-purchase-submit-button]')?.textContent = 'Open payment details';
+                orderSubmitButton.textContent = 'Open payment details';
             }
         };
 
@@ -1165,11 +1166,15 @@
             }
         });
 
-        orderForm?.addEventListener('submit', (event) => {
+        orderSubmitButton?.addEventListener('click', () => {
             const selectedMethod = methodSelect?.value || null;
 
+            if (!selectedMethod) {
+                methodSelect?.focus();
+                return;
+            }
+
             if (resumeExistingPendingOrder(selectedMethod)) {
-                event.preventDefault();
                 orderForm.removeAttribute('target');
                 return;
             }
@@ -1183,8 +1188,9 @@
                 } else {
                     orderForm.setAttribute('target', '_blank');
                 }
+
+                orderForm.requestSubmit();
             } else {
-                event.preventDefault();
                 orderForm.removeAttribute('target');
                 openManualPaymentModal(selectedMethod ?? '');
             }
