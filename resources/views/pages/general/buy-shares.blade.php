@@ -970,8 +970,12 @@
             manualPaymentModal?.show();
         };
 
-        const resumeExistingPendingOrder = () => {
+        const resumeExistingPendingOrder = (selectedMethod = null) => {
             if (!pendingOrder || pendingOrder.package_slug !== (activePackage?.slug || packageInput?.value || '')) {
+                return false;
+            }
+
+            if (selectedMethod && pendingOrder.payment_method && pendingOrder.payment_method !== selectedMethod) {
                 return false;
             }
 
@@ -1162,13 +1166,15 @@
         });
 
         orderForm?.addEventListener('submit', (event) => {
-            if (resumeExistingPendingOrder()) {
+            const selectedMethod = methodSelect?.value || null;
+
+            if (resumeExistingPendingOrder(selectedMethod)) {
                 event.preventDefault();
                 orderForm.removeAttribute('target');
                 return;
             }
 
-            if (methodSelect?.value === 'ziina') {
+            if (selectedMethod === 'ziina') {
                 const popupName = `ziinaCheckout${Date.now()}`;
                 const paymentWindow = window.open('', popupName, 'popup=yes,width=520,height=760,resizable=yes,scrollbars=yes');
 
@@ -1180,7 +1186,7 @@
             } else {
                 event.preventDefault();
                 orderForm.removeAttribute('target');
-                openManualPaymentModal(methodSelect?.value ?? '');
+                openManualPaymentModal(selectedMethod ?? '');
             }
         });
 

@@ -5846,20 +5846,80 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             ->first();
 
         if ($existingPendingOrder) {
-            if ($existingPendingOrder->payment_method === 'ziina' && filled($existingPendingOrder->gateway_redirect_url)) {
-                return redirect()->away($existingPendingOrder->gateway_redirect_url);
-            }
+            if ($existingPendingOrder->payment_method === $validated['payment_method']) {
+                if ($existingPendingOrder->payment_method === 'ziina' && filled($existingPendingOrder->gateway_redirect_url)) {
+                    return redirect()->away($existingPendingOrder->gateway_redirect_url);
+                }
 
-            if ($existingPendingOrder->payment_method !== 'ziina') {
+                if ($existingPendingOrder->payment_method !== 'ziina') {
+                    return redirect()
+                        ->route('dashboard.buy-shares', ['miner' => $package->miner?->slug])
+                        ->with('subscription_success', 'You already have a pending manual payment for the '.$package->name.' package. Continue from the payment popup.')
+                        ->with('reopen_pending_order', true);
+                }
+
                 return redirect()
                     ->route('dashboard.buy-shares', ['miner' => $package->miner?->slug])
-                    ->with('subscription_success', 'You already have a pending manual payment for the '.$package->name.' package. Continue from the payment popup.')
-                    ->with('reopen_pending_order', true);
+                    ->with('subscription_success', 'You already have a pending payment review for the '.$package->name.' package.');
             }
+
+            if ($validated['payment_method'] === 'ziina') {
+                $ziinaGateway = app(ZiinaGatewayService::class);
+                $reference = $ziinaGateway->generateReference();
+
+                $existingPendingOrder->forceFill([
+                    'payment_method' => 'ziina',
+                    'gateway_provider' => 'ziina',
+                    'payment_reference' => $reference,
+                    'gateway_reference' => $reference,
+                    'gateway_status' => 'requires_payment_instrument',
+                    'gateway_redirect_url' => null,
+                    'gateway_embedded_url' => null,
+                    'gateway_payload' => null,
+                    'notes' => $validated['notes'] ?? null,
+                    'payment_proof_path' => null,
+                    'payment_proof_original_name' => null,
+                    'proof_uploaded_at' => null,
+                ])->save();
+
+                $intent = $ziinaGateway->createPaymentIntent(
+                    $existingPendingOrder->fresh()->loadMissing('package'),
+                    route('dashboard.buy-shares.ziina.return', ['investmentOrder' => $existingPendingOrder, 'result' => 'success']),
+                    route('dashboard.buy-shares.ziina.return', ['investmentOrder' => $existingPendingOrder, 'result' => 'cancel']),
+                    route('dashboard.buy-shares.ziina.return', ['investmentOrder' => $existingPendingOrder, 'result' => 'failure']),
+                );
+
+                $existingPendingOrder->forceFill([
+                    'payment_reference' => (string) ($intent['id'] ?? $reference),
+                    'gateway_reference' => (string) ($intent['id'] ?? $reference),
+                    'gateway_status' => strtolower((string) ($intent['status'] ?? 'requires_payment_instrument')),
+                    'gateway_redirect_url' => $intent['redirect_url'] ?? null,
+                    'gateway_embedded_url' => $intent['embedded_url'] ?? null,
+                    'gateway_payload' => $intent,
+                ])->save();
+
+                return redirect()->away((string) ($intent['redirect_url'] ?? route('dashboard.buy-shares', ['miner' => $package->miner?->slug])));
+            }
+
+            $existingPendingOrder->forceFill([
+                'payment_method' => $validated['payment_method'],
+                'gateway_provider' => null,
+                'gateway_reference' => null,
+                'gateway_status' => null,
+                'gateway_redirect_url' => null,
+                'gateway_embedded_url' => null,
+                'gateway_payload' => null,
+                'payment_reference' => $validated['payment_reference'] ?? $existingPendingOrder->payment_reference,
+                'notes' => $validated['notes'] ?? null,
+                'payment_proof_path' => null,
+                'payment_proof_original_name' => null,
+                'proof_uploaded_at' => null,
+            ])->save();
 
             return redirect()
                 ->route('dashboard.buy-shares', ['miner' => $package->miner?->slug])
-                ->with('subscription_success', 'You already have a pending payment review for the '.$package->name.' package.');
+                ->with('subscription_success', 'Your pending order for '.$package->name.' was switched to '.str_replace('_', ' ', $validated['payment_method']).'. Continue from the payment popup.')
+                ->with('reopen_pending_order', true);
         }
 
         if ($validated['payment_method'] !== 'ziina' && blank($validated['payment_reference'] ?? null)) {
