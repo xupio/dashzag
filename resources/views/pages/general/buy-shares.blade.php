@@ -634,7 +634,10 @@
           <h5 class="modal-title" id="manualPaymentModalLabel">Complete manual payment</h5>
           <div class="text-secondary small">Use the payment details below, complete the transfer, then submit your reference for review.</div>
         </div>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <div class="d-flex align-items-center gap-2">
+          <a href="{{ route('dashboard.investment-orders', ['status' => 'pending']) }}" class="btn btn-sm btn-outline-primary">View pending order</a>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
       </div>
       <div class="modal-body">
         <div class="border rounded p-3 bg-light mb-3">
@@ -652,6 +655,10 @@
 
         <div class="border rounded p-3 bg-white mb-3" data-manual-method-details>
           <div class="text-secondary">Choose a manual payment method first.</div>
+        </div>
+
+        <div class="alert alert-success d-none mb-3" data-manual-success-alert>
+          Payment reference saved. Your order is now waiting for review. You can track it from the pending orders page.
         </div>
 
         <form method="POST" action="{{ route('dashboard.buy-shares.subscribe') }}" class="d-grid gap-3" data-manual-payment-form>
@@ -757,7 +764,7 @@
         const cryptoMethods = ['btc_transfer', 'usdt_transfer'];
         const methodMeta = {
             btc_transfer: {
-                networkLabel: 'Bitcoin network',
+                networkLabel: 'Bitcoin mainnet wallet',
                 warning: 'Send BTC only. Do not send any other coin or token to this address.',
                 referenceLabel: 'Submit the BTC transaction hash after sending.',
             },
@@ -811,6 +818,7 @@
         const manualReferenceInput = manualPaymentModalElement?.querySelector('[data-manual-reference-input]');
         const manualReferenceHelp = manualPaymentModalElement?.querySelector('[data-manual-reference-help]');
         const manualNotesInput = manualPaymentModalElement?.querySelector('[data-manual-notes-input]');
+        const manualSuccessAlert = manualPaymentModalElement?.querySelector('[data-manual-success-alert]');
 
         let activePackage = null;
         let lastPurchaseTrigger = null;
@@ -851,6 +859,7 @@
                     <div class="d-flex flex-column flex-md-row gap-3 align-items-start">
                         <div class="flex-grow-1">
                             <div class="text-muted text-uppercase small mb-1">${isZiina ? 'Checkout flow' : 'Send payment to'}</div>
+                            ${method.key === 'btc_transfer' ? '<div class="text-muted small mb-1">Use this exact BTC mainnet wallet address only.</div>' : ''}
                             <div class="fw-semibold text-dark mb-2 text-break" data-payment-destination>${destination}</div>
                             ${isZiina ? '' : `
                             <div class="d-flex flex-wrap gap-2 mb-3">
@@ -931,6 +940,9 @@
             if (manualNotesInput) {
                 manualNotesInput.value = modalElement?.querySelector('#purchase_notes')?.value || '';
             }
+            if (manualSuccessAlert) {
+                manualSuccessAlert.classList.add('d-none');
+            }
 
             manualMethodDetailsElement.innerHTML = `
                 <div class="d-flex flex-column gap-3">
@@ -944,6 +956,7 @@
                     <div class="d-flex flex-column flex-md-row gap-3 align-items-start">
                         <div class="flex-grow-1">
                             <div class="text-muted text-uppercase small mb-1">Send payment to</div>
+                            ${method.key === 'btc_transfer' ? '<div class="text-muted small mb-1">Use this exact BTC mainnet wallet address only.</div>' : ''}
                             <div class="fw-semibold text-dark mb-2 text-break" data-payment-destination>${destination}</div>
                             <div class="d-flex flex-wrap gap-2 mb-3">
                                 <button type="button" class="btn btn-sm btn-outline-primary" data-copy-payment-destination>Copy details</button>
@@ -1237,6 +1250,16 @@
                 openPurchaseModal(packageButton);
                 setTimeout(() => {
                     resumeExistingPendingOrder();
+                }, 250);
+            }
+        } else if (subscriptionSuccess && pendingOrder && pendingOrder.payment_method !== 'ziina' && modalElement) {
+            const packageButton = document.querySelector(`[data-open-purchase-modal][data-package-slug="${pendingOrder.package_slug}"]`);
+            if (packageButton) {
+                openPurchaseModal(packageButton);
+                setTimeout(() => {
+                    if (resumeExistingPendingOrder()) {
+                        manualSuccessAlert?.classList.remove('d-none');
+                    }
                 }, 250);
             }
         }
