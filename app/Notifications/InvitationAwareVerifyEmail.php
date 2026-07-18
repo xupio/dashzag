@@ -16,11 +16,7 @@ class InvitationAwareVerifyEmail extends VerifyEmail
     public function toMail($notifiable): MailMessage
     {
         $verificationUrl = $this->verificationUrl($notifiable);
-
-        $mailMessage = (new MailMessage)
-            ->subject('Verify Your ZagChain Email Address')
-            ->greeting('Welcome to ZagChain')
-            ->line('Please click the button below to verify your email address and activate your ZagChain account.');
+        $inviterSummary = null;
 
         if ($this->friendInvitations->isNotEmpty()) {
             $inviterNames = $this->friendInvitations
@@ -30,12 +26,16 @@ class InvitationAwareVerifyEmail extends VerifyEmail
                 ->unique()
                 ->values();
 
-            $mailMessage->line($this->invitationLine($inviterNames));
+            $inviterSummary = $this->invitationLine($inviterNames);
         }
 
-        return $mailMessage
-            ->action('Verify ZagChain Email', $verificationUrl)
-            ->line('If you did not create an account, no further action is required.');
+        return (new MailMessage)
+            ->subject('Verify Your ZagChain Email Address')
+            ->view('emails.verify-email', [
+                'notifiable' => $notifiable,
+                'verificationUrl' => $verificationUrl,
+                'inviterSummary' => $inviterSummary,
+            ]);
     }
 
     protected function invitationLine(Collection $inviterNames): string
