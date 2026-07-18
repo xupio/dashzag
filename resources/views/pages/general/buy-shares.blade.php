@@ -57,7 +57,7 @@
 <div class="d-flex justify-content-between align-items-center flex-wrap grid-margin gap-3">
   <div>
     <h4 class="mb-1">Buy {{ $miner->name }} Shares</h4>
-    <p class="text-secondary mb-0">Choose a package, then either pay instantly with Ziina or use a manual transfer and upload proof after payment.</p>
+    <p class="text-secondary mb-0">Choose a package, then either pay instantly with card checkout or use a manual transfer and upload proof after payment.</p>
   </div>
   <div class="d-flex gap-2 flex-wrap">
     <a href="{{ route('dashboard') }}?miner={{ $miner->slug }}" class="btn btn-outline-primary btn-sm">Back to overview</a>
@@ -135,7 +135,7 @@
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
           <div>
             <h5 class="mb-1">Client payment flow</h5>
-            <p class="text-secondary mb-0">Choose one method for each order. Ziina can confirm automatically, while manual transfers still require a reference and proof upload.</p>
+            <p class="text-secondary mb-0">Choose one method for each order. Card checkout can confirm automatically, while manual transfers still require a reference and proof upload.</p>
           </div>
           <span class="badge bg-primary text-white">Mixed checkout</span>
         </div>
@@ -149,13 +149,13 @@
           <div class="col-md-4">
             <div class="border rounded p-3 h-100 bg-white">
               <div class="fw-semibold mb-1">2. Pay securely</div>
-              <div class="text-secondary small">Use QR or copied details for manual transfers, or continue to Ziina for hosted card checkout.</div>
+              <div class="text-secondary small">Use QR or copied details for manual transfers, or continue to card checkout for hosted payment.</div>
             </div>
           </div>
           <div class="col-md-4">
             <div class="border rounded p-3 h-100 bg-white">
               <div class="fw-semibold mb-1">3. Final confirmation</div>
-              <div class="text-secondary small">Manual transfers need proof upload. Ziina orders should confirm automatically after successful payment.</div>
+              <div class="text-secondary small">Manual transfers need proof upload. Card checkout orders should confirm automatically after successful payment.</div>
             </div>
           </div>
         </div>
@@ -442,11 +442,11 @@
                 </div>
                 <div class="text-secondary d-flex align-items-start gap-2 mb-2">
                   <span class="badge bg-primary-subtle text-primary mt-1">2</span>
-                  <span>For Ziina, continue to secure card or Apple Pay checkout. For manual methods, complete the transfer and keep the payment reference ready.</span>
+                  <span>For card checkout, continue to secure card or Apple Pay checkout. For manual methods, complete the transfer and keep the payment reference ready.</span>
                 </div>
                 <div class="text-secondary d-flex align-items-start gap-2 mb-2">
                   <span class="badge bg-primary-subtle text-primary mt-1">3</span>
-                  <span>Manual methods need proof upload. Ziina orders should confirm automatically after successful payment.</span>
+                  <span>Manual methods need proof upload. Card checkout orders should confirm automatically after successful payment.</span>
                 </div>
                 <div class="text-secondary d-flex align-items-start gap-2">
                   <span class="badge bg-primary-subtle text-primary mt-1">4</span>
@@ -499,7 +499,7 @@
       <div class="modal-header">
         <div>
           <h5 class="modal-title" id="purchaseFlowModalLabel">Complete package payment</h5>
-          <div class="text-secondary small" data-purchase-modal-subtitle>Choose a payment method. Manual transfers stay in this popup, while Ziina will send you to secure hosted checkout.</div>
+          <div class="text-secondary small" data-purchase-modal-subtitle>Choose a payment method. Manual transfers stay in this popup, while card checkout sends you to secure hosted checkout.</div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -548,14 +548,14 @@
               <div class="d-flex flex-column gap-3">
                 <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
                   <div>
-                    <div class="fw-semibold text-dark">{{ $defaultPaymentMethodData['label'] ?? 'Ziina Card Checkout' }}</div>
+                    <div class="fw-semibold text-dark">{{ $defaultPaymentMethodData['label'] ?? 'Card Checkout' }}</div>
                     <div class="text-muted small">Continue to secure hosted checkout for card or Apple Pay.</div>
                   </div>
-                  <span class="badge bg-primary-subtle text-primary">Ziina secure checkout</span>
+                  <span class="badge bg-primary-subtle text-primary">Card secure checkout</span>
                 </div>
                 <div class="border rounded bg-white p-3">
                   <div class="fw-semibold text-dark mb-1">Pay with Card or Apple Pay</div>
-                  <div class="text-muted small">When you continue, Ziina will open a secure checkout popup where the customer can pay like a normal online store checkout.</div>
+                  <div class="text-muted small">When you continue, secure card checkout will open in a popup where the customer can pay like a normal online store checkout.</div>
                 </div>
               </div>
             @else
@@ -779,9 +779,9 @@
                 referenceLabel: 'Submit the bank reference, receipt number, or SWIFT trace.',
             },
             ziina: {
-                networkLabel: 'Ziina secure checkout',
-                warning: 'You will be redirected to Ziina to pay by card. Your order should confirm automatically after successful payment.',
-                referenceLabel: 'No manual hash is needed. Ziina will create and update the payment intent automatically.',
+                networkLabel: 'Card secure checkout',
+                warning: 'You will be redirected to secure card checkout to pay by card. Your order should confirm automatically after successful payment.',
+                referenceLabel: 'No manual hash is needed. Card checkout will create and update the payment reference automatically.',
             },
         };
         const modalElement = document.getElementById('purchaseFlowModal');
@@ -873,7 +873,7 @@
                             ${isZiina ? `
                             <div class="border rounded bg-white p-3">
                                 <div class="fw-semibold text-dark mb-1">Pay with Card or Apple Pay</div>
-                                <div class="text-muted small">When you continue, Ziina will open a secure checkout page where the customer can pay like a normal online store checkout.</div>
+                                <div class="text-muted small">When you continue, secure card checkout will open a page where the customer can pay like a normal online store checkout.</div>
                             </div>
                             ` : `
                             <div class="text-muted text-uppercase small mb-1">What to submit after payment</div>
@@ -1093,7 +1093,7 @@
             }
             if (modalSubtitleElement) {
                 modalSubtitleElement.textContent = matchingOrder.payment_method === 'ziina'
-                    ? 'This Ziina order is already created. Continue to secure card or Apple Pay checkout and we will confirm the payment automatically.'
+                    ? 'This card checkout order is already created. Continue to secure card or Apple Pay checkout and we will confirm the payment automatically.'
                     : 'This order is already created. Confirm the destination, scan the QR code, and upload your proof in the same popup.';
             }
         };
@@ -1126,7 +1126,7 @@
             renderMethod(previousMethod || '');
 
             if (modalSubtitleElement) {
-                modalSubtitleElement.textContent = 'Choose a payment method. Manual transfers stay in this popup, while Ziina will send you to secure hosted checkout.';
+                modalSubtitleElement.textContent = 'Choose a payment method. Manual transfers stay in this popup, while card checkout sends you to secure hosted checkout.';
             }
 
             syncOrderState(activePackage.slug);
@@ -1174,7 +1174,7 @@
             renderMethod(methodSelect.value);
             if (modalSubtitleElement) {
                 modalSubtitleElement.textContent = methodSelect.value === 'ziina'
-                    ? 'Ziina will send you to a normal secure card or Apple Pay checkout after you continue.'
+                    ? 'Card checkout will send you to a normal secure card or Apple Pay checkout after you continue.'
                     : 'Choose a payment method, copy the destination, then submit your proof in the same popup.';
             }
         });
