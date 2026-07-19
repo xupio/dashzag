@@ -4807,12 +4807,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
         Route::post('/dashboard/notification-templates', function (Request $request) {
             MiningPlatform::ensureDefaults();
 
-            $templateKeys = [
-                'payout_submitted', 'payout_approved', 'payout_paid',
-                'free_starter', 'network_join', 'reward_registration',
-                'network_sponsor', 'basic_unlocked', 'investment_activated',
-                'team_level_1', 'team_level_2', 'team_level_generic',
-            ];
+            $templateKeys = MiningPlatform::notificationTemplateKeys();
 
             $rules = [];
 
@@ -4831,43 +4826,50 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             MiningPlatform::ensureDefaults();
 
             $validated = $request->validate([
-                'template_key' => ['required', 'string', 'in:payout_submitted,payout_approved,payout_paid,free_starter,network_join,reward_registration,network_sponsor,basic_unlocked,investment_activated,team_level_1,team_level_2,team_level_generic'],
+                'template_key' => ['required', 'string', 'in:'.implode(',', MiningPlatform::notificationTemplateKeys())],
+                'target_email' => ['nullable', 'email'],
             ]);
 
             $templateKey = $validated['template_key'];
+            $targetUser = filled($validated['target_email'] ?? null)
+                ? User::query()->where('email', strtolower((string) $validated['target_email']))->first()
+                : $request->user();
+
+            if (! $targetUser) {
+                return redirect()
+                    ->route('dashboard.notification-templates')
+                    ->withErrors(['target_email' => 'No user was found with that email address.'])
+                    ->withInput();
+            }
+
             $category = match ($templateKey) {
                 'payout_submitted', 'payout_approved', 'payout_paid' => 'payout',
-                'investment_activated' => 'investment',
+                'investment_activated', 'investment_welcome' => 'investment',
                 'network_join', 'network_sponsor' => 'network',
                 'free_starter', 'basic_unlocked' => 'milestone',
                 default => 'reward',
             };
 
-            $template = MiningPlatform::activityTemplate($templateKey, [
-                'user_name' => 'Preview Investor',
-                'user_email' => 'preview@example.com',
-                'package_name' => 'Basic 100',
-                'level' => 3,
-                'sponsor_name' => 'Preview Sponsor',
-                'sponsor_email' => 'sponsor@example.com',
-                'gross_amount' => '$100.00',
-                'fee_amount' => '$5.00',
-                'net_amount' => '$95.00',
-                'method_label' => 'BTC Wallet',
-                'destination' => 'bc1-preview-wallet',
-            ]);
+            $template = MiningPlatform::activityTemplate(
+                $templateKey,
+                MiningPlatform::notificationTemplatePreviewReplacements($targetUser)
+            );
 
-            $request->user()->notify(new ActivityFeedNotification([
+            $targetUser->notify(new ActivityFeedNotification([
                 'category' => $category,
                 'status' => 'info',
                 'subject' => $template['subject'],
                 'message' => $template['message'],
-                'context_label' => 'Preview event',
+                'context_label' => filled($validated['target_email'] ?? null) ? 'Manual template send' : 'Preview event',
                 'context_value' => str($templateKey)->replace('_', ' ')->title()->toString(),
                 'is_preview' => true,
             ]));
 
-            return redirect()->route('dashboard.notification-templates')->with('notification_templates_success', 'Preview notification sent to your dashboard feed.');
+            $successMessage = filled($validated['target_email'] ?? null)
+                ? 'Notification template sent to '.$targetUser->email.'.'
+                : 'Preview notification sent to your dashboard feed.';
+
+            return redirect()->route('dashboard.notification-templates')->with('notification_templates_success', $successMessage);
         })->name('dashboard.notification-templates.preview');
 
         Route::get('/dashboard/packages', function () {

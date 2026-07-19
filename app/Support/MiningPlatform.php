@@ -196,6 +196,8 @@ class MiningPlatform
             'template_investment_payment_rejected_message' => 'Your payment for :package_name was rejected. Please review the admin notes and resubmit with the correct payment reference.',
             'template_investment_activated_subject' => 'Investment subscription activated',
             'template_investment_activated_message' => 'Your :package_name package is active and your mining shares are now running.',
+            'template_investment_welcome_subject' => 'Welcome to your :package_name investment',
+            'template_investment_welcome_message' => "Your :package_name investment is now active.\n\nCurrent estimate:\n- Investment amount: :investment_amount\n- Estimated monthly return rate: :monthly_return_rate_percent\n- Estimated monthly profit: :projected_monthly_profit\n\nReferral growth example over :example_period:\n- Invite :invite_goal friends\n- If :one_subscriber_count friend subscribes to :example_subscriber_package, your estimated extra reward is :one_subscriber_direct_reward direct + :one_subscriber_team_bonus team = :one_subscriber_total\n- If :two_subscriber_count friends subscribe, your estimated extra reward becomes :two_subscriber_direct_reward direct + :two_subscriber_team_bonus team = :two_subscriber_total\n\nCombined monthly picture:\n- Package projection only: :projected_monthly_profit\n- Package + 1 subscribing friend: :one_subscriber_total_with_package\n- Package + 2 subscribing friends: :two_subscriber_total_with_package",
             'template_team_level_1_subject' => 'Direct referral investment reward added',
             'template_team_level_1_message' => ':user_name subscribed to :package_name and your direct reward plus team bonus have been added.',
             'template_team_level_2_subject' => 'A second-level investor subscribed',
@@ -236,6 +238,8 @@ class MiningPlatform
             'template_investment_payment_rejected_message' => 'Your payment for :package_name was rejected. Please review the admin notes and resubmit with the correct payment reference.',
             'template_investment_activated_subject' => 'Investment subscription activated',
             'template_investment_activated_message' => 'Your :package_name package is active and your mining shares are now running.',
+            'template_investment_welcome_subject' => 'Welcome to your :package_name investment',
+            'template_investment_welcome_message' => "Your :package_name investment is now active.\n\nCurrent estimate:\n- Investment amount: :investment_amount\n- Estimated monthly return rate: :monthly_return_rate_percent\n- Estimated monthly profit: :projected_monthly_profit\n\nReferral growth example over :example_period:\n- Invite :invite_goal friends\n- If :one_subscriber_count friend subscribes to :example_subscriber_package, your estimated extra reward is :one_subscriber_direct_reward direct + :one_subscriber_team_bonus team = :one_subscriber_total\n- If :two_subscriber_count friends subscribe, your estimated extra reward becomes :two_subscriber_direct_reward direct + :two_subscriber_team_bonus team = :two_subscriber_total\n\nCombined monthly picture:\n- Package projection only: :projected_monthly_profit\n- Package + 1 subscribing friend: :one_subscriber_total_with_package\n- Package + 2 subscribing friends: :two_subscriber_total_with_package",
             'template_team_level_1_subject' => 'Direct referral investment reward added',
             'template_team_level_1_message' => ':user_name subscribed to :package_name and your direct reward plus team bonus have been added.',
             'template_team_level_2_subject' => 'A second-level investor subscribed',
@@ -266,6 +270,88 @@ class MiningPlatform
         return [
             'subject' => self::renderNotificationTemplate(self::notificationTemplateSetting('template_'.$key.'_subject'), $replacements),
             'message' => self::renderNotificationTemplate(self::notificationTemplateSetting('template_'.$key.'_message'), $replacements),
+        ];
+    }
+
+    public static function notificationTemplateKeys(): array
+    {
+        return [
+            'payout_submitted',
+            'payout_approved',
+            'payout_paid',
+            'free_starter',
+            'network_join',
+            'reward_registration',
+            'network_sponsor',
+            'basic_unlocked',
+            'investment_activated',
+            'investment_welcome',
+            'team_level_1',
+            'team_level_2',
+            'team_level_generic',
+        ];
+    }
+
+    public static function notificationTemplatePreviewReplacements(?User $user = null): array
+    {
+        $user?->loadMissing(['investments.package', 'userLevel', 'friendInvitations', 'sponsoredUsers.investments']);
+
+        $investment = $user?->investments
+            ?->where('status', 'active')
+            ->where('amount', '>', 0)
+            ->sortByDesc(fn (UserInvestment $investment) => optional($investment->subscribed_at)->timestamp ?? 0)
+            ->first();
+
+        $package = $investment?->package
+            ?? InvestmentPackage::query()->where('slug', self::BASIC_UPGRADE_PACKAGE_SLUG)->first()
+            ?? InvestmentPackage::query()->where('price', '>', 0)->orderBy('price')->first();
+
+        $investmentAmount = round((float) ($investment?->amount ?? $package?->price ?? 100), 2);
+        $packageName = $investment?->package?->name ?? $package?->name ?? 'Basic 100';
+        $monthlyReturnRate = $investment
+            ? self::investmentTotalRewardRate($investment)
+            : (float) ($package?->monthly_return_rate ?? 0.0800);
+        $projectedMonthlyProfit = $investment
+            ? self::investmentProjectedRewardAmount($investment)
+            : round($investmentAmount * $monthlyReturnRate, 2);
+
+        $directRewardRate = (float) self::rewardSetting('referral_subscription_reward_rate');
+        $teamRewardRate = self::networkLevelRewardRate(1);
+        $oneSubscriberDirectReward = round($investmentAmount * $directRewardRate, 2);
+        $oneSubscriberTeamBonus = round($investmentAmount * $teamRewardRate, 2);
+        $oneSubscriberTotal = round($oneSubscriberDirectReward + $oneSubscriberTeamBonus, 2);
+        $twoSubscriberDirectReward = round($oneSubscriberDirectReward * 2, 2);
+        $twoSubscriberTeamBonus = round($oneSubscriberTeamBonus * 2, 2);
+        $twoSubscriberTotal = round($oneSubscriberTotal * 2, 2);
+
+        return [
+            'user_name' => $user?->name ?? 'Preview Investor',
+            'user_email' => $user?->email ?? 'preview@example.com',
+            'package_name' => $packageName,
+            'level' => 3,
+            'sponsor_name' => 'Preview Sponsor',
+            'sponsor_email' => 'sponsor@example.com',
+            'gross_amount' => '$100.00',
+            'fee_amount' => '$5.00',
+            'net_amount' => '$95.00',
+            'method_label' => 'BTC Wallet',
+            'destination' => 'bc1-preview-wallet',
+            'investment_amount' => '$'.number_format($investmentAmount, 2),
+            'monthly_return_rate_percent' => number_format($monthlyReturnRate * 100, 2).'%',
+            'projected_monthly_profit' => '$'.number_format($projectedMonthlyProfit, 2),
+            'invite_goal' => 10,
+            'example_period' => '30 days',
+            'example_subscriber_package' => $packageName,
+            'one_subscriber_count' => 1,
+            'two_subscriber_count' => 2,
+            'one_subscriber_direct_reward' => '$'.number_format($oneSubscriberDirectReward, 2),
+            'one_subscriber_team_bonus' => '$'.number_format($oneSubscriberTeamBonus, 2),
+            'one_subscriber_total' => '$'.number_format($oneSubscriberTotal, 2),
+            'two_subscriber_direct_reward' => '$'.number_format($twoSubscriberDirectReward, 2),
+            'two_subscriber_team_bonus' => '$'.number_format($twoSubscriberTeamBonus, 2),
+            'two_subscriber_total' => '$'.number_format($twoSubscriberTotal, 2),
+            'one_subscriber_total_with_package' => '$'.number_format($projectedMonthlyProfit + $oneSubscriberTotal, 2),
+            'two_subscriber_total_with_package' => '$'.number_format($projectedMonthlyProfit + $twoSubscriberTotal, 2),
         ];
     }
     public static function digestSummaryForUser(User $user, ?string $frequency = null): array

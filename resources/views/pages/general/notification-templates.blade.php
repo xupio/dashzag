@@ -25,9 +25,10 @@
     ],
     'Investment & Team Rewards' => [
       'accent' => 'warning',
-      'description' => 'Messages for investment activation and direct or deeper team-level reward events.',
+      'description' => 'Messages for investment activation, onboarding guidance, and direct or deeper team-level reward events.',
       'items' => [
         'investment_activated' => ['label' => 'Investment Activated', 'hint' => 'Available placeholders: :package_name'],
+        'investment_welcome' => ['label' => 'Investment Welcome & Referral Example', 'hint' => 'Available placeholders: :package_name, :investment_amount, :monthly_return_rate_percent, :projected_monthly_profit, :invite_goal, :example_period, :example_subscriber_package, :one_subscriber_direct_reward, :one_subscriber_team_bonus, :one_subscriber_total, :two_subscriber_direct_reward, :two_subscriber_team_bonus, :two_subscriber_total, :one_subscriber_total_with_package, :two_subscriber_total_with_package'],
         'team_level_1' => ['label' => 'Level 1 Team Reward', 'hint' => 'Available placeholders: :user_name, :user_email, :package_name, :level'],
         'team_level_2' => ['label' => 'Level 2 Team Reward', 'hint' => 'Available placeholders: :user_name, :user_email, :package_name, :level'],
         'team_level_generic' => ['label' => 'Generic Deeper Level Reward', 'hint' => 'Available placeholders: :user_name, :user_email, :package_name, :level'],
@@ -305,8 +306,8 @@
     <div class="notification-preview-card__body">
       <div class="notification-preview-card__header">
         <div>
-          <h5 class="notification-preview-card__title">Send Preview</h5>
-          <p class="notification-preview-card__text">Send a sample notification to your own in-app feed before saving wording changes live.</p>
+          <h5 class="notification-preview-card__title">Send Preview Or Targeted Notification</h5>
+          <p class="notification-preview-card__text">Leave the recipient email empty to send the template to yourself, or enter a user email to manually target the intended recipient.</p>
         </div>
         <form method="POST" action="{{ route('dashboard.notification-templates.preview') }}" class="notification-preview-form">
           @csrf
@@ -315,6 +316,15 @@
               <option value="{{ $previewKey }}">{{ $previewLabel }}</option>
             @endforeach
           </select>
+          <input
+            type="email"
+            name="target_email"
+            class="form-control @error('target_email') is-invalid @enderror"
+            value="{{ old('target_email') }}"
+            placeholder="Recipient email (optional)"
+            style="min-width: 280px;"
+          >
+          @error('target_email')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
           <button type="submit" class="btn btn-outline-primary btn-icon-text">
             <i data-lucide="send" class="btn-icon-prepend"></i> Send preview
           </button>

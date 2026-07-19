@@ -34,7 +34,8 @@ test('admin can view notification templates page', function () {
         ->get(route('dashboard.notification-templates'))
         ->assertOk()
         ->assertSee('Notification Templates')
-        ->assertSee('Payout Submitted');
+        ->assertSee('Payout Submitted')
+        ->assertSee('Investment Welcome & Referral Example');
 });
 
 test('admin can update notification templates and they are applied', function () {
@@ -63,6 +64,8 @@ test('admin can update notification templates and they are applied', function ()
             'template_basic_unlocked_message' => ':package_name is now active.',
             'template_investment_activated_subject' => 'Investment live',
             'template_investment_activated_message' => ':package_name has started mining.',
+            'template_investment_welcome_subject' => 'Welcome to :package_name',
+            'template_investment_welcome_message' => 'Invite :invite_goal friends over :example_period and watch your potential grow to :two_subscriber_total_with_package.',
             'template_team_level_1_subject' => 'Direct team reward posted',
             'template_team_level_1_message' => ':user_name activated :package_name.',
             'template_team_level_2_subject' => 'Level 2 reward posted',
@@ -80,6 +83,17 @@ test('admin can update notification templates and they are applied', function ()
 
     expect($template['subject'])->toBe('A new teammate joined');
     expect($template['message'])->toBe('Nora entered your network.');
+
+    $welcomeTemplate = MiningPlatform::activityTemplate('investment_welcome', [
+        'package_name' => 'Growth 500',
+        'invite_goal' => 10,
+        'example_period' => '30 days',
+        'two_subscriber_total_with_package' => '$74.00',
+    ]);
+
+    expect($welcomeTemplate['subject'])->toBe('Welcome to Growth 500');
+    expect($welcomeTemplate['message'])->toContain('Invite 10 friends over 30 days');
+    expect($welcomeTemplate['message'])->toContain('$74.00');
 
     $user = User::factory()->create([
         'email_verified_at' => now(),
@@ -109,7 +123,36 @@ test('admin can send a preview notification to the dashboard feed', function () 
 
     expect($admin->notifications)->toHaveCount(1);
     expect($admin->notifications->first()->data['subject'])->toBe('Referral registration reward added');
-});test('non admin cannot access notification templates page', function () {
+});
+
+test('admin can manually target a notification template to another user', function () {
+    $admin = User::factory()->create([
+        'email_verified_at' => now(),
+        'role' => 'admin',
+    ]);
+    $target = User::factory()->create([
+        'email_verified_at' => now(),
+        'email' => 'target@example.com',
+    ]);
+
+    $this->actingAs($admin)
+        ->post(route('dashboard.notification-templates.preview'), [
+            'template_key' => 'investment_welcome',
+            'target_email' => $target->email,
+        ])
+        ->assertRedirect(route('dashboard.notification-templates'));
+
+    $target->refresh();
+    $admin->refresh();
+
+    expect($target->notifications)->toHaveCount(1);
+    expect($target->notifications->first()->data['subject'])->toContain('Welcome');
+    expect($target->notifications->first()->data['message'])->toContain('Invite 10 friends');
+    expect($target->notifications->first()->data['context_label'])->toBe('Manual template send');
+    expect($admin->notifications)->toHaveCount(0);
+});
+
+test('non admin cannot access notification templates page', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),
         'role' => 'user',
