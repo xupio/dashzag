@@ -185,6 +185,15 @@
                           Waiting for upload
                         @endif
                       </div>
+                      @if ($listedUser->kyc_reviewed_at)
+                        <div class="small text-secondary">Reviewed {{ $listedUser->kyc_reviewed_at->format('M d, Y') }}</div>
+                      @endif
+                      @if ($listedUser->kycReviewer)
+                        <div class="small text-secondary">Reviewer: {{ $listedUser->kycReviewer->adminLabel() }}</div>
+                      @endif
+                      @if ($listedUser->kyc_admin_notes)
+                        <div class="small {{ $kyc === 'rejected' ? 'text-danger' : 'text-secondary' }}">Note: {{ $listedUser->kyc_admin_notes }}</div>
+                      @endif
                     </div>
                   </td>
                   <td>{{ $listedUser->userLevel?->name ?? 'Starter' }}</td>

@@ -529,6 +529,7 @@ test('admin users page shows kyc queue cards and can filter pending kyc users', 
         'email_verified_at' => now(),
         'kyc_status' => 'rejected',
         'kyc_reviewed_at' => now()->subHour(),
+        'kyc_admin_notes' => 'Please upload a clearer responsibility proof.',
     ]);
 
     User::factory()->create([
@@ -544,6 +545,8 @@ test('admin users page shows kyc queue cards and can filter pending kyc users', 
     $response->assertSee('Pending KYC');
     $response->assertSee('Rejected KYC');
     $response->assertSee('No KYC Uploaded');
+    $response->assertSee('Reviewed');
+    $response->assertSee('Note:');
 
     $filteredResponse = $this->actingAs($admin)->get(route('dashboard.users', [
         'kyc_status' => 'pending',
@@ -591,5 +594,25 @@ test('kyc submission sends n8n webhook payload', function () {
             && ($payload['data']['kyc']['status'] ?? null) === 'pending'
             && ($payload['data']['kyc']['proof_original_name'] ?? null) === 'legal-proof.pdf';
     });
+});
+
+test('wallet page shows enhanced kyc guidance and proof link details', function () {
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'kyc_status' => 'pending',
+        'kyc_proof_path' => 'kyc-proofs/existing-proof.pdf',
+        'kyc_proof_original_name' => 'existing-proof.pdf',
+        'kyc_submitted_at' => now()->subHour(),
+        'kyc_admin_notes' => 'Please keep the document readable and complete.',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.wallet'));
+
+    $response->assertOk();
+    $response->assertSee('Step 1');
+    $response->assertSee('Admin review');
+    $response->assertSee('Open current proof');
+    $response->assertSee('Review note');
+    $response->assertSee('existing-proof.pdf');
 });
 
