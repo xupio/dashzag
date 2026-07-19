@@ -7,6 +7,7 @@ use App\Models\InvestmentOrder;
 use App\Models\PayoutRequest;
 use App\Models\User;
 use App\Models\UserInvestment;
+use App\Notifications\ActivityFeedNotification;
 use App\Notifications\PayoutStatusNotification;
 use App\Support\MiningPlatform;
 use Illuminate\Http\UploadedFile;
@@ -336,6 +337,10 @@ test('verified user can request a payout from available balance', function () {
     config()->set('services.n8n.webhook_url', 'https://n8n.example.test/webhook/zagchain');
     config()->set('services.n8n.webhook_secret', 'test-secret');
 
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
     $user = User::factory()->create([
         'email_verified_at' => now(),
         'account_type' => 'user',
@@ -343,8 +348,16 @@ test('verified user can request a payout from available balance', function () {
         'kyc_reviewed_at' => now(),
     ]);
 
-    activateGrowthInvestment($this, $user);
-    $this->actingAs($user)->post(route('dashboard.wallet.generate'));
+    Earning::create([
+        'user_id' => $user->id,
+        'investment_id' => null,
+        'payout_request_id' => null,
+        'earned_on' => now()->toDateString(),
+        'amount' => 40,
+        'source' => 'mining_daily_share',
+        'status' => 'available',
+        'notes' => 'Seeded earning for payout notification coverage.',
+    ]);
 
     $response = $this->actingAs($user)->post(route('dashboard.wallet.request'), [
         'amount' => 30,
@@ -365,6 +378,12 @@ test('verified user can request a payout from available balance', function () {
     expect((float) $payoutRequest->fee_amount)->toBe(0.0);
     expect((float) $payoutRequest->net_amount)->toBe(30.0);
     expect($user->earnings->where('status', 'payout_pending')->sum('amount'))->toBe(30.0);
+    Notification::assertSentTo(
+        $admin,
+        ActivityFeedNotification::class,
+        fn (ActivityFeedNotification $notification, array $channels) => in_array('database', $channels, true)
+            && (($notification->toArray($admin)['subject'] ?? null) === 'New payout request submitted')
+    );
     Http::assertSent(function ($request) use ($user, $payoutRequest) {
         $payload = $request->data();
 

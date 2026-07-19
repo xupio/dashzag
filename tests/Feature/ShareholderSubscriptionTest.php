@@ -79,6 +79,10 @@ test('paid package flow uses popup payment instructions', function () {
 });
 
 test('verified user submits a package payment for admin approval', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
     $user = User::factory()->create([
         'email_verified_at' => now(),
         'account_type' => 'user',
@@ -108,10 +112,15 @@ test('verified user submits a package payment for admin approval', function () {
     expect($order->payment_proof_path)->toBeNull();
     expect($order->payment_proof_original_name)->toBeNull();
     expect($order->proof_uploaded_at)->toBeNull();
+    expect($admin->fresh()->notifications()->where('data->subject', 'New investment payment submitted')->exists())->toBeTrue();
     Storage::disk('public')->assertDirectoryEmpty('investment-proofs');
 });
 
 test('verified user can start Ziina checkout for a package', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+    ]);
+
     config([
         'services.ziina.enabled' => true,
         'services.ziina.access_token' => 'ziina-test-token',
@@ -155,6 +164,7 @@ test('verified user can start Ziina checkout for a package', function () {
     expect($order->payment_reference)->toBe('pi_test_123');
     expect($order->gateway_reference)->toBe('pi_test_123');
     expect($order->gateway_redirect_url)->toBe('https://pay.ziina.com/checkout/pi_test_123');
+    expect($admin->fresh()->notifications()->where('data->subject', 'Card checkout started')->exists())->toBeTrue();
 });
 
 test('ziina webhook can auto approve a pending investment order', function () {

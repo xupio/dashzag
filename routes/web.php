@@ -1669,6 +1669,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
         );
 
         $user->notify(new PayoutStatusNotification($payoutRequest, 'submitted'));
+        MiningPlatform::notifyAdminsOfPayoutRequestSubmitted($payoutRequest);
 
       return redirect()->route('dashboard.wallet')->with('wallet_success', 'Your payout request has been submitted successfully.');
     })->middleware('throttle:5,1')->name('dashboard.wallet.request');
@@ -5974,6 +5975,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'amount_label' => 'Checkout amount',
                 'force_mail' => true,
             ]));
+            MiningPlatform::notifyAdminsOfInvestmentCheckoutStarted($investmentOrder);
 
             return redirect()->away((string) ($intent['redirect_url'] ?? route('dashboard.buy-shares', ['miner' => $package->miner?->slug])));
         }
@@ -5994,6 +5996,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             'amount_label' => 'Submitted amount',
             'force_mail' => true,
         ]));
+        MiningPlatform::notifyAdminsOfInvestmentOrderSubmitted($investmentOrder);
 
         return redirect()
             ->route('dashboard.buy-shares', ['miner' => $package->miner?->slug])
@@ -6108,6 +6111,7 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             'amount_label' => 'Submitted amount',
             'force_mail' => true,
         ]));
+        MiningPlatform::notifyAdminsOfInvestmentProofUploaded($investmentOrder);
 
         return redirect()
             ->route('dashboard.buy-shares', ['miner' => $investmentOrder->miner?->slug])

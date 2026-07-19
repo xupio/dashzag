@@ -524,6 +524,114 @@ class MiningPlatform
         ]));
     }
 
+    public static function notifyAdminsOfInvestmentOrderSubmitted(InvestmentOrder $order): void
+    {
+        $order->loadMissing(['user', 'package']);
+
+        User::query()
+            ->where('role', 'admin')
+            ->whereNotNull('email_verified_at')
+            ->orderBy('id')
+            ->get()
+            ->each(function (User $admin) use ($order) {
+                $admin->notify(new ActivityFeedNotification([
+                    'category' => 'admin',
+                    'status' => 'warning',
+                    'subject' => 'New investment payment submitted',
+                    'message' => ($order->user?->name ?? 'A user').' submitted a '.($order->package?->name ?? 'package').' payment for review.',
+                    'context_label' => 'Payment reference',
+                    'context_value' => $order->payment_reference,
+                    'status_line' => 'Method: '.str((string) $order->payment_method)->replace('_', ' ')->title().' | Amount: $'.number_format((float) $order->amount, 2),
+                    'notes_line' => $order->notes ?: 'Open operations to review the submitted order and wait for proof upload if needed.',
+                    'related_user_id' => $order->user_id,
+                    'action_text' => 'Open Operations Queue',
+                    'action_url' => route('dashboard.operations', ['search' => $order->payment_reference]),
+                    'force_mail' => true,
+                ]));
+            });
+    }
+
+    public static function notifyAdminsOfInvestmentCheckoutStarted(InvestmentOrder $order): void
+    {
+        $order->loadMissing(['user', 'package']);
+
+        User::query()
+            ->where('role', 'admin')
+            ->whereNotNull('email_verified_at')
+            ->orderBy('id')
+            ->get()
+            ->each(function (User $admin) use ($order) {
+                $admin->notify(new ActivityFeedNotification([
+                    'category' => 'admin',
+                    'status' => 'info',
+                    'subject' => 'Card checkout started',
+                    'message' => ($order->user?->name ?? 'A user').' started hosted card checkout for '.($order->package?->name ?? 'a package').'.',
+                    'context_label' => 'Checkout reference',
+                    'context_value' => $order->payment_reference,
+                    'status_line' => 'Gateway: '.str((string) ($order->gateway_provider ?: 'ziina'))->upper().' | Amount: $'.number_format((float) $order->amount, 2),
+                    'notes_line' => 'This order should confirm automatically after the payment gateway marks it completed.',
+                    'related_user_id' => $order->user_id,
+                    'action_text' => 'Open Operations Queue',
+                    'action_url' => route('dashboard.operations', ['search' => $order->payment_reference]),
+                    'force_mail' => true,
+                ]));
+            });
+    }
+
+    public static function notifyAdminsOfInvestmentProofUploaded(InvestmentOrder $order): void
+    {
+        $order->loadMissing(['user', 'package']);
+
+        User::query()
+            ->where('role', 'admin')
+            ->whereNotNull('email_verified_at')
+            ->orderBy('id')
+            ->get()
+            ->each(function (User $admin) use ($order) {
+                $admin->notify(new ActivityFeedNotification([
+                    'category' => 'admin',
+                    'status' => 'warning',
+                    'subject' => 'Investment payment proof uploaded',
+                    'message' => ($order->user?->name ?? 'A user').' uploaded payment proof for '.($order->package?->name ?? 'a pending package').'.',
+                    'context_label' => 'Proof file',
+                    'context_value' => $order->payment_proof_original_name ?: 'Uploaded proof',
+                    'status_line' => 'Reference: '.($order->payment_reference ?: 'N/A').' | Amount: $'.number_format((float) $order->amount, 2),
+                    'notes_line' => 'Review the uploaded file and approve or reject the order from operations.',
+                    'related_user_id' => $order->user_id,
+                    'action_text' => 'Review Payment Proof',
+                    'action_url' => route('dashboard.operations', ['search' => $order->payment_reference]),
+                    'force_mail' => true,
+                ]));
+            });
+    }
+
+    public static function notifyAdminsOfPayoutRequestSubmitted(PayoutRequest $payoutRequest): void
+    {
+        $payoutRequest->loadMissing('user');
+
+        User::query()
+            ->where('role', 'admin')
+            ->whereNotNull('email_verified_at')
+            ->orderBy('id')
+            ->get()
+            ->each(function (User $admin) use ($payoutRequest) {
+                $admin->notify(new ActivityFeedNotification([
+                    'category' => 'admin',
+                    'status' => 'warning',
+                    'subject' => 'New payout request submitted',
+                    'message' => ($payoutRequest->user?->name ?? 'A user').' submitted a payout request and it is waiting for review.',
+                    'context_label' => 'Payout destination',
+                    'context_value' => $payoutRequest->destination,
+                    'status_line' => 'Method: '.self::payoutMethodLabel((string) $payoutRequest->method).' | Net amount: $'.number_format((float) $payoutRequest->net_amount, 2),
+                    'notes_line' => $payoutRequest->notes ?: 'Open operations to approve or pay the request.',
+                    'related_user_id' => $payoutRequest->user_id,
+                    'action_text' => 'Open Payout Queue',
+                    'action_url' => route('dashboard.operations', ['search' => $payoutRequest->destination]),
+                    'force_mail' => true,
+                ]));
+            });
+    }
+
     public static function notificationDefaultPreferences(): array
     {
         return [
