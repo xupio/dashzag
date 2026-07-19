@@ -4860,8 +4860,8 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
                 'status' => 'info',
                 'subject' => $template['subject'],
                 'message' => $template['message'],
-                'context_label' => filled($validated['target_email'] ?? null) ? 'Manual template send' : 'Preview event',
-                'context_value' => str($templateKey)->replace('_', ' ')->title()->toString(),
+                'context_label' => filled($validated['target_email'] ?? null) ? 'ZagChain team' : 'Preview event',
+                'context_value' => filled($validated['target_email'] ?? null) ? 'We wish you good luck on your journey.' : str($templateKey)->replace('_', ' ')->title()->toString(),
                 'is_preview' => true,
             ]));
 
