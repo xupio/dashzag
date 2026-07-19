@@ -499,7 +499,7 @@
       <div class="modal-header">
         <div>
           <h5 class="modal-title" id="purchaseFlowModalLabel">Complete package payment</h5>
-          <div class="text-secondary small" data-purchase-modal-subtitle>Choose a payment method. Manual transfers stay in this popup, while card checkout sends you to secure hosted checkout.</div>
+          <div class="text-secondary small" data-purchase-modal-subtitle>Choose a payment method. Manual transfers stay in this popup, while Ziina will send you to secure hosted checkout.</div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -525,6 +525,7 @@
           <div class="text-secondary small mb-1">Payment method: <span class="fw-semibold text-dark" data-existing-order-method-label></span></div>
           <div class="text-secondary small mb-1">Reference: <span class="fw-semibold text-dark" data-existing-order-reference></span></div>
           <div class="text-secondary small mb-0" data-existing-order-proof-summary>Upload your proof below to complete the popup flow.</div>
+          <div class="text-secondary small mt-2">Finish your pending payment without leaving this flow.</div>
         </div>
 
         <form method="POST" action="{{ route('dashboard.buy-shares.subscribe') }}" class="d-grid gap-3" data-purchase-order-form>
@@ -541,6 +542,34 @@
             @error('payment_method')
               <div class="invalid-feedback d-block">{{ $message }}</div>
             @enderror
+          </div>
+
+          <div>
+            <div class="text-secondary text-uppercase small mb-2">Quick method picker</div>
+            <div class="row g-2" data-purchase-method-cards>
+              @foreach ($paymentMethods as $paymentMethod)
+                <div class="col-md-6">
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary w-100 text-start h-100 py-3 px-3 {{ $defaultPaymentMethod === $paymentMethod['key'] ? 'active border-primary' : '' }}"
+                    data-purchase-method-card
+                    data-method-key="{{ $paymentMethod['key'] }}"
+                  >
+                    <div class="d-flex justify-content-between align-items-start gap-2">
+                      <div>
+                        <div class="fw-semibold text-dark">{{ $paymentMethod['label'] }}</div>
+                        <div class="text-secondary small">
+                          {{ $paymentMethod['key'] === 'ziina' ? 'Card or Apple Pay secure checkout' : 'Manual transfer with popup details' }}
+                        </div>
+                      </div>
+                      <span class="badge {{ $paymentMethod['key'] === 'ziina' ? 'bg-primary-subtle text-primary' : 'bg-light text-dark' }}">
+                        {{ $paymentMethod['key'] === 'ziina' ? 'Instant' : 'Manual' }}
+                      </span>
+                    </div>
+                  </button>
+                </div>
+              @endforeach
+            </div>
           </div>
 
           <div class="border rounded p-3 bg-light" data-purchase-method-panel>
@@ -580,7 +609,12 @@
             @enderror
           </div>
 
-          <button class="btn btn-primary" type="button" data-purchase-submit-button>Continue payment</button>
+          <div class="border rounded p-3 bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div class="small text-secondary" data-purchase-action-hint>
+              Choose a payment method first. Then continue to either secure checkout or the manual payment details popup.
+            </div>
+            <button class="btn btn-primary" type="button" data-purchase-submit-button @disabled(blank($defaultPaymentMethod))>Continue payment</button>
+          </div>
         </form>
 
         <div class="border-top my-4"></div>
@@ -791,11 +825,14 @@
         const modalSubtitleElement = modalElement?.querySelector('[data-purchase-modal-subtitle]');
         const packageInput = modalElement?.querySelector('[data-purchase-package-input]');
         const methodSelect = modalElement?.querySelector('[data-purchase-method-select]');
+        const methodCardsContainer = modalElement?.querySelector('[data-purchase-method-cards]');
+        const methodCards = Array.from(modalElement?.querySelectorAll('[data-purchase-method-card]') ?? []);
         const methodPanel = modalElement?.querySelector('[data-purchase-method-panel]');
         const referenceInput = modalElement?.querySelector('[data-payment-reference-input]');
         const referenceGroup = modalElement?.querySelector('[data-payment-reference-group]');
         const orderForm = modalElement?.querySelector('[data-purchase-order-form]');
         const orderSubmitButton = modalElement?.querySelector('[data-purchase-submit-button]');
+        const orderActionHint = modalElement?.querySelector('[data-purchase-action-hint]');
         const proofSection = modalElement?.querySelector('[data-proof-upload-section]');
         const proofForm = modalElement?.querySelector('[data-proof-upload-form]');
         const proofViewLink = modalElement?.querySelector('[data-proof-view-link]');
@@ -823,6 +860,16 @@
         let activePackage = null;
         let lastPurchaseTrigger = null;
 
+        const syncMethodCardState = (methodKey) => {
+            methodCards.forEach((card) => {
+                const isActive = card.dataset.methodKey === methodKey;
+                card.classList.toggle('active', isActive);
+                card.classList.toggle('border-primary', isActive);
+                card.classList.toggle('btn-outline-primary', isActive);
+                card.classList.toggle('btn-outline-secondary', !isActive);
+            });
+        };
+
         const renderMethod = (methodKey) => {
             if (!methodPanel || !referenceInput) {
                 return;
@@ -836,6 +883,14 @@
                 referenceInput.removeAttribute('readonly');
                 referenceInput.removeAttribute('required');
                 referenceGroup?.classList.remove('d-none');
+                if (orderSubmitButton) {
+                    orderSubmitButton.textContent = 'Continue payment';
+                    orderSubmitButton.setAttribute('disabled', 'disabled');
+                }
+                if (orderActionHint) {
+                    orderActionHint.textContent = 'Choose a payment method first. Then continue to either secure checkout or the manual payment details popup.';
+                }
+                syncMethodCardState('');
                 orderSubmitButton.textContent = 'Continue payment';
                 return;
             }
@@ -899,13 +954,23 @@
                 referenceInput.removeAttribute('required');
                 referenceGroup?.classList.add('d-none');
                 orderSubmitButton.textContent = 'Pay with Card / Apple Pay';
+                orderSubmitButton.removeAttribute('disabled');
+                if (orderActionHint) {
+                    orderActionHint.textContent = 'Card checkout opens a secure hosted page in a popup or new tab and should confirm automatically after payment.';
+                }
             } else {
                 referenceInput.value = '';
                 referenceInput.removeAttribute('readonly');
                 referenceInput.removeAttribute('required');
                 referenceGroup?.classList.add('d-none');
                 orderSubmitButton.textContent = 'Open payment details';
+                orderSubmitButton.removeAttribute('disabled');
+                if (orderActionHint) {
+                    orderActionHint.textContent = 'Manual transfer opens the payment details popup with wallet or bank instructions, QR if available, and proof upload guidance.';
+                }
             }
+
+            syncMethodCardState(method.key);
         };
 
         const openManualPaymentModal = (methodKey) => {
@@ -1172,6 +1237,22 @@
 
         methodSelect?.addEventListener('change', () => {
             renderMethod(methodSelect.value);
+            if (modalSubtitleElement) {
+                modalSubtitleElement.textContent = methodSelect.value === 'ziina'
+                    ? 'Card checkout will send you to a normal secure card or Apple Pay checkout after you continue.'
+                    : 'Choose a payment method, copy the destination, then submit your proof in the same popup.';
+            }
+        });
+
+        methodCardsContainer?.addEventListener('click', (event) => {
+            const card = event.target.closest('[data-purchase-method-card]');
+            if (!card || !methodSelect) {
+                return;
+            }
+
+            methodSelect.value = card.dataset.methodKey || '';
+            renderMethod(methodSelect.value);
+
             if (modalSubtitleElement) {
                 modalSubtitleElement.textContent = methodSelect.value === 'ziina'
                     ? 'Card checkout will send you to a normal secure card or Apple Pay checkout after you continue.'
