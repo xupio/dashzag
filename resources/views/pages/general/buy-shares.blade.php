@@ -54,6 +54,11 @@
     : null;
 @endphp
 
+@php
+  $subscriptionNoticeVariant = session('subscription_notice_variant', 'success');
+  $ziinaReturnResult = session('ziina_return_result');
+@endphp
+
 <div class="d-flex justify-content-between align-items-center flex-wrap grid-margin gap-3">
   <div>
     <h4 class="mb-1">Buy {{ $miner->name }} Shares</h4>
@@ -67,9 +72,25 @@
 </div>
 
 @if (session('subscription_success'))
-  <div class="alert alert-success d-flex align-items-center justify-content-between" role="alert">
+  <div class="alert alert-{{ $subscriptionNoticeVariant }} d-flex align-items-center justify-content-between flex-wrap gap-2" role="alert">
     <span>{{ session('subscription_success') }}</span>
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      @if (in_array($ziinaReturnResult, ['cancel', 'failure', 'pending_confirmation'], true) && $pendingInvestmentOrder?->payment_method === 'ziina')
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-dark"
+          data-bs-toggle="modal"
+          data-bs-target="#purchaseFlowModal"
+          data-open-purchase-modal
+          data-package-slug="{{ $pendingInvestmentOrder->package?->slug }}"
+          data-package-name="{{ $pendingInvestmentOrder->package?->name }}"
+          data-package-price="{{ number_format((float) $pendingInvestmentOrder->amount, 2) }}"
+        >
+          Resume card checkout
+        </button>
+      @endif
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
   </div>
 @endif
 

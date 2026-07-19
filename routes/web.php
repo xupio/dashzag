@@ -6005,18 +6005,21 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
         abort_unless($investmentOrder->gateway_provider === 'ziina', 404);
 
         $result = strtolower($result);
+        $resolvedGatewayStatus = strtolower((string) $investmentOrder->gateway_status);
 
         if ($investmentOrder->gateway_reference && in_array($result, ['success', 'cancel', 'failure'], true)) {
             try {
                 $intent = app(ZiinaGatewayService::class)->getPaymentIntent($investmentOrder->gateway_reference);
 
+                $resolvedGatewayStatus = strtolower((string) ($intent['status'] ?? $investmentOrder->gateway_status));
+
                 $investmentOrder->forceFill([
-                    'gateway_status' => strtolower((string) ($intent['status'] ?? $investmentOrder->gateway_status)),
+                    'gateway_status' => $resolvedGatewayStatus,
                     'gateway_payload' => $intent,
-                    'gateway_paid_at' => strtolower((string) ($intent['status'] ?? '')) === 'completed' ? now() : $investmentOrder->gateway_paid_at,
+                    'gateway_paid_at' => $resolvedGatewayStatus === 'completed' ? now() : $investmentOrder->gateway_paid_at,
                 ])->save();
 
-                if (strtolower((string) ($intent['status'] ?? '')) === 'completed' && $investmentOrder->status === 'pending') {
+                if ($resolvedGatewayStatus === 'completed' && $investmentOrder->status === 'pending') {
                     MiningPlatform::approveGatewayInvestmentOrder($investmentOrder->fresh(), 'ziina', $intent);
                 }
             } catch (\Throwable $exception) {
@@ -6024,15 +6027,38 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             }
         }
 
-        $message = match ($result) {
-            'success' => 'Ziina sent you back successfully. We are checking the payment confirmation now.',
-            'cancel' => 'Ziina checkout was cancelled. You can restart it any time from Buy Shares.',
-            default => 'Ziina checkout did not complete. Please try again or contact support if the charge was captured.',
+        $notice = match (true) {
+            $resolvedGatewayStatus === 'completed' => [
+                'message' => 'Your card payment was confirmed successfully. ZagChain is now activating your package automatically.',
+                'variant' => 'success',
+                'result' => 'confirmed',
+                'reopen' => false,
+            ],
+            $result === 'success' => [
+                'message' => 'Ziina returned successfully, but the final payment confirmation is still pending. You can wait a moment or reopen the secure checkout if needed.',
+                'variant' => 'info',
+                'result' => 'pending_confirmation',
+                'reopen' => false,
+            ],
+            $result === 'cancel' => [
+                'message' => 'Card checkout was cancelled before completion. Your pending order is still saved, and you can reopen secure checkout any time below.',
+                'variant' => 'warning',
+                'result' => 'cancel',
+                'reopen' => false,
+            ],
+            default => [
+                'message' => 'Card checkout did not complete. If no charge was captured, you can try again now. If the card was charged, please contact support and share your payment reference.',
+                'variant' => 'danger',
+                'result' => 'failure',
+                'reopen' => false,
+            ],
         };
 
         return redirect()
             ->route('dashboard.buy-shares', ['miner' => $investmentOrder->miner?->slug])
-            ->with('subscription_success', $message);
+            ->with('subscription_success', $notice['message'])
+            ->with('subscription_notice_variant', $notice['variant'])
+            ->with('ziina_return_result', $notice['result']);
     })->name('dashboard.buy-shares.ziina.return');
 
     Route::post('/dashboard/buy-shares/{investmentOrder}/proof', function (Request $request, InvestmentOrder $investmentOrder) {

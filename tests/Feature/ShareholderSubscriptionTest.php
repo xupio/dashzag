@@ -193,6 +193,86 @@ test('ziina webhook can auto approve a pending investment order', function () {
     expect($user->investments()->count())->toBe(1);
 });
 
+test('ziina return success shows a clear confirmation message after completed payment', function () {
+    config([
+        'services.ziina.enabled' => true,
+        'services.ziina.access_token' => 'ziina-test-token',
+    ]);
+
+    Http::fake([
+        'https://api-v2.ziina.com/api/payment_intent/pi_test_done' => Http::response([
+            'id' => 'pi_test_done',
+            'status' => 'completed',
+        ], 200),
+    ]);
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+    ]);
+
+    $package = \App\Models\InvestmentPackage::where('slug', 'growth-500')->firstOrFail();
+
+    $order = MiningPlatform::submitInvestmentOrder($user, $package, [
+        'payment_method' => 'ziina',
+        'gateway_provider' => 'ziina',
+        'payment_reference' => 'pi_test_done',
+        'gateway_reference' => 'pi_test_done',
+        'gateway_status' => 'requires_user_action',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.buy-shares.ziina.return', [
+        'investmentOrder' => $order,
+        'result' => 'success',
+    ]));
+
+    $response->assertRedirect(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+
+    $page = $this->actingAs($user)->get(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+    $page->assertSee('Your card payment was confirmed successfully. ZagChain is now activating your package automatically.');
+});
+
+test('ziina return cancel keeps the pending order and offers checkout resume', function () {
+    config([
+        'services.ziina.enabled' => true,
+        'services.ziina.access_token' => 'ziina-test-token',
+    ]);
+
+    Http::fake([
+        'https://api-v2.ziina.com/api/payment_intent/pi_test_cancel' => Http::response([
+            'id' => 'pi_test_cancel',
+            'status' => 'requires_user_action',
+        ], 200),
+    ]);
+
+    $user = User::factory()->create([
+        'email_verified_at' => now(),
+        'account_type' => 'user',
+    ]);
+
+    $package = \App\Models\InvestmentPackage::where('slug', 'growth-500')->firstOrFail();
+
+    $order = MiningPlatform::submitInvestmentOrder($user, $package, [
+        'payment_method' => 'ziina',
+        'gateway_provider' => 'ziina',
+        'payment_reference' => 'pi_test_cancel',
+        'gateway_reference' => 'pi_test_cancel',
+        'gateway_status' => 'requires_user_action',
+        'gateway_redirect_url' => 'https://pay.ziina.com/checkout/pi_test_cancel',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('dashboard.buy-shares.ziina.return', [
+        'investmentOrder' => $order,
+        'result' => 'cancel',
+    ]));
+
+    $response->assertRedirect(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+
+    $page = $this->actingAs($user)->get(route('dashboard.buy-shares', ['miner' => 'alpha-one']));
+    $page->assertSee('Card checkout was cancelled before completion.');
+    $page->assertSee('Resume card checkout');
+});
+
 test('pending order page keeps the payment popup flow available', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),
