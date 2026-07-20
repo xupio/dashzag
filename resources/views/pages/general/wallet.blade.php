@@ -60,7 +60,7 @@
   <div class="col-md-3 grid-margin stretch-card"><div class="card"><div class="card-body"><p class="text-secondary mb-1">Confirmed earnings</p><h4 class="mb-0">${{ number_format($wallet['total'], 2) }}</h4></div></div></div>
   </div>
 
-  @if (($kycSummary['is_limited'] ?? false) && !$user->isAdmin())
+  @if (($kycSummary['is_limited'] ?? false))
     <div class="row mb-4">
       <div class="col-12">
         @include('pages.general.partials.kyc-status-card', ['kycSummary' => $kycSummary])

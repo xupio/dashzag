@@ -473,6 +473,20 @@ test('wallet page prefills saved payout destinations from account settings', fun
     $response->assertSee('Your selected wallet');
 });
 
+test('admin wallet page still renders the kyc modal when kyc is incomplete', function () {
+    $admin = User::factory()->admin()->create([
+        'email_verified_at' => now(),
+        'kyc_status' => 'not_submitted',
+    ]);
+
+    $response = $this->actingAs($admin)->get(route('dashboard.wallet'));
+
+    $response->assertOk();
+    $response->assertSee('Complete KYC');
+    $response->assertSee('id="kycUploadModal"', false);
+    $response->assertSee('Upload legal verification proof');
+});
+
 test('payout destination is trimmed before storing the request', function () {
     $user = User::factory()->create([
         'email_verified_at' => now(),
