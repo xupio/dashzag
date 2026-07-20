@@ -1,206 +1,552 @@
-@extends('marketing.legacy-dark-layout', ['pageTitle' => 'ZagChain | How It Works'])
+@extends('marketing.legacy-dark-layout', ['pageTitle' => 'ZagChain | About'])
+
+@push('style')
+<style>
+    .about-shell {
+        background:
+            radial-gradient(circle at top right, rgba(245, 158, 11, 0.16), transparent 26%),
+            linear-gradient(180deg, #071022 0%, #0b1430 45%, #ffffff 45%, #ffffff 100%);
+    }
+
+    .about-hero {
+        overflow: hidden;
+        padding: 118px 0 88px;
+        position: relative;
+    }
+
+    .about-hero::before {
+        background:
+            radial-gradient(circle at 18% 24%, rgba(255, 255, 255, 0.08), transparent 26%),
+            radial-gradient(circle at 82% 16%, rgba(245, 158, 11, 0.22), transparent 22%);
+        content: "";
+        inset: 0;
+        pointer-events: none;
+        position: absolute;
+    }
+
+    .about-hero-copy,
+    .about-hero-visual {
+        position: relative;
+        z-index: 1;
+    }
+
+    .about-kicker {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        color: #f8fafc;
+        display: inline-flex;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        margin-bottom: 22px;
+        padding: 10px 18px;
+        text-transform: uppercase;
+    }
+
+    .about-hero h1 {
+        color: #fff;
+        font-size: 58px;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        line-height: 1.02;
+        margin-bottom: 18px;
+        max-width: 650px;
+    }
+
+    .about-hero h1 span {
+        color: #f59e0b;
+    }
+
+    .about-hero p {
+        color: rgba(255, 255, 255, 0.76);
+        font-size: 18px;
+        line-height: 1.8;
+        margin-bottom: 0;
+        max-width: 580px;
+    }
+
+    .about-hero-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-top: 30px;
+    }
+
+    .about-outline-btn {
+        background: transparent !important;
+        border: 1px solid rgba(255, 255, 255, 0.18) !important;
+        color: #fff !important;
+    }
+
+    .about-outline-btn:hover {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-color: rgba(255, 255, 255, 0.3) !important;
+    }
+
+    .about-proof-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        margin-top: 34px;
+        max-width: 640px;
+    }
+
+    .about-proof-card {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 18px;
+        padding: 18px;
+    }
+
+    .about-proof-card strong {
+        color: #fff;
+        display: block;
+        font-size: 28px;
+        line-height: 1;
+        margin-bottom: 8px;
+    }
+
+    .about-proof-card span {
+        color: rgba(255, 255, 255, 0.66);
+        display: block;
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .about-visual-panel {
+        background: linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(8, 14, 29, 0.98));
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 28px;
+        box-shadow: 0 28px 80px rgba(2, 6, 23, 0.45);
+        margin-left: auto;
+        max-width: 455px;
+        padding: 28px;
+    }
+
+    .about-visual-panel h3 {
+        color: #fff;
+        font-size: 28px;
+        margin-bottom: 18px;
+    }
+
+    .about-visual-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .about-visual-list li {
+        align-items: flex-start;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.76);
+        display: flex;
+        gap: 14px;
+        padding: 16px 0;
+    }
+
+    .about-visual-list li:first-child {
+        border-top: 0;
+        padding-top: 0;
+    }
+
+    .about-visual-list b {
+        align-items: center;
+        background: rgba(245, 158, 11, 0.16);
+        border-radius: 12px;
+        color: #f59e0b;
+        display: inline-flex;
+        flex: 0 0 38px;
+        font-size: 15px;
+        height: 38px;
+        justify-content: center;
+        margin-top: 2px;
+    }
+
+    .about-visual-list strong {
+        color: #fff;
+        display: block;
+        font-size: 18px;
+        margin-bottom: 4px;
+    }
+
+    .about-section {
+        padding: 84px 0;
+    }
+
+    .about-head {
+        margin-bottom: 34px;
+        text-align: center;
+    }
+
+    .about-head span {
+        color: #f59e0b;
+        display: block;
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        margin-bottom: 14px;
+        text-transform: uppercase;
+    }
+
+    .about-head h2 {
+        color: #0f172a;
+        font-size: 42px;
+        line-height: 1.08;
+        margin-bottom: 0;
+    }
+
+    .about-head p {
+        color: #64748b;
+        font-size: 17px;
+        margin: 18px auto 0;
+        max-width: 690px;
+    }
+
+    .about-stage-grid {
+        display: grid;
+        gap: 22px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .about-stage-card,
+    .about-detail-card,
+    .about-summary-card,
+    .about-cta-card {
+        background: #fff;
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 24px;
+        box-shadow: 0 20px 45px rgba(15, 23, 42, 0.07);
+        padding: 28px;
+    }
+
+    .about-stage-number,
+    .about-detail-number {
+        align-items: center;
+        background: rgba(245, 158, 11, 0.12);
+        border-radius: 14px;
+        color: #d97706;
+        display: inline-flex;
+        font-size: 16px;
+        font-weight: 800;
+        height: 46px;
+        justify-content: center;
+        margin-bottom: 18px;
+        width: 46px;
+    }
+
+    .about-stage-card h3,
+    .about-detail-card h3,
+    .about-summary-card h3,
+    .about-cta-card h3 {
+        color: #0f172a;
+        font-size: 24px;
+        margin-bottom: 12px;
+    }
+
+    .about-stage-card p,
+    .about-detail-card p,
+    .about-summary-card p,
+    .about-cta-card p {
+        color: #64748b;
+        margin-bottom: 0;
+    }
+
+    .about-detail-grid {
+        display: grid;
+        gap: 22px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .about-summary-panel {
+        background: linear-gradient(135deg, #0b1228, #16203f);
+        border: 1px solid rgba(245, 158, 11, 0.16);
+        border-radius: 28px;
+        box-shadow: 0 26px 60px rgba(15, 23, 42, 0.18);
+        color: #fff;
+        padding: 34px;
+    }
+
+    .about-summary-panel h3 {
+        color: #fff;
+        font-size: 34px;
+        margin-bottom: 14px;
+    }
+
+    .about-summary-panel p {
+        color: rgba(255, 255, 255, 0.74);
+        margin-bottom: 0;
+    }
+
+    .about-summary-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        list-style: none;
+        margin: 28px 0 0;
+        padding: 0;
+    }
+
+    .about-summary-grid li {
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 18px;
+        color: rgba(255, 255, 255, 0.78);
+        padding: 18px;
+    }
+
+    .about-summary-grid strong {
+        color: #fff;
+        display: block;
+        font-size: 18px;
+        margin-bottom: 6px;
+    }
+
+    .about-cta-card {
+        text-align: center;
+    }
+
+    .about-cta-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        justify-content: center;
+        margin-top: 24px;
+    }
+
+    @media (max-width: 1199px) {
+        .about-hero h1 {
+            font-size: 50px;
+        }
+
+        .about-stage-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    @media (max-width: 991px) {
+        .about-shell {
+            background:
+                radial-gradient(circle at top right, rgba(245, 158, 11, 0.18), transparent 32%),
+                linear-gradient(180deg, #071022 0%, #0b1430 38%, #ffffff 38%, #ffffff 100%);
+        }
+
+        .about-hero {
+            padding: 100px 0 68px;
+        }
+
+        .about-hero-copy {
+            margin-bottom: 34px;
+        }
+
+        .about-visual-panel {
+            margin: 0;
+            max-width: none;
+        }
+
+        .about-proof-grid,
+        .about-detail-grid,
+        .about-summary-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 767px) {
+        .about-hero h1,
+        .about-head h2,
+        .about-summary-panel h3 {
+            font-size: 34px;
+        }
+
+        .about-hero p,
+        .about-head p {
+            font-size: 16px;
+        }
+
+        .about-proof-grid,
+        .about-stage-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .about-section {
+            padding: 68px 0;
+        }
+
+        .about-stage-card,
+        .about-detail-card,
+        .about-summary-panel,
+        .about-cta-card {
+            padding: 24px;
+        }
+    }
+</style>
+@endpush
 
 @section('content')
-<main>
-    <div class="slider-area">
-        <div class="single-slider slider-height2 legacy-page-hero">
-            <video class="legacy-page-video" autoplay muted loop playsinline>
-                <source src="{{ asset('branding/ZagChainvid.mp4') }}" type="video/mp4">
-            </video>
-        </div>
-    </div>
-
-    <section class="about-low-area section-padding30 pt-0">
+<main class="about-shell">
+    <section class="about-hero">
         <div class="container">
-            <div class="row align-items-center mb-80">
-                <div class="col-lg-6 col-md-12">
-                    <div class="about-caption mb-50">
-                        <div class="section-tittle mb-35">
-                            <span>ZagChain system</span>
-                            <h2>One connected platform that explains the full client journey from registration to tracked profits.</h2>
+            <div class="row align-items-center">
+                <div class="col-lg-7 about-hero-copy">
+                    <span class="about-kicker">About ZagChain</span>
+                    <h1>One platform. <span>One journey.</span> Clear from start to growth.</h1>
+                    <p>ZagChain is designed to keep the client journey simple: join the platform, activate a package, track every result, and grow through visible progress instead of guesswork.</p>
+                    <div class="about-hero-actions">
+                        <a href="{{ route('register') }}" class="btn">Start the Journey</a>
+                        <a href="{{ route('marketing.how-it-works') }}" class="btn about-outline-btn">See the Flow</a>
+                    </div>
+                    <div class="about-proof-grid">
+                        <div class="about-proof-card">
+                            <strong>1 platform</strong>
+                            <span>Everything connected</span>
                         </div>
-                        <p>The client journey starts with registration and continues into a complete dashboard experience. After joining, the client can choose a mining package, activate an account position, and begin following rewards through a clear user flow.</p>
-                        <p>Instead of using separate tools, ZagChain keeps everything inside one platform: package subscriptions, profile-power progress, team growth, wallet tracking, daily miner reporting, network strength, and milestone visibility.</p>
-                        <p>This makes the system easier to understand for both new users and serious investors, because the client can see what to do next, what affects rewards, and where each earning source comes from.</p>
-                        <a href="{{ route('register') }}" class="btn">Start the journey</a>
-                    </div>
-                </div>
-                <div class="col-lg-6 col-md-12">
-                    <div class="about-img legacy-system-visual">
-                        <div class="about-font-img">
-                            <img src="{{ asset('legacy-start/assets/img/gallery/about21.png') }}" alt="ZagChain system overview">
+                        <div class="about-proof-card">
+                            <strong>4 layers</strong>
+                            <span>Account, package, wallet, growth</span>
                         </div>
-                        <div class="about-back-img d-none d-lg-block">
-                            <img src="{{ asset('legacy-start/assets/img/about/about_right.png') }}" alt="ZagChain supporting visual">
+                        <div class="about-proof-card">
+                            <strong>Clear view</strong>
+                            <span>From entry to rewards</span>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="row g-4 mb-80">
-                <div class="col-lg-3 col-md-6">
-                    <div class="legacy-system-card">
-                        <div class="legacy-system-icon">1</div>
-                        <h3>Join the platform</h3>
-                        <p>The client creates an account, verifies email, and enters the dashboard where all actions begin.</p>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6">
-                    <div class="legacy-system-card">
-                        <div class="legacy-system-icon">2</div>
-                        <h3>Activate a package</h3>
-                        <p>The user subscribes to a package and receives a clear package position tied to rewards and growth potential.</p>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6">
-                    <div class="legacy-system-card">
-                        <div class="legacy-system-icon">3</div>
-                        <h3>Grow account power</h3>
-                        <p>Invites, referrals, direct investors, and stronger commitment increase profile power and unlock stronger caps.</p>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-md-6">
-                    <div class="legacy-system-card">
-                        <div class="legacy-system-icon">4</div>
-                        <h3>Track every result</h3>
-                        <p>The client can see wallet history, network strength, miner reporting, and personal reward progress in one place.</p>
-                    </div>
-                </div>
-            </div>
-            <div class="row justify-content-center">
-                <div class="col-xl-8 col-lg-8">
-                    <div class="section-tittle text-center mb-70">
-                        <span>ZagChain flow</span>
-                        <h2>A simple client journey from registration to tracked profits</h2>
-                    </div>
-                </div>
-            </div>
-            <div class="row g-4">
-                <div class="col-lg-6 col-md-6">
-                    <div class="legacy-step-card">
-                        <div class="legacy-step-number">1</div>
-                        <h3>Register and verify</h3>
-                        <p>The client creates an account, verifies email, and enters the dashboard. From there, they can access packages, profile tools, wallet tracking, and network growth pages.</p>
-                    </div>
-                </div>
-                <div class="col-lg-6 col-md-6">
-                    <div class="legacy-step-card">
-                        <div class="legacy-step-number">2</div>
-                        <h3>Choose a package</h3>
-                        <p>The client selects a mining subscription package such as Basic 100, Growth 500, or Scale 1000+, each with its own share position and return structure.</p>
-                    </div>
-                </div>
-                <div class="col-lg-6 col-md-6">
-                    <div class="legacy-step-card">
-                        <div class="legacy-step-number">3</div>
-                        <h3>Grow profile power</h3>
-                        <p>Verified invites, registered referrals, active direct investors, and stronger capital commitment all increase profile power and unlock stronger reward caps.</p>
-                    </div>
-                </div>
-                <div class="col-lg-6 col-md-6">
-                    <div class="legacy-step-card">
-                        <div class="legacy-step-number">4</div>
-                        <h3>Build network rewards</h3>
-                        <p>As the team grows, the client can earn direct referral rewards and multi-level team rewards, while also becoming more visible through ranks, milestones, and leaderboard progress.</p>
-                    </div>
-                </div>
-                <div class="col-lg-6 col-md-6">
-                    <div class="legacy-step-card">
-                        <div class="legacy-step-number">5</div>
-                        <h3>Track the miner story</h3>
-                        <p>The platform also shows daily miner performance through hashrate, revenue, costs, net profit, and per-share reporting, creating a stronger and more transparent operational picture.</p>
-                    </div>
-                </div>
-                <div class="col-lg-6 col-md-6">
-                    <div class="legacy-step-card">
-                        <div class="legacy-step-number">6</div>
-                        <h3>Understand profits clearly</h3>
-                        <p>The wallet and investments pages help the client see exactly where earnings come from, including miner share income, package return, referral rewards, and team bonuses.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section class="contact-form-area section-bg pt-115 pb-120 fix" style="background-image: url('{{ asset('legacy-start/assets/img/gallery/section_bg04.jpg') }}'); background-size: cover;">
-        <div class="container">
-            <div class="row justify-content-end mb-80">
-                <div class="col-xl-8 col-lg-9">
-                    <div class="contact-form-wrapper">
-                        <div class="row">
-                            <div class="col-lg-12">
-                                <div class="section-tittle mb-50">
-                                    <span>Why clients choose ZagChain</span>
-                                    <h2>Clear rewards, visible growth, and a stronger investor story</h2>
-                                    <p>Instead of leaving the client with hidden calculations, ZagChain shows package returns, profile-power progression, reward caps, network growth, and miner reporting in one clean flow.</p>
+                <div class="col-lg-5 about-hero-visual">
+                    <div class="about-visual-panel">
+                        <h3>What ZagChain connects</h3>
+                        <ul class="about-visual-list">
+                            <li>
+                                <b>1</b>
+                                <div>
+                                    <strong>Registration</strong>
+                                    <span>Simple sign-up and email verification.</span>
                                 </div>
-                            </div>
-                        </div>
-                        <div class="legacy-dark-panel">
-                            <ul class="legacy-mini-list list-unstyled mb-0">
-                                <li>Basic 100 can grow toward a 4% profile-power cap</li>
-                                <li>Growth 500 can grow toward a 6% profile-power cap</li>
-                                <li>Scale 1000+ can grow toward a 7% profile-power cap</li>
-                                <li>Wallet pages separate miner income, monthly return, referral income, and MLM rewards</li>
-                                <li>Daily miner reporting gives clients a more transparent performance picture</li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="legacy-highlight-grid mb-80">
-                <div class="legacy-highlight-item">
-                    <h4>What makes the system clear</h4>
-                    <p>The client can see package information, profile power, team activity, and miner data without leaving the platform or guessing how rewards are formed.</p>
-                </div>
-                <div class="legacy-highlight-item">
-                    <h4>What makes the system stronger</h4>
-                    <p>Growth is visible. More verified invites, more active investors, and stronger commitment increase both account strength and benefit potential.</p>
-                </div>
-                <div class="legacy-highlight-item">
-                    <h4>What the wallet explains</h4>
-                    <p>The wallet separates miner income, package return, direct referral rewards, and team rewards, so the client understands every earning source.</p>
-                </div>
-                <div class="legacy-highlight-item">
-                    <h4>What the miner page proves</h4>
-                    <p>Daily miner visibility through hashrate, revenue, costs, net profit, and share reporting helps give the platform a more transparent operational story.</p>
-                </div>
-            </div>
-            <div class="row justify-content-between align-items-center">
-                <div class="col-xl-7 col-lg-7">
-                    <div class="section-tittle section-tittle2 mb-25">
-                        <span>Reward structure</span>
-                        <h2>How the monthly benefit becomes stronger</h2>
-                    </div>
-                    <div class="legacy-dark-panel">
-                        <ul class="legacy-mini-list list-unstyled mb-0">
-                            <li>Base package return starts the monthly reward structure</li>
-                            <li>Investor level bonus adds strength as the account matures</li>
-                            <li>Invite and team bonus reward real network activity</li>
-                            <li>Profile power adds an extra cap-based reward layer</li>
-                            <li>Basic 100 can grow toward 4%</li>
-                            <li>Growth 500 can grow toward 6%</li>
-                            <li>Scale 1000+ can grow toward 7%</li>
+                            </li>
+                            <li>
+                                <b>2</b>
+                                <div>
+                                    <strong>Packages</strong>
+                                    <span>Clear subscription levels and positions.</span>
+                                </div>
+                            </li>
+                            <li>
+                                <b>3</b>
+                                <div>
+                                    <strong>Wallet tracking</strong>
+                                    <span>Visible earning sources and payout flow.</span>
+                                </div>
+                            </li>
+                            <li>
+                                <b>4</b>
+                                <div>
+                                    <strong>Network growth</strong>
+                                    <span>Referrals, milestones, and stronger account power.</span>
+                                </div>
+                            </li>
                         </ul>
-                    </div>
-                </div>
-                <div class="col-xl-4 col-lg-5 col-md-8 mt-4 mt-lg-0">
-                    <div class="legacy-explain-card">
-                        <h3>What the client understands at the end</h3>
-                        <p class="mb-3">By the end of this page, the visitor should understand the full ZagChain model:</p>
-                        <ul class="legacy-mini-list list-unstyled mb-4">
-                            <li>How to join the system</li>
-                            <li>How packages create account positions</li>
-                            <li>How profile power affects reward potential</li>
-                            <li>How network growth adds new reward layers</li>
-                            <li>How miner performance supports visibility and reporting</li>
-                        </ul>
-                        <a href="{{ route('register') }}" class="submit-btn">Create Account</a>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    {{-- Core experience section temporarily hidden --}}
+    <section class="about-section">
+        <div class="container">
+            <div class="about-head">
+                <span>Main journey</span>
+                <h2>How the platform feels to a new client.</h2>
+                <p>The experience is meant to move in a clean order, with each next step feeling obvious.</p>
+            </div>
+            <div class="about-stage-grid">
+                <div class="about-stage-card">
+                    <div class="about-stage-number">1</div>
+                    <h3>Join</h3>
+                    <p>Create an account, verify email, and enter the dashboard with a clean starting point.</p>
+                </div>
+                <div class="about-stage-card">
+                    <div class="about-stage-number">2</div>
+                    <h3>Activate</h3>
+                    <p>Choose a package that fits the plan and turn it into a clear position inside the system.</p>
+                </div>
+                <div class="about-stage-card">
+                    <div class="about-stage-number">3</div>
+                    <h3>Track</h3>
+                    <p>See wallet activity, earnings sources, miner visibility, and personal progress in one place.</p>
+                </div>
+                <div class="about-stage-card">
+                    <div class="about-stage-number">4</div>
+                    <h3>Grow</h3>
+                    <p>Build stronger profile power through commitment, referrals, and active direct investors.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="pb-90">
+        <div class="container">
+            <div class="about-head">
+                <span>Why it is clearer</span>
+                <h2>Visibility replaces confusion.</h2>
+            </div>
+            <div class="about-detail-grid">
+                <div class="about-detail-card">
+                    <div class="about-detail-number">A</div>
+                    <h3>Package clarity</h3>
+                    <p>Each package creates a visible account position, not a hidden or disconnected investment step.</p>
+                </div>
+                <div class="about-detail-card">
+                    <div class="about-detail-number">B</div>
+                    <h3>Reward separation</h3>
+                    <p>The wallet helps clients see miner share, monthly return, referral rewards, and team rewards separately.</p>
+                </div>
+                <div class="about-detail-card">
+                    <div class="about-detail-number">C</div>
+                    <h3>Growth logic</h3>
+                    <p>Profile power becomes easier to understand because stronger activity visibly improves the account path.</p>
+                </div>
+                <div class="about-detail-card">
+                    <div class="about-detail-number">D</div>
+                    <h3>Miner visibility</h3>
+                    <p>Daily miner reporting gives the platform a stronger operational story and more transparent performance view.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="pb-90">
+        <div class="container">
+            <div class="about-summary-panel">
+                <h3>Why clients choose ZagChain</h3>
+                <p>Instead of scattering the experience across different tools, ZagChain keeps the story together so the user can understand what to do, what changes rewards, and where progress comes from.</p>
+                <ul class="about-summary-grid">
+                    <li>
+                        <strong>Simple entry</strong>
+                        Fast registration and a clear first action.
+                    </li>
+                    <li>
+                        <strong>Visible wallet</strong>
+                        Separate earning sources and payout progress.
+                    </li>
+                    <li>
+                        <strong>Stronger story</strong>
+                        Growth, network activity, and miner visibility in one flow.
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <section class="pb-100">
+        <div class="container">
+            <div class="about-cta-card">
+                <h3>Ready to see it from inside?</h3>
+                <p>Create your account and move from explanation into the actual platform journey.</p>
+                <div class="about-cta-actions">
+                    <a href="{{ route('register') }}" class="btn">Create Account</a>
+                    <a href="{{ route('marketing.how-it-works') }}" class="btn about-outline-btn" style="color:#0f172a !important;border-color:rgba(15,23,42,0.12) !important;background:#fff !important;">How It Works</a>
+                </div>
+            </div>
+        </div>
+    </section>
 </main>
 @endsection
