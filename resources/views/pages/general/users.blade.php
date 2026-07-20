@@ -191,8 +191,11 @@
                       @if ($listedUser->kycReviewer)
                         <div class="small text-secondary">Reviewer: {{ $listedUser->kycReviewer->adminLabel() }}</div>
                       @endif
+                      @if ($listedUser->kyc_submission_notes)
+                        <div class="small text-secondary">User note: {{ $listedUser->kyc_submission_notes }}</div>
+                      @endif
                       @if ($listedUser->kyc_admin_notes)
-                        <div class="small {{ $kyc === 'rejected' ? 'text-danger' : 'text-secondary' }}">Note: {{ $listedUser->kyc_admin_notes }}</div>
+                        <div class="small {{ $kyc === 'rejected' ? 'text-danger' : 'text-secondary' }}">Review note: {{ $listedUser->kyc_admin_notes }}</div>
                       @endif
                     </div>
                   </td>

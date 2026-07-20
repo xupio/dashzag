@@ -453,6 +453,9 @@ test('user cannot request a payout before kyc approval', function () {
 
     $response->assertRedirect(route('dashboard.wallet'));
     $response->assertSessionHasErrors('kyc_proof');
+    $response->assertSessionHasErrors([
+        'kyc_proof' => 'Your KYC proof is still pending review. Please wait for admin approval before requesting the first withdrawal.',
+    ]);
     expect(PayoutRequest::count())->toBe(0);
 });
 

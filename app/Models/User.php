@@ -27,6 +27,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'kyc_status',
         'kyc_proof_path',
         'kyc_proof_original_name',
+        'kyc_submission_notes',
         'kyc_submitted_at',
         'kyc_reviewed_at',
         'kyc_reviewer_user_id',

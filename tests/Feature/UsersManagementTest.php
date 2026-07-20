@@ -546,7 +546,7 @@ test('admin users page shows kyc queue cards and can filter pending kyc users', 
     $response->assertSee('Rejected KYC');
     $response->assertSee('No KYC Uploaded');
     $response->assertSee('Reviewed');
-    $response->assertSee('Note:');
+    $response->assertSee('Review note:');
 
     $filteredResponse = $this->actingAs($admin)->get(route('dashboard.users', [
         'kyc_status' => 'pending',
@@ -602,6 +602,7 @@ test('wallet page shows enhanced kyc guidance and proof link details', function 
         'kyc_status' => 'pending',
         'kyc_proof_path' => 'kyc-proofs/existing-proof.pdf',
         'kyc_proof_original_name' => 'existing-proof.pdf',
+        'kyc_submission_notes' => 'This document belongs to the legal account representative.',
         'kyc_submitted_at' => now()->subHour(),
         'kyc_admin_notes' => 'Please keep the document readable and complete.',
     ]);
@@ -613,6 +614,7 @@ test('wallet page shows enhanced kyc guidance and proof link details', function 
     $response->assertSee('Admin review');
     $response->assertSee('Open current proof');
     $response->assertSee('Review note');
+    $response->assertSee('Your submission note');
     $response->assertSee('existing-proof.pdf');
 });
 

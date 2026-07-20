@@ -65,5 +65,11 @@
         <div>{{ $kycSummary['admin_notes'] }}</div>
       </div>
     @endif
+    @if (!empty($kycSummary['submission_notes']))
+      <div class="alert alert-light border mt-3 mb-0">
+        <div class="fw-semibold mb-1">Your submission note</div>
+        <div>{{ $kycSummary['submission_notes'] }}</div>
+      </div>
+    @endif
   </div>
 </div>

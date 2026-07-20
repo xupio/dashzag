@@ -1634,8 +1634,14 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
       $wallet = MiningPlatform::walletSummary($user);
 
       if (! $user->hasApprovedKyc()) {
+          $kycMessage = match ($user->kyc_status) {
+              'pending' => 'Your KYC proof is still pending review. Please wait for admin approval before requesting the first withdrawal.',
+              'rejected' => 'Your KYC proof was rejected. Please upload a clearer or corrected document before requesting the first withdrawal.',
+              default => 'Complete and pass legal verification before requesting the first withdrawal.',
+          };
+
           return back()->withErrors([
-              'kyc_proof' => 'Complete and pass legal verification before requesting the first withdrawal.',
+              'kyc_proof' => $kycMessage,
           ])->withInput();
       }
 
@@ -1690,6 +1696,12 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
     Route::post('/dashboard/kyc', function (Request $request) {
         $user = $request->user();
 
+        if ($user->hasApprovedKyc()) {
+            return back()->withErrors([
+                'kyc_proof' => 'Your KYC is already approved. Contact admin only if you need to replace the approved document.',
+            ]);
+        }
+
         $validated = $request->validate([
             'kyc_proof' => [
                 'required',
@@ -1715,10 +1727,11 @@ Route::middleware(['auth', 'verified', 'admin.two_factor', 'single_session'])->g
             'kyc_status' => 'pending',
             'kyc_proof_path' => $storedPath,
             'kyc_proof_original_name' => $validated['kyc_proof']->getClientOriginalName(),
+            'kyc_submission_notes' => $validated['kyc_notes'] ?? null,
             'kyc_submitted_at' => now(),
             'kyc_reviewed_at' => null,
             'kyc_reviewer_user_id' => null,
-            'kyc_admin_notes' => $validated['kyc_notes'] ?? null,
+            'kyc_admin_notes' => null,
         ])->save();
 
         MiningPlatform::notifyAdminsOfKycSubmission($user);

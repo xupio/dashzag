@@ -472,6 +472,7 @@ class MiningPlatform
             'show_prompt' => in_array($status, ['not_submitted', 'rejected'], true),
             'submitted_at' => $user->kyc_submitted_at,
             'reviewed_at' => $user->kyc_reviewed_at,
+            'submission_notes' => $user->kyc_submission_notes,
             'admin_notes' => $user->kyc_admin_notes,
             'reviewer_label' => $reviewer?->adminLabel(),
             'proof_name' => $user->kyc_proof_original_name,
